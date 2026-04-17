@@ -113,7 +113,7 @@ export default function Home() {
       <View style={styles.headerLeft}>
         <Image source={IMAGES.logo} style={styles.headerLogo} resizeMode="contain" />
         <View>
-          <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>Olá, Pet Lover! 👋</Text>
+          <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>Olá, Pet Lover! </Text>
           <Text style={[styles.brandText, { color: theme.text }]}>Golden Paw</Text>
         </View>
       </View>
