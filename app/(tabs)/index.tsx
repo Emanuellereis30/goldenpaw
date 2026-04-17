@@ -9,12 +9,33 @@ import {
   StatusBar, 
   useColorScheme, 
   Image,
-  Dimensions
+  Dimensions,
+  Platform,
+  ImageSourcePropType
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+/**
+ * INTERFACES DE TIPO
+ */
+interface Produto {
+  id: string;
+  nome: string;
+  preco: string;
+  image: ImageSourcePropType;
+  tag?: string;
+  cartId?: string;
+}
+
+interface Categoria {
+  id: string;
+  name: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}
 
 /**
  * CONFIGURAÇÕES E ASSETS
@@ -30,13 +51,20 @@ const IMAGES = {
   logo: require('../../assets/img/logo.png'),
 };
 
-const PRODUTOS_DATA = [
-  { id: '1', nome: 'Ração Premium Cães', preco: 'R$ 189,90', descricao: 'Ração super premium', image: IMAGES.racao },
-  { id: '2', nome: 'Ração Premium Gatos', preco: 'R$ 159,90', descricao: 'Alimento completo', image: IMAGES.racaogato },
-  { id: '3', nome: 'Brinquedo Interativo', preco: 'R$ 45,90', descricao: 'Estimula atividade', image: IMAGES.brinquedos },
-  { id: '4', nome: 'Coleira Antipulgas', preco: 'R$ 189,90', descricao: 'Proteção por 8 meses', image: IMAGES.coleira },
-  { id: '5', nome: 'Cama Ortopédica', preco: 'R$ 159,90', descricao: 'Conforto para idosos', image: IMAGES.cama },
-  { id: '6', nome: 'Shampoo Hidratante', preco: 'R$ 45,90', descricao: 'Hidratação profunda', image: IMAGES.shamppo },
+const PRODUTOS_DATA: Produto[] = [
+  { id: '1', nome: 'Ração Premium Cães', preco: 'R$ 189,90', image: IMAGES.racao, tag: 'Popular' },
+  { id: '2', nome: 'Ração Premium Gatos', preco: 'R$ 159,90', image: IMAGES.racaogato, tag: 'Saudável' },
+  { id: '3', nome: 'Brinquedo Interativo', preco: 'R$ 45,90', image: IMAGES.brinquedos, tag: 'Diversão' },
+  { id: '4', nome: 'Coleira Antipulgas', preco: 'R$ 189,90', image: IMAGES.coleira, tag: 'Saúde' },
+  { id: '5', nome: 'Cama Ortopédica', preco: 'R$ 159,90', image: IMAGES.cama, tag: 'Conforto' },
+  { id: '6', nome: 'Shampoo Hidratante', preco: 'R$ 45,90', image: IMAGES.shamppo, tag: 'Higiene' },
+];
+
+const CATEGORIES: Categoria[] = [
+  { id: 'c1', name: 'Cães', icon: 'paw' },
+  { id: 'c2', name: 'Gatos', icon: 'logo-octocat' },
+  { id: 'c3', name: 'Aves', icon: 'egg' },
+  { id: 'c4', name: 'Peixes', icon: 'fish' },
 ];
 
 export default function Home() {
@@ -46,154 +74,282 @@ export default function Home() {
   
   const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
   const [activeTab, setActiveTab] = useState('home');
+  const [cart, setCart] = useState<Produto[]>([]);
 
   const theme = useMemo(() => ({
-    background: isDarkMode ? '#1F1A2E' : '#F9F7FF',
-    surface: isDarkMode ? '#2D2648' : '#FFFFFF',
-    primary: '#8B5CF6',
-    text: isDarkMode ? '#F3F4F6' : '#1F2937',
-    textSecondary: isDarkMode ? '#9CA3AF' : '#6B7280',
-    border: isDarkMode ? '#3D3663' : '#E5E7EB',
+    background: isDarkMode ? '#121212' : '#e0e0e0',
+    surface: isDarkMode ? '#1E1E1E' : '#ffffff',
+    primary: '#D4AF37',
+    secondary: isDarkMode ? '#2A2A2A' : '#927957',
+    text: isDarkMode ? '#F5F5F5' : '#1A1A1A',
+    textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
+    border: isDarkMode ? '#2A2A2A' : '#E5E7EB',
+    shadow: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.08)',
   }), [isDarkMode]);
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
-  const renderNavbar = () => (
-    <View style={[styles.navbar, { backgroundColor: theme.primary }]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navbarScroll}>
-        {['home', 'produtos', 'carrinho'].map((tab) => (
-          <TouchableOpacity 
-            key={tab}
-            onPress={() => setActiveTab(tab)} 
-            style={[styles.navItem, activeTab === tab && styles.navItemActive]}
-          >
-            <Text style={[styles.navText, activeTab === tab && styles.navTextActive]}>
-              {tab.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity onPress={() => router.push('/login')} style={styles.navItem}>
-          <Text style={styles.navText}>LOGIN</Text>
+  const addToCart = (product: Produto) => {
+    const newItem = { ...product, cartId: Math.random().toString(36).substr(2, 9) };
+    setCart([...cart, newItem]);
+    setActiveTab('carrinho');
+  };
+
+  const removeFromCart = (cartId: string | undefined) => {
+    if (!cartId) return;
+    setCart(cart.filter(item => item.cartId !== cartId));
+  };
+
+  const calculateTotal = () => {
+    const total = cart.reduce((acc, item) => {
+      const priceStr = item.preco.replace('R$ ', '').replace('.', '').replace(',', '.');
+      return acc + parseFloat(priceStr);
+    }, 0);
+    return total.toFixed(2).replace('.', ',');
+  };
+
+  const renderHeader = () => (
+    <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={styles.headerLeft}>
+        <Image source={IMAGES.logo} style={styles.headerLogo} resizeMode="contain" />
+        <View>
+          <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>Olá, Pet Lover! 👋</Text>
+          <Text style={[styles.brandText, { color: theme.text }]}>Golden Paw</Text>
+        </View>
+      </View>
+      <View style={styles.headerActions}>
+        <TouchableOpacity onPress={toggleDarkMode} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
+          <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={22} color={theme.primary} />
         </TouchableOpacity>
-      </ScrollView>
+        <TouchableOpacity onPress={() => router.push('/login')} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
+          <Ionicons name="person-outline" size={22} color={theme.text} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar backgroundColor={theme.primary} barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       
-      {renderNavbar()}
+      {renderHeader()}
 
-      <TouchableOpacity onPress={toggleDarkMode} style={[styles.themeToggle, { backgroundColor: theme.primary }]}>
-        <Text style={styles.themeToggleText}>{isDarkMode ? '☀️' : '🌙'}</Text>
-      </TouchableOpacity>
-
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingTop: 10 }]}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {activeTab === 'home' && (
-          <>
-            <View style={styles.header}>
-              <Image source={IMAGES.logo} style={styles.logo} resizeMode="contain" />
-              <Text style={[styles.slogan, { color: theme.textSecondary }]}>Produtos que seu pet ama!</Text>
-            </View>
-
-            <View style={[styles.banner, { backgroundColor: theme.primary }]}>
-              <Image source={IMAGES.banner} style={styles.bannerImage} resizeMode="cover" />
-              <View style={styles.bannerOverlay}>
-                <Text style={styles.bannerTitle}>Cuidado e Amor para Seu Pet</Text>
-                <TouchableOpacity style={styles.bannerButton} onPress={() => setActiveTab('produtos')}>
-                  <Text style={styles.bannerButtonText}>Explorar Produtos →</Text>
+          <View>
+            <View style={[styles.heroBanner, { backgroundColor: theme.primary }]}>
+              <Image source={IMAGES.banner} style={styles.heroBackgroundImage} resizeMode="cover" />
+              <View style={styles.heroOverlay} />
+              <View style={styles.heroContent}>
+                <Text style={styles.heroTitle}>Tudo para o seu melhor amigo</Text>
+                <Text style={styles.heroSubtitle}>Descontos de até 30% em rações selecionadas.</Text>
+                <TouchableOpacity style={styles.heroButton} onPress={() => setActiveTab('produtos')}>
+                  <Text style={styles.heroButtonText}>Comprar Agora</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>⭐ Destaques</Text>
-            {PRODUTOS_DATA.slice(0, 3).map((item) => (
-              <View key={item.id} style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <View style={styles.cardImageContainer}>
-                  <Image source={item.image} style={styles.cardImage} resizeMode="contain" />
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Categorias</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+              {CATEGORIES.map((cat) => (
+                <TouchableOpacity key={cat.id} style={styles.categoryItem}>
+                  <View style={[styles.categoryIcon, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                    <Ionicons name={cat.icon} size={24} color={theme.primary} />
+                  </View>
+                  <Text style={[styles.categoryName, { color: theme.textSecondary }]}>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Destaques</Text>
+              <TouchableOpacity onPress={() => setActiveTab('produtos')}>
+                <Text style={{ color: theme.primary, fontWeight: '600' }}>Ver tudo</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {PRODUTOS_DATA.slice(0, 4).map((item) => (
+                <View key={`feat-${item.id}`} style={[styles.featuredCard, { backgroundColor: theme.surface }]}>
+                  <View style={styles.tagBadge}>
+                    <Text style={styles.tagText}>{item.tag}</Text>
+                  </View>
+                  <Image source={item.image} style={styles.featuredImage} resizeMode="contain" />
+                  <Text style={[styles.productName, { color: theme.text }]} numberOfLines={1}>{item.nome}</Text>
+                  <Text style={[styles.productPrice, { color: theme.primary }]}>{item.preco}</Text>
+                  <TouchableOpacity 
+                    style={[styles.addButton, { backgroundColor: theme.primary }]} 
+                    onPress={() => addToCart(item)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="add" size={20} color="#FFF" />
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.cardContent}>
-                  <Text style={[styles.cardTitle, { color: theme.text }]} numberOfLines={1}>{item.nome}</Text>
-                  <Text style={[styles.cardPrice, { color: theme.primary }]}>{item.preco}</Text>
-                </View>
-              </View>
-            ))}
-          </>
+              ))}
+            </ScrollView>
+          </View>
         )}
 
         {activeTab === 'produtos' && (
-          <View style={styles.grid}>
-            {PRODUTOS_DATA.map((item) => (
-              <View key={item.id} style={[styles.productCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <View style={styles.productImageContainer}>
-                  <Image source={item.image} style={styles.productImage} resizeMode="contain" />
+          <View style={styles.gridContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 20 }]}>Nossa Loja</Text>
+            <View style={styles.grid}>
+              {PRODUTOS_DATA.map((item) => (
+                <View key={`grid-${item.id}`} style={[styles.gridCard, { backgroundColor: theme.surface }]}>
+                  <Image source={item.image} style={styles.gridImage} resizeMode="contain" />
+                  <View style={styles.gridInfo}>
+                    <Text style={[styles.productName, { color: theme.text }]} numberOfLines={1}>{item.nome}</Text>
+                    <Text style={[styles.productPrice, { color: theme.primary }]}>{item.preco}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={[styles.gridAddButton, { backgroundColor: theme.primary }]} 
+                    onPress={() => addToCart(item)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="cart-outline" size={18} color="#FFF" />
+                  </TouchableOpacity>
                 </View>
-                <Text style={[styles.productName, { color: theme.text }]} numberOfLines={2}>{item.nome}</Text>
-                <Text style={[styles.productPrice, { color: theme.primary }]}>{item.preco}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
         )}
 
         {activeTab === 'carrinho' && (
-          <View style={styles.emptyState}>
-            <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>Seu carrinho está vazio 🛍️</Text>
+          <View style={styles.cartContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 20 }]}>Meu Carrinho</Text>
+            {cart.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="cart-outline" size={80} color={theme.textSecondary} />
+                <Text style={[styles.emptyStateTitle, { color: theme.text }]}>Vazio</Text>
+                <TouchableOpacity style={[styles.emptyButton, { backgroundColor: theme.primary }]} onPress={() => setActiveTab('produtos')}>
+                  <Text style={styles.emptyButtonText}>Ir para a Loja</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.cartList}>
+                {cart.map((item) => (
+                  <View key={item.cartId} style={[styles.cartItem, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                    <Image source={item.image} style={styles.cartItemImage} resizeMode="contain" />
+                    <View style={styles.cartItemInfo}>
+                      <Text style={[styles.productName, { color: theme.text }]}>{item.nome}</Text>
+                      <Text style={[styles.productPrice, { color: theme.primary }]}>{item.preco}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => removeFromCart(item.cartId)}>
+                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <View style={[styles.cartFooter, { borderTopColor: theme.border }]}>
+                  <View style={styles.totalRow}>
+                    <Text style={[styles.totalLabel, { color: theme.textSecondary }]}>Total:</Text>
+                    <Text style={[styles.totalValue, { color: theme.text }]}>R$ {calculateTotal()}</Text>
+                  </View>
+                  <TouchableOpacity style={[styles.checkoutButton, { backgroundColor: theme.primary }]}>
+                    <Text style={styles.checkoutButtonText}>Finalizar Compra</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
+
+      <View style={[styles.bottomTab, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 10, borderTopColor: theme.border }]}>
+        {[
+          { id: 'home', icon: 'home' as const, label: 'Início' },
+          { id: 'produtos', icon: 'search' as const, label: 'Loja' },
+          { id: 'carrinho', icon: 'cart' as const, label: 'Carrinho' },
+        ].map((tab) => (
+          <TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={styles.tabItem}>
+            <Ionicons 
+              name={activeTab === tab.id ? tab.icon : `${tab.icon}-outline` as any} 
+              size={24} 
+              color={activeTab === tab.id ? theme.primary : theme.textSecondary} 
+            />
+            <Text style={[styles.tabLabel, { color: activeTab === tab.id ? theme.primary : theme.textSecondary }]}>{tab.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: '5%', paddingBottom: 100 },
-  
-  // Navbar Responsiva
-  navbar: { width: '100%', elevation: 4 },
-  navbarScroll: { paddingVertical: 12, paddingHorizontal: 10 },
-  navItem: { marginHorizontal: 5, paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20 },
-  navItemActive: { backgroundColor: 'rgba(255,255,255,0.2)' },
-  navText: { fontWeight: '600', color: 'rgba(255,255,255,0.7)', fontSize: 14 },
-  navTextActive: { color: '#FFFFFF' },
-
-  // Header
-  header: { alignItems: 'center', marginVertical: 20 },
-  logo: { width: '60%', height: 60, maxWidth: 250 },
-  slogan: { fontSize: 13, fontWeight: '500', marginTop: 5, textAlign: 'center' },
-
-  // Banner Responsivo
-  banner: { width: '100%', borderRadius: 20, marginBottom: 30, overflow: 'hidden' },
-  bannerImage: { width: '100%', height: 200 },
-  bannerOverlay: { padding: 20, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.1)' },
-  bannerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', marginBottom: 15 },
-  bannerButton: { backgroundColor: '#FFFFFF', paddingHorizontal: 25, paddingVertical: 12, borderRadius: 30 },
-  bannerButtonText: { color: '#8B5CF6', fontWeight: 'bold' },
-
-  // Seções e Cards (Flexíveis)
-  sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
-  card: { flexDirection: 'row', padding: 12, borderRadius: 15, marginBottom: 12, borderWidth: 1, alignItems: 'center', width: '100%' },
-  cardImageContainer: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#f0f0f0', overflow: 'hidden', marginRight: 15 },
-  cardImage: { width: '100%', height: '100%' },
-  cardContent: { flex: 1 },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 2 },
-  cardPrice: { fontSize: 17, fontWeight: '800' },
-
-  // Grid de Produtos (2 colunas responsivas)
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', width: '100%' },
-  productCard: { width: '48%', padding: 12, marginBottom: 15, borderRadius: 15, borderWidth: 1, alignItems: 'center' },
-  productImageContainer: { width: '100%', height: 100, marginBottom: 10, justifyContent: 'center', alignItems: 'center' },
-  productImage: { width: '90%', height: '90%' },
-  productName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', marginBottom: 5, height: 40 },
+  scrollContent: { paddingBottom: 120 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 20 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
+  headerLogo: { width: 45, height: 45, marginRight: 12, borderRadius: 10 },
+  welcomeText: { fontSize: 12, fontWeight: '500' },
+  brandText: { fontSize: 18, fontWeight: '800' },
+  headerActions: { flexDirection: 'row', gap: 10 },
+  iconButton: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  heroBanner: { 
+    marginHorizontal: 20, 
+    borderRadius: 24, 
+    height: 220, 
+    overflow: 'hidden', 
+    marginBottom: 25, 
+    position: 'relative',
+    width: SCREEN_WIDTH - 40 
+  },
+  heroBackgroundImage: { 
+    ...StyleSheet.absoluteFillObject, 
+    width: '100%', 
+    height: '100%' 
+  },
+  heroOverlay: { 
+    ...StyleSheet.absoluteFillObject, 
+    backgroundColor: 'rgba(0,0,0,0.4)' 
+  },
+  heroContent: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    zIndex: 2, 
+    padding: 25 
+  },
+  heroTitle: { color: '#FFF', fontSize: 24, fontWeight: '800', marginBottom: 8 },
+  heroSubtitle: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginBottom: 20 },
+  heroButton: { backgroundColor: '#FFF', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, alignSelf: 'flex-start' },
+  heroButtonText: { color: '#D4AF37', fontWeight: 'bold', fontSize: 14 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 20, marginBottom: 15 },
+  categoriesScroll: { paddingHorizontal: 15, marginBottom: 20 },
+  categoryItem: { alignItems: 'center', marginHorizontal: 8 },
+  categoryIcon: { width: 64, height: 64, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  categoryName: { fontSize: 12, fontWeight: '600' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 },
+  horizontalScroll: { paddingHorizontal: 15, paddingBottom: 10 },
+  featuredCard: { width: 160, borderRadius: 20, padding: 15, marginHorizontal: 8, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  featuredImage: { width: '100%', height: 100, marginBottom: 12 },
+  tagBadge: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(212, 175, 55, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, zIndex: 1 },
+  tagText: { color: '#D4AF37', fontSize: 10, fontWeight: '700' },
+  productName: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
   productPrice: { fontSize: 16, fontWeight: '800' },
-
-  // Utilidades
-  themeToggle: { position: 'absolute', bottom: 30, right: 20, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', zIndex: 1000, elevation: 5 },
-  themeToggleText: { fontSize: 24 },
-  emptyState: { paddingVertical: 100, alignItems: 'center', width: '100%' },
-  emptyStateText: { fontSize: 16, fontWeight: '500' }
+  addButton: { position: 'absolute', bottom: 12, right: 12, width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  gridContainer: { paddingHorizontal: 20 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gridCard: { width: '47%', borderRadius: 20, padding: 12, marginBottom: 18, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+  gridImage: { width: '100%', height: 120, marginBottom: 10 },
+  gridInfo: { paddingHorizontal: 4 },
+  gridAddButton: { marginTop: 10, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  bottomTab: { position: 'absolute', bottom: 0, width: '100%', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 12, borderTopWidth: 1 },
+  tabItem: { alignItems: 'center' },
+  tabLabel: { fontSize: 10, fontWeight: '600', marginTop: 4 },
+  cartContainer: { paddingHorizontal: 20 },
+  cartList: { marginBottom: 20 },
+  cartItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 15, borderWidth: 1, marginBottom: 10 },
+  cartItemImage: { width: 50, height: 50, marginRight: 15 },
+  cartItemInfo: { flex: 1 },
+  cartFooter: { marginTop: 20, paddingTop: 20, borderTopWidth: 1 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  totalLabel: { fontSize: 16, fontWeight: '600' },
+  totalValue: { fontSize: 20, fontWeight: '800' },
+  checkoutButton: { height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  checkoutButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  emptyStateTitle: { fontSize: 20, fontWeight: '800', marginTop: 10, marginBottom: 20 },
+  emptyButton: { paddingHorizontal: 30, paddingVertical: 15, borderRadius: 15 },
+  emptyButtonText: { color: '#FFF', fontWeight: 'bold' }
 });

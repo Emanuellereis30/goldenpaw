@@ -38,14 +38,14 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const theme = useMemo(() => ({
-    background: isDarkMode ? '#1F1A2E' : '#F9F7FF',
-    surface: isDarkMode ? '#2D2648' : '#FFFFFF',
-    primary: '#8B5CF6',
-    text: isDarkMode ? '#F3F4F6' : '#1F2937',
-    textSecondary: isDarkMode ? '#9CA3AF' : '#6B7280',
-    border: isDarkMode ? '#3D3663' : '#E5E7EB',
-  }), [isDarkMode]);
+ const theme = useMemo(() => ({
+   background: isDarkMode ? '#121212' : '#F8F6F2',
+   surface: isDarkMode ? '#1E1E1E' : '#FFFFFF',
+   primary: '#D4AF37', // dourado
+   text: isDarkMode ? '#F5F5F5' : '#1A1A1A',
+   textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
+   border: isDarkMode ? '#2A2A2A' : '#E5E7EB',
+ }), [isDarkMode]);
 
   // Lógica de Voltar Robusta
   const handleBack = () => {
@@ -85,7 +85,7 @@ export default function RegisterScreen() {
             <View style={styles.logoContainer}>
               <Image source={IMAGES.logo} style={styles.logo} resizeMode="contain" />
             </View>
-            <Text style={[styles.title, { color: theme.text }]}>Crie sua conta! 🚀</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Crie sua conta!</Text>
 
             <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <TextInput style={[styles.input, { color: theme.text }]} placeholder="Nome Completo" placeholderTextColor={theme.textSecondary} autoCapitalize="words" value={fullName} onChangeText={setFullName} />
