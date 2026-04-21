@@ -50,6 +50,14 @@ const IMAGES = {
   banner: require('../../assets/img/banner.png'),
   logo: require('../../assets/img/logo.png'),
   caixadeareia: require('../../assets/img/caixadeareia.png'),
+  aquario: require('../../assets/img/aquario.png'),
+  arranhador: require('../../assets/img/arranhador.png'),
+  bebedouro: require('../../assets/img/bebedouro.png'),
+  petisco: require('../../assets/img/petisco.png'),
+  petiscocachorro: require('../../assets/img/petiscocachorro.png'),
+  caixadetransportegato: require('../../assets/img/caixadetransportegato.png'),
+  caixadetransportecachorro: require('../../assets/img/caixadetransportecachorro.png')
+
 };
 
 const PRODUTOS_DATA: Produto[] = [
@@ -59,14 +67,14 @@ const PRODUTOS_DATA: Produto[] = [
   { id: '4', nome: 'Coleira Antipulgas', preco: 'R$ 189,90', image: IMAGES.coleira, tag: 'Saúde' },
   { id: '5', nome: 'Cama Ortopédica', preco: 'R$ 159,90', image: IMAGES.cama, tag: 'Conforto' },
   { id: '6', nome: 'Shampoo Hidratante', preco: 'R$ 45,90', image: IMAGES.shamppo, tag: 'Higiene' },
-  { id: '7', nome: 'Aranhador Para Gatos', preco: 'R$ 40,00', image: IMAGES.shamppo, tag: 'Diversão' },
-  { id: '8', nome: 'Bebedouro Elétrico', preco: 'R$ 60,00', image: IMAGES.shamppo, tag: 'Saudável' },
-  { id: '9', nome: 'Petisco(Gato)', preco: 'R$ 15,00', image: IMAGES.shamppo, tag: 'Popular' },
-  { id: '10', nome: 'Petisco(cachorro)', preco: 'R$ 15,00', image: IMAGES.shamppo, tag: 'Popular' },
-  { id: '11', nome: 'Aquário (50L)', preco: 'R$ 250,00 ', image: IMAGES.shamppo, tag: 'Popular' },
-  { id: '12', nome: 'Caixa De Transporte (Gato)', preco: 'R$ 50,00 ', image: IMAGES.shamppo, tag: 'Conforto' },
-  { id: '12', nome: 'Caixa De Transporte (Cachorro)', preco: 'R$ 60,00 ', image: IMAGES.shamppo, tag: 'Conforto' },
-  { id: '13', nome: 'Caixa De Areia', preco: 'R$ 21,90 ', image: IMAGES.caixadeareia, tag: 'Higiene' },
+  { id: '7', nome: 'Aranhador Para Gatos', preco: 'R$ 40,00', image: IMAGES.arranhador, tag: 'Diversão' },
+  { id: '8', nome: 'Bebedouro Elétrico', preco: 'R$ 60,00', image: IMAGES.bebedouro, tag: 'Saudável' },
+  { id: '9', nome: 'Petisco(Gato)', preco: 'R$ 15,00', image: IMAGES.petisco, tag: 'Popular' },
+  { id: '10', nome: 'Petisco(cachorro)', preco: 'R$ 15,00', image: IMAGES.petiscocachorro, tag: 'Popular' },
+  { id: '11', nome: 'Aquário Para Peixes (50L)', preco: 'R$ 250,00 ', image: IMAGES.aquario, tag: 'Popular' },
+  { id: '12', nome: 'Caixa De Transporte (Gato)', preco: 'R$ 50,00 ', image: IMAGES.caixadetransportegato, tag: 'Conforto' },
+  { id: '12', nome: 'Caixa De Transporte (Cachorro)', preco: 'R$ 60,00 ', image: IMAGES.caixadetransportecachorro, tag: 'Conforto' },
+  { id: '13', nome: 'Caixa De Areia', preco: 'R$ 26,90 ', image: IMAGES.caixadeareia, tag: 'Higiene' },
   { id: '14', nome: '', preco: 'R$ 21,90 ', image: IMAGES.shamppo, tag: 'Higiene' },
   { id: '15', nome: '', preco: 'R$ 21,90 ', image: IMAGES.shamppo, tag: 'Higiene' },
   { id: '16', nome: '', preco: 'R$ 21,90 ', image: IMAGES.shamppo, tag: 'Higiene' },
