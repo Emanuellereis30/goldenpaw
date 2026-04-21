@@ -49,6 +49,7 @@ const IMAGES = {
   shamppo: require('../../assets/img/shamppo.png'),
   banner: require('../../assets/img/banner.png'),
   logo: require('../../assets/img/logo.png'),
+  caixadeareia: require('../../assets/img/caixadeareia.png'),
 };
 
 const PRODUTOS_DATA: Produto[] = [
@@ -65,7 +66,7 @@ const PRODUTOS_DATA: Produto[] = [
   { id: '11', nome: 'Aquário (50L)', preco: 'R$ 250,00 ', image: IMAGES.shamppo, tag: 'Popular' },
   { id: '12', nome: 'Caixa De Transporte (Gato)', preco: 'R$ 50,00 ', image: IMAGES.shamppo, tag: 'Conforto' },
   { id: '12', nome: 'Caixa De Transporte (Cachorro)', preco: 'R$ 60,00 ', image: IMAGES.shamppo, tag: 'Conforto' },
-  { id: '13', nome: 'Caixa De Areia', preco: 'R$ 21,90 ', image: IMAGES.shamppo, tag: 'Higiene' },
+  { id: '13', nome: 'Caixa De Areia', preco: 'R$ 21,90 ', image: IMAGES.caixadeareia, tag: 'Higiene' },
   { id: '14', nome: '', preco: 'R$ 21,90 ', image: IMAGES.shamppo, tag: 'Higiene' },
   { id: '15', nome: '', preco: 'R$ 21,90 ', image: IMAGES.shamppo, tag: 'Higiene' },
   { id: '16', nome: '', preco: 'R$ 21,90 ', image: IMAGES.shamppo, tag: 'Higiene' },
