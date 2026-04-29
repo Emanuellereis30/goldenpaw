@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons'; // Importando ícones para um visual mais moderno
 
 /**
  * CONFIGURAÇÕES E ASSETS
@@ -39,6 +40,7 @@ export default function LoginScreen() {
    text: isDarkMode ? '#F5F5F5' : '#1A1A1A',
    textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
    border: isDarkMode ? '#2A2A2A' : '#E5E7EB',
+   buttonBackground: isDarkMode ? 'rgba(212, 175, 55, 0.15)' : 'rgba(212, 175, 55, 0.1)',
  }), [isDarkMode]);
 
   // Lógica de Voltar Corrigida: Força a volta para a Home
@@ -55,12 +57,20 @@ export default function LoginScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar backgroundColor={theme.primary} barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       
-      {/* Botão Voltar Corrigido */}
+      {/* Botão Voltar Modernizado */}
       <TouchableOpacity 
-        style={[styles.backButton, { top: insets.top + 10 }]} 
+        style={[
+          styles.backButton, 
+          { 
+            top: insets.top + 10,
+            backgroundColor: theme.buttonBackground,
+            borderColor: theme.primary + '40', // 40 é 25% de opacidade em hex
+          }
+        ]} 
         onPress={handleBackToHome}
+        activeOpacity={0.7}
       >
-        <Text style={[styles.backButtonText, { color: theme.primary }]}>← Voltar</Text>
+        <Ionicons name="chevron-back" size={24} color={theme.primary} />
       </TouchableOpacity>
 
       <KeyboardAvoidingView 
@@ -68,7 +78,7 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView 
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 60 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 80 }]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
@@ -128,8 +138,23 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backButton: { position: 'absolute', left: 20, zIndex: 10, padding: 10 },
-  backButtonText: { fontSize: 16, fontWeight: 'bold' },
+  backButton: { 
+    position: 'absolute', 
+    left: 20, 
+    zIndex: 10, 
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Sombra leve para dar profundidade
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   scrollContent: { paddingHorizontal: '5%', paddingBottom: 40, alignItems: 'center', flexGrow: 1, justifyContent: 'center' },
   content: { width: '100%', maxWidth: 400, alignItems: 'center' },
   logoContainer: { marginBottom: 20 },
