@@ -1,20 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  SafeAreaView,
-  StatusBar,
-  useColorScheme,
   Image,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
 /**
  * CONFIGURAÇÕES E ASSETS
@@ -32,6 +32,7 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
   const [cpf, setCpf] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [street, setStreet] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
@@ -64,6 +65,7 @@ export default function RegisterScreen() {
     return formattedText;
   };
 
+  
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar backgroundColor={theme.primary} barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
@@ -98,6 +100,18 @@ export default function RegisterScreen() {
             <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <TextInput style={[styles.input, { color: theme.text }]} placeholder="Celular (DDD) 9XXXX-XXXX" placeholderTextColor={theme.textSecondary} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
             </View>
+
+           <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+             <TextInput
+          style={[styles.input, { color: theme.text }]}
+          placeholder="Email"
+          placeholderTextColor={theme.textSecondary}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+          />
+       </View>
 
             <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <TextInput style={[styles.input, { color: theme.text }]} placeholder="Rua" placeholderTextColor={theme.textSecondary} value={street} onChangeText={setStreet} />
