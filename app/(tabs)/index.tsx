@@ -202,7 +202,7 @@ export default function Home() {
         </View>
       </View>
       <View style={styles.headerActions}>
-        <TouchableOpacity onPress={() => (router.push as any)('/admin')} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
+        <TouchableOpacity onPress={() => (router.push as any)('/adminLogin')} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
           <Ionicons name="settings" size={22} color={theme.primary} />
         </TouchableOpacity>
         <TouchableOpacity onPress={toggleDarkMode} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
