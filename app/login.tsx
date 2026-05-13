@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -43,9 +44,18 @@ export default function LoginScreen() {
       text: isDarkMode ? "#F5F5F5" : "#1A1A1A",
       textSecondary: isDarkMode ? "#A1A1AA" : "#6B7280",
       border: isDarkMode ? "#2A2A2A" : "#E5E7EB",
+      buttonBackground: isDarkMode ? "#2A2A2A" : "#FFFFFF",
     }),
     [isDarkMode],
   );
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
 
   // FUNÇÃO DE LOGIN REAL
   const handleLogin = async () => {
@@ -77,11 +87,25 @@ export default function LoginScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+      <TouchableOpacity
+        style={[
+          styles.backButton,
+          {
+            top: insets.top + 10,
+            backgroundColor: theme.buttonBackground,
+            borderColor: theme.primary + "40",
+          },
+        ]}
+        onPress={handleBack}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="chevron-back" size={24} color={theme.primary} />
+      </TouchableOpacity>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 80 }]}>
           <View style={styles.content}>
             <Image
               source={IMAGES.logo}
@@ -154,6 +178,22 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  backButton: {
+    position: "absolute",
+    left: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",
