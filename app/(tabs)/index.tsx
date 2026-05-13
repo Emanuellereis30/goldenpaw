@@ -1,21 +1,24 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
-  SafeAreaView, 
-  StatusBar, 
-  useColorScheme, 
-  Image,
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { doc, getDoc } from 'firebase/firestore';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
   Dimensions,
-  Platform,
-  ImageSourcePropType
+  Image,
+  ImageSourcePropType,
+  LayoutChangeEvent,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { auth, db } from '../../firebaseConfig';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -132,6 +135,10 @@ export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
   const [activeTab, setActiveTab] = useState('home');
   const [cart, setCart] = useState<Produto[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [profileMenuPosition, setProfileMenuPosition] = useState({ top: 0, right: 0 });
+  const profileButtonRef = useRef<View>(null);
 
   const theme = useMemo(() => ({
     background: isDarkMode ? '#121212' : '#e0e0e0',
@@ -143,6 +150,26 @@ export default function Home() {
     border: isDarkMode ? '#2A2A2A' : '#E5E7EB',
     shadow: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.08)',
   }), [isDarkMode]);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.tipo === 'admin') {
+              setIsAdmin(true);
+            }
+          }
+        } catch (error) {
+          console.error('Erro ao verificar admin:', error);
+        }
+      }
+    };
+    checkAdmin();
+  }, []);
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
@@ -175,10 +202,24 @@ export default function Home() {
         </View>
       </View>
       <View style={styles.headerActions}>
+        <TouchableOpacity onPress={() => (router.push as any)('/admin')} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
+          <Ionicons name="settings" size={22} color={theme.primary} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={toggleDarkMode} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
           <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={22} color={theme.primary} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/login')} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
+        <TouchableOpacity 
+          ref={profileButtonRef}
+          onLayout={(event: LayoutChangeEvent) => {
+            const layout = event.nativeEvent.layout;
+            setProfileMenuPosition({
+              top: layout.y + layout.height + 5,
+              right: 20,
+            });
+          }}
+          onPress={() => setShowProfileMenu(!showProfileMenu)} 
+          style={[styles.iconButton, { backgroundColor: theme.surface }]}
+        >
           <Ionicons name="person-outline" size={22} color={theme.text} />
         </TouchableOpacity>
       </View>
@@ -329,6 +370,35 @@ export default function Home() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {showProfileMenu && (
+        <>
+          <Pressable 
+            style={styles.dropdownOverlay} 
+            onPress={() => setShowProfileMenu(false)}
+          />
+          <View style={[styles.dropdownMenu, { backgroundColor: theme.surface, top: profileMenuPosition.top, right: profileMenuPosition.right }]}>
+            <TouchableOpacity
+              style={[styles.dropdownOption, { borderBottomColor: theme.border }]}
+              onPress={() => {
+                setShowProfileMenu(false);
+                router.push('/register');
+              }}
+            >
+              <Text style={[styles.dropdownOptionText, { color: theme.text }]}>Cadastrar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dropdownOption, { borderBottomColor: theme.border }]}
+              onPress={() => {
+                setShowProfileMenu(false);
+                router.push('/login');
+              }}
+            >
+              <Text style={[styles.dropdownOptionText, { color: theme.text }]}>Login</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -408,5 +478,9 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
   emptyStateTitle: { fontSize: 20, fontWeight: '800', marginTop: 10, marginBottom: 20 },
   emptyButton: { paddingHorizontal: 30, paddingVertical: 15, borderRadius: 15 },
-  emptyButtonText: { color: '#FFF', fontWeight: 'bold' }
+  emptyButtonText: { color: '#FFF', fontWeight: 'bold' },
+  dropdownOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 98 },
+  dropdownMenu: { position: 'absolute', width: 160, borderRadius: 12, overflow: 'hidden', zIndex: 99, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3 },
+  dropdownOption: { padding: 15, borderBottomWidth: 1, alignItems: 'center' },
+  dropdownOptionText: { fontSize: 16, fontWeight: '600' },
 });

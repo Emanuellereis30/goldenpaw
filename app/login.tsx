@@ -44,7 +44,9 @@ export default function LoginScreen() {
       text: isDarkMode ? "#F5F5F5" : "#1A1A1A",
       textSecondary: isDarkMode ? "#A1A1AA" : "#6B7280",
       border: isDarkMode ? "#2A2A2A" : "#E5E7EB",
-      buttonBackground: isDarkMode ? "#2A2A2A" : "#FFFFFF",
+      buttonBackground: isDarkMode
+        ? "rgba(212, 175, 55, 0.15)"
+        : "rgba(212, 175, 55, 0.1)",
     }),
     [isDarkMode],
   );
