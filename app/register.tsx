@@ -1,21 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -34,7 +34,7 @@ const IMAGES = {
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const systemColorScheme = useColorScheme();
-  const isDarkMode = systemColorScheme === "dark";
+  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === "dark");
   const router = useRouter();
 
   // Estados dos inputs
@@ -65,6 +65,12 @@ export default function RegisterScreen() {
     }),
     [isDarkMode],
   );
+
+  useEffect(() => {
+    setIsDarkMode(systemColorScheme === "dark");
+  }, [systemColorScheme]);
+
+  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   const formatCpf = (text: string) => {
     let formattedText = text.replace(/\D/g, "");
@@ -155,7 +161,7 @@ export default function RegisterScreen() {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <StatusBar
-        backgroundColor={theme.primary}
+        backgroundColor={theme.background}
         barStyle={isDarkMode ? "light-content" : "dark-content"}
       />
 
@@ -172,6 +178,24 @@ export default function RegisterScreen() {
         activeOpacity={0.7}
       >
         <Ionicons name="chevron-back" size={24} color={theme.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.themeToggleButton,
+          {
+            top: insets.top + 10,
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+          },
+        ]}
+        onPress={toggleDarkMode}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name={isDarkMode ? "sunny" : "moon"}
+          size={22}
+          color={theme.primary}
+        />
       </TouchableOpacity>
 
       <KeyboardAvoidingView
@@ -420,4 +444,20 @@ const styles = StyleSheet.create({
   },
   registerButtonText: { color: "#FFFFFF", fontSize: 18, fontWeight: "bold" },
   loginText: { fontSize: 14, fontWeight: "bold" },
+  themeToggleButton: {
+    position: "absolute",
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
 });

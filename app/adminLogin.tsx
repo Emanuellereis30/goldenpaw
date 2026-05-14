@@ -1,28 +1,35 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { collection, getDocs, query, where } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import React, { useState } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  useColorScheme,
-  View,
-  ActivityIndicator,
-  Image,
+    ActivityIndicator,
+    Alert,
+    Image,
+    SafeAreaView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth, db } from '../firebaseConfig';
 
 export default function AdminLoginScreen() {
   const insets = useSafeAreaInsets();
-  const isDarkMode = useColorScheme() === 'dark';
+  const systemColorScheme = useColorScheme();
+  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
   const router = useRouter();
+
+  useEffect(() => {
+    setIsDarkMode(systemColorScheme === 'dark');
+  }, [systemColorScheme]);
+
+  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -93,6 +100,21 @@ export default function AdminLoginScreen() {
         activeOpacity={0.7}
       >
         <Ionicons name="chevron-back" size={24} color={theme.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.themeToggleButton,
+          {
+            top: insets.top + 10,
+            right: 20,
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+          },
+        ]}
+        onPress={toggleDarkMode}
+        activeOpacity={0.7}
+      >
+        <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={22} color={theme.primary} />
       </TouchableOpacity>
 
       <View style={[styles.content, { paddingTop: insets.top + 40 }]}>
@@ -266,4 +288,19 @@ const styles = StyleSheet.create({
   },
   warningText: { fontSize: 12, flex: 1 },
   footer: { fontSize: 12, textAlign: 'center', marginTop: 20 },
+  themeToggleButton: {
+    position: 'absolute',
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
 });
