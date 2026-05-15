@@ -1,25 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// IMPORT DO FIREBASE
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 
@@ -29,34 +28,12 @@ const IMAGES = {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const systemColorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === "dark");
+  const { theme, colorScheme, toggleColorScheme } = useAppTheme();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const theme = useMemo(
-    () => ({
-      background: isDarkMode ? "#121212" : "#F8F6F2",
-      surface: isDarkMode ? "#1E1E1E" : "#FFFFFF",
-      primary: "#D4AF37",
-      text: isDarkMode ? "#F5F5F5" : "#1A1A1A",
-      textSecondary: isDarkMode ? "#A1A1AA" : "#6B7280",
-      border: isDarkMode ? "#2A2A2A" : "#E5E7EB",
-      buttonBackground: isDarkMode
-        ? "rgba(212, 175, 55, 0.15)"
-        : "rgba(212, 175, 55, 0.1)",
-    }),
-    [isDarkMode],
-  );
-
-  useEffect(() => {
-    setIsDarkMode(systemColorScheme === "dark");
-  }, [systemColorScheme]);
-
-  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -66,7 +43,6 @@ export default function LoginScreen() {
     }
   };
 
-  // FUNÇÃO DE LOGIN REAL
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Erro", "Preencha e-mail e senha.");
@@ -76,15 +52,12 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // Login bem-sucedido! Redireciona para as Tabs
       router.replace("/(tabs)");
     } catch (error: any) {
       console.error(error);
       let message = "E-mail ou senha incorretos.";
-      if (error.code === "auth/user-not-found")
-        message = "Usuário não encontrado.";
+      if (error.code === "auth/user-not-found") message = "Usuário não encontrado.";
       if (error.code === "auth/wrong-password") message = "Senha incorreta.";
-
       Alert.alert("Erro no Login", message);
     } finally {
       setLoading(false);
@@ -92,10 +65,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
+      <StatusBar barStyle={colorScheme === "dark" ? "light-content" : "dark-content"} />
+
       <TouchableOpacity
         style={[
           styles.backButton,
@@ -110,6 +82,7 @@ export default function LoginScreen() {
       >
         <Ionicons name="chevron-back" size={24} color={theme.primary} />
       </TouchableOpacity>
+
       <TouchableOpacity
         style={[
           styles.themeToggleButton,
@@ -119,36 +92,26 @@ export default function LoginScreen() {
             borderColor: theme.border,
           },
         ]}
-        onPress={toggleDarkMode}
+        onPress={toggleColorScheme}
         activeOpacity={0.7}
       >
-        <Ionicons
-          name={isDarkMode ? "sunny" : "moon"}
-          size={22}
-          color={theme.primary}
-        />
+        <Ionicons name={colorScheme === "dark" ? "sunny" : "moon"} size={22} color={theme.primary} />
       </TouchableOpacity>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 80 }]}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 80 }]}> 
           <View style={styles.content}>
             <Image
               source={IMAGES.logo}
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={[styles.title, { color: theme.text }]}>
-              Bem-vindo de volta!
-            </Text>
+            <Text style={[styles.title, { color: theme.text }]}>Bem-vindo de volta!</Text>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Email"
@@ -160,12 +123,7 @@ export default function LoginScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Senha"
@@ -177,10 +135,7 @@ export default function LoginScreen() {
             </View>
 
             <TouchableOpacity
-              style={[
-                styles.loginButton,
-                { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 },
-              ]}
+              style={[styles.loginButton, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }]}
               onPress={handleLogin}
               disabled={loading}
             >
@@ -192,9 +147,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.push("/register")}>
-              <Text style={[styles.linkText, { color: theme.primary }]}>
-                Não tem uma conta? Cadastre-se
-              </Text>
+              <Text style={[styles.linkText, { color: theme.primary }]}>Não tem uma conta? Cadastre-se</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -204,10 +157,10 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
   backButton: {
-    position: "absolute",
-    left: 20,
     zIndex: 10,
     width: 44,
     height: 44,

@@ -1,7 +1,8 @@
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -14,7 +15,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,12 +32,16 @@ interface Produto {
   image: ImageSourcePropType;
   tag?: string;
   cartId?: string;
+  category: 'caes' | 'gatos' | 'aves' | 'peixes' | 'outros';
 }
+
+type CategoryRoute = '/caes' | '/gatos' | '/aves' | '/peixes';
 
 interface Categoria {
   id: string;
   name: string;
   icon: keyof typeof Ionicons.glyphMap;
+  route: CategoryRoute;
 }
 
 /**
@@ -84,72 +88,58 @@ const IMAGES = {
 };
 
 const PRODUTOS_DATA: Produto[] = [
-  { id: '1', nome: 'Ração Premium Cães', preco: 'R$ 189,90', image: IMAGES.racao, tag: 'Popular' },
-  { id: '2', nome: 'Ração Premium Gatos', preco: 'R$ 159,90', image: IMAGES.racaogato, tag: 'Saudável' },
-  { id: '3', nome: 'Brinquedo Interativo', preco: 'R$ 45,90', image: IMAGES.brinquedos, tag: 'Diversão' },
-  { id: '4', nome: 'Coleira Antipulgas', preco: 'R$ 189,90', image: IMAGES.coleira, tag: 'Saúde' },
-  { id: '5', nome: 'Cama Ortopédica', preco: 'R$ 159,90', image: IMAGES.cama, tag: 'Conforto' },
-  { id: '6', nome: 'Shampoo Hidratante', preco: 'R$ 45,90', image: IMAGES.shamppo, tag: 'Higiene' },
-  { id: '7', nome: 'Aranhador Para Gatos', preco: 'R$ 40,00', image: IMAGES.arranhador, tag: 'Diversão' },
-  { id: '8', nome: 'Bebedouro Elétrico', preco: 'R$ 60,00', image: IMAGES.bebedouro, tag: 'Saudável' },
-  { id: '9', nome: 'Petisco(Gato)', preco: 'R$ 15,00', image: IMAGES.petisco, tag: 'Popular' },
-  { id: '10', nome: 'Petisco(cachorro)', preco: 'R$ 15,00', image: IMAGES.petiscocachorro, tag: 'Popular' },
-  { id: '12', nome: 'Caixa De Transporte (Gato)', preco: 'R$ 50,00 ', image: IMAGES.caixadetransportegato, tag: 'Conforto' },
-  { id: '12', nome: 'Caixa De Transporte (Cachorro)', preco: 'R$ 60,00 ', image: IMAGES.caixadetransportecachorro, tag: 'Conforto' },
-  { id: '13', nome: 'Caixa De Areia', preco: 'R$ 26,90 ', image: IMAGES.caixadeareia, tag: 'Higiene' },
-  { id: '14', nome: 'Casa de Cachorro', preco: 'R$ 89,80 ', image: IMAGES.casadecachorro, tag: 'Conforto' },
-  { id: '15', nome: 'Cama de Pet', preco: 'R$ 39,98 ', image: IMAGES.camadepet, tag: 'Higiene' },
-  { id: '16', nome: 'Tapete higienico', preco: 'R$ 37,99 ', image: IMAGES.tapetehigienico, tag: 'Higiene' },
-  { id: '17', nome: 'Comedouro Simples', preco: 'R$ 15,90 ', image: IMAGES.comedourosimples, tag: 'Popular' },
-  { id: '18', nome: 'Comedouro Duplo', preco: 'R$ 20,00 ', image: IMAGES.comedouroduplo, tag: 'Popular' },
-  { id: '11', nome: 'Aquário Para Peixes (50L)', preco: 'R$ 250,00 ', image: IMAGES.aquario, tag: 'Popular' },
-  { id: '19', nome: 'Ração Para Peixes', preco: 'R$ 46,10 ', image: IMAGES.racaopeixes, tag: 'Saudável' },
-  { id: '20', nome: 'Filtro de Agua Aquario', preco: 'R$ 96,90 ', image: IMAGES.filtrodeagua, tag: 'Higiene' },
-
-  // os itens abaixo estõ sem imagem
-  { id: '21', nome: 'Bomba de oxigênio', preco: 'R$ 57,80 ', image: IMAGES.bombadeoxigenioaquario, tag: 'Saúde' },
-  { id: '22', nome: 'Iluminação LED para aquário', preco: 'R$ 39,00 ', image: IMAGES.iluminacaoaquario, tag: 'Popular' },
-  { id: '23', nome: 'Plantas Artificiais para Aquario', preco: 'R$ 15,59 ', image: IMAGES.plantaaquario, tag: 'Popular' },
-  { id: '24', nome: 'Pedras Decorativas para Aquario', preco: 'R$ 2,90 ', image: IMAGES.pedradecorativaaquario, tag: 'Popular' },
-  { id: '25', nome: 'Esconderijo de Rocha para Aquario', preco: 'R$ 78,70 ', image: IMAGES.esconderijoaquario, tag: 'Popular' },
-  { id: '26', nome: 'Ração para Pássaros', preco: 'R$ 21,50 ', image: IMAGES.racaopassaros, tag: 'Saúde' },
-  { id: '27', nome: 'Ração para Pássaros Premium', preco: 'R$ 299,90 ', image: IMAGES.racaopassaropremium, tag: 'Saúde' },
-  { id: '28', nome: 'Bebedouro para Pássaros', preco: 'R$ 11,90 ', image: IMAGES.bebedouroaves, tag: 'Higiene' },
-  { id: '29', nome: 'Comedouro para Pássaros', preco: 'R$ 14,99 ', image: IMAGES.comedouroaves, tag: 'Higiene' },
-  { id: '30', nome: 'Kit Bebedouro e Comedouro Pássaros', preco: 'R$ 25,00 ', image: IMAGES.kitcomedouro, tag: 'Higiene' },
-  { id: '31', nome: 'Balanço para Pássaros', preco: 'R$ 7,90 ', image: IMAGES.blancopassaros, tag: 'Popular' },
+  { id: '1', nome: 'Ração Premium Cães', preco: 'R$ 189,90', image: IMAGES.racao, tag: 'Popular', category: 'caes' },
+  { id: '2', nome: 'Ração Premium Gatos', preco: 'R$ 159,90', image: IMAGES.racaogato, tag: 'Saudável', category: 'gatos' },
+  { id: '3', nome: 'Brinquedo Interativo', preco: 'R$ 45,90', image: IMAGES.brinquedos, tag: 'Diversão', category: 'caes' },
+  { id: '4', nome: 'Coleira Antipulgas', preco: 'R$ 189,90', image: IMAGES.coleira, tag: 'Saúde', category: 'caes' },
+  { id: '5', nome: 'Cama Ortopédica', preco: 'R$ 159,90', image: IMAGES.cama, tag: 'Conforto', category: 'caes' },
+  { id: '6', nome: 'Shampoo Hidratante', preco: 'R$ 45,90', image: IMAGES.shamppo, tag: 'Higiene', category: 'caes' },
+  { id: '7', nome: 'Aranhador Para Gatos', preco: 'R$ 40,00', image: IMAGES.arranhador, tag: 'Diversão', category: 'gatos' },
+  { id: '8', nome: 'Bebedouro Elétrico', preco: 'R$ 60,00', image: IMAGES.bebedouro, tag: 'Saudável', category: 'gatos' },
+  { id: '9', nome: 'Petisco(Gato)', preco: 'R$ 15,00', image: IMAGES.petisco, tag: 'Popular', category: 'gatos' },
+  { id: '10', nome: 'Petisco(cachorro)', preco: 'R$ 15,00', image: IMAGES.petiscocachorro, tag: 'Popular', category: 'caes' },
+  { id: '12', nome: 'Caixa De Transporte (Gato)', preco: 'R$ 50,00 ', image: IMAGES.caixadetransportegato, tag: 'Conforto', category: 'gatos' },
+  { id: '12', nome: 'Caixa De Transporte (Cachorro)', preco: 'R$ 60,00 ', image: IMAGES.caixadetransportecachorro, tag: 'Conforto', category: 'caes' },
+  { id: '13', nome: 'Caixa De Areia', preco: 'R$ 26,90 ', image: IMAGES.caixadeareia, tag: 'Higiene', category: 'gatos' },
+  { id: '14', nome: 'Casa de Cachorro', preco: 'R$ 89,80 ', image: IMAGES.casadecachorro, tag: 'Conforto', category: 'caes' },
+  { id: '15', nome: 'Cama de Pet', preco: 'R$ 39,98 ', image: IMAGES.camadepet, tag: 'Higiene', category: 'caes' },
+  { id: '16', nome: 'Tapete higienico', preco: 'R$ 37,99 ', image: IMAGES.tapetehigienico, tag: 'Higiene', category: 'caes' },
+  { id: '17', nome: 'Comedouro Simples', preco: 'R$ 15,90 ', image: IMAGES.comedourosimples, tag: 'Popular', category: 'caes' },
+  { id: '18', nome: 'Comedouro Duplo', preco: 'R$ 20,00 ', image: IMAGES.comedouroduplo, tag: 'Popular', category: 'caes' },
+  { id: '11', nome: 'Aquário Para Peixes (50L)', preco: 'R$ 250,00 ', image: IMAGES.aquario, tag: 'Popular', category: 'peixes' },
+  { id: '19', nome: 'Ração Para Peixes', preco: 'R$ 46,10 ', image: IMAGES.racaopeixes, tag: 'Saudável', category: 'peixes' },
+  { id: '20', nome: 'Filtro de Agua Aquario', preco: 'R$ 96,90 ', image: IMAGES.filtrodeagua, tag: 'Higiene', category: 'peixes' },
+  { id: '21', nome: 'Bomba de oxigênio', preco: 'R$ 57,80 ', image: IMAGES.bombadeoxigenioaquario, tag: 'Saúde', category: 'peixes' },
+  { id: '22', nome: 'Iluminação LED para aquário', preco: 'R$ 39,00 ', image: IMAGES.iluminacaoaquario, tag: 'Popular', category: 'peixes' },
+  { id: '23', nome: 'Plantas Artificiais para Aquario', preco: 'R$ 15,59 ', image: IMAGES.plantaaquario, tag: 'Popular', category: 'peixes' },
+  { id: '24', nome: 'Pedras Decorativas para Aquario', preco: 'R$ 2,90 ', image: IMAGES.pedradecorativaaquario, tag: 'Popular', category: 'peixes' },
+  { id: '25', nome: 'Esconderijo de Rocha para Aquario', preco: 'R$ 78,70 ', image: IMAGES.esconderijoaquario, tag: 'Popular', category: 'peixes' },
+  { id: '26', nome: 'Ração para Pássaros', preco: 'R$ 21,50 ', image: IMAGES.racaopassaros, tag: 'Saúde', category: 'aves' },
+  { id: '27', nome: 'Ração para Pássaros Premium', preco: 'R$ 299,90 ', image: IMAGES.racaopassaropremium, tag: 'Saúde', category: 'aves' },
+  { id: '28', nome: 'Bebedouro para Pássaros', preco: 'R$ 11,90 ', image: IMAGES.bebedouroaves, tag: 'Higiene', category: 'aves' },
+  { id: '29', nome: 'Comedouro para Pássaros', preco: 'R$ 14,99 ', image: IMAGES.comedouroaves, tag: 'Higiene', category: 'aves' },
+  { id: '30', nome: 'Kit Bebedouro e Comedouro Pássaros', preco: 'R$ 25,00 ', image: IMAGES.kitcomedouro, tag: 'Higiene', category: 'aves' },
+  { id: '31', nome: 'Balanço para Pássaros', preco: 'R$ 7,90 ', image: IMAGES.blancopassaros, tag: 'Popular', category: 'aves' },
 ];
 
 const CATEGORIES: Categoria[] = [
-  { id: 'c1', name: 'Cães', icon: 'paw' },
-  { id: 'c2', name: 'Gatos', icon: 'logo-octocat' },
-  { id: 'c3', name: 'Aves', icon: 'egg' },
-  { id: 'c4', name: 'Peixes', icon: 'fish' },
+  { id: 'c1', name: 'Cães', icon: 'paw', route: '/caes' },
+  { id: 'c2', name: 'Gatos', icon: 'logo-octocat', route: '/gatos' },
+  { id: 'c3', name: 'Aves', icon: 'egg', route: '/aves' },
+  { id: 'c4', name: 'Peixes', icon: 'fish', route: '/peixes' },
 ];
 
 export default function Home() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const systemColorScheme = useColorScheme();
+  const { theme, colorScheme, toggleColorScheme } = useAppTheme();
   
-  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
   const [activeTab, setActiveTab] = useState('home');
   const [cart, setCart] = useState<Produto[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [profileMenuPosition, setProfileMenuPosition] = useState({ top: 0, right: 0 });
   const profileButtonRef = useRef<View>(null);
-
-  const theme = useMemo(() => ({
-    background: isDarkMode ? '#121212' : '#e0e0e0',
-    surface: isDarkMode ? '#1E1E1E' : '#ffffff',
-    primary: '#D4AF37',
-    secondary: isDarkMode ? '#2A2A2A' : '#927957',
-    text: isDarkMode ? '#F5F5F5' : '#1A1A1A',
-    textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
-    border: isDarkMode ? '#2A2A2A' : '#E5E7EB',
-    shadow: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.08)',
-  }), [isDarkMode]);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -170,8 +160,6 @@ export default function Home() {
     };
     checkAdmin();
   }, []);
-
-  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
   const addToCart = (product: Produto) => {
     const newItem = { ...product, cartId: Math.random().toString(36).substr(2, 9) };
@@ -205,8 +193,8 @@ export default function Home() {
         <TouchableOpacity onPress={() => (router.push as any)('/adminLogin')} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
           <Ionicons name="settings" size={22} color={theme.primary} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={toggleDarkMode} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
-          <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={22} color={theme.primary} />
+        <TouchableOpacity onPress={toggleColorScheme} style={[styles.iconButton, { backgroundColor: theme.surface }]}> 
+          <Ionicons name={colorScheme === 'dark' ? 'sunny' : 'moon'} size={22} color={theme.primary} />
         </TouchableOpacity>
         <TouchableOpacity 
           ref={profileButtonRef}
@@ -228,8 +216,7 @@ export default function Home() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      
+      <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
       {renderHeader()}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -250,9 +237,13 @@ export default function Home() {
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Categorias</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
               {CATEGORIES.map((cat) => (
-                <TouchableOpacity key={cat.id} style={styles.categoryItem}>
-                  <View style={[styles.categoryIcon, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                    <Ionicons name={cat.icon} size={24} color={theme.primary} />
+                <TouchableOpacity
+                  key={cat.id}
+                  style={styles.categoryItem}
+                  onPress={() => router.push(cat.route as CategoryRoute)}
+                >
+                  <View style={[styles.categoryIcon, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
+                    <Ionicons name={cat.icon as any} size={28} color={theme.primary} />
                   </View>
                   <Text style={[styles.categoryName, { color: theme.textSecondary }]}>{cat.name}</Text>
                 </TouchableOpacity>

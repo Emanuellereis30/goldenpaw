@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -14,11 +14,11 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    useColorScheme,
     View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAppTheme } from '@/hooks/use-app-theme';
 // IMPORTS DO FIREBASE
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -33,8 +33,7 @@ const IMAGES = {
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
-  const systemColorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === "dark");
+  const { theme, colorScheme, toggleColorScheme } = useAppTheme();
   const router = useRouter();
 
   // Estados dos inputs
@@ -50,27 +49,6 @@ export default function RegisterScreen() {
 
   // Estado de carregamento
   const [loading, setLoading] = useState(false);
-
-  const theme = useMemo(
-    () => ({
-      background: isDarkMode ? "#121212" : "#F8F6F2",
-      surface: isDarkMode ? "#1E1E1E" : "#FFFFFF",
-      primary: "#D4AF37", // dourado
-      text: isDarkMode ? "#F5F5F5" : "#1A1A1A",
-      textSecondary: isDarkMode ? "#A1A1AA" : "#6B7280",
-      border: isDarkMode ? "#2A2A2A" : "#E5E7EB",
-      buttonBackground: isDarkMode
-        ? "rgba(212, 175, 55, 0.15)"
-        : "rgba(212, 175, 55, 0.1)",
-    }),
-    [isDarkMode],
-  );
-
-  useEffect(() => {
-    setIsDarkMode(systemColorScheme === "dark");
-  }, [systemColorScheme]);
-
-  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   const formatCpf = (text: string) => {
     let formattedText = text.replace(/\D/g, "");
@@ -162,7 +140,7 @@ export default function RegisterScreen() {
     >
       <StatusBar
         backgroundColor={theme.background}
-        barStyle={isDarkMode ? "light-content" : "dark-content"}
+        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
       />
 
       <TouchableOpacity
@@ -188,45 +166,28 @@ export default function RegisterScreen() {
             borderColor: theme.border,
           },
         ]}
-        onPress={toggleDarkMode}
+        onPress={toggleColorScheme}
         activeOpacity={0.7}
       >
         <Ionicons
-          name={isDarkMode ? "sunny" : "moon"}
+          name={colorScheme === "dark" ? "sunny" : "moon"}
           size={22}
           color={theme.primary}
         />
       </TouchableOpacity>
 
-      <KeyboardAvoidingView
+<KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: insets.top + 80 },
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 80 }]}> 
           <View style={styles.content}>
             <View style={styles.logoContainer}>
-              <Image
-                source={IMAGES.logo}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+              <Image source={IMAGES.logo} style={styles.logo} resizeMode="contain" />
             </View>
-            <Text style={[styles.title, { color: theme.text }]}>
-              Crie sua conta!
-            </Text>
+            <Text style={[styles.title, { color: theme.text }]}>Crie sua conta!</Text>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Nome Completo"
@@ -237,12 +198,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="CPF"
@@ -254,12 +210,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Celular (DDD) 9XXXX-XXXX"
@@ -270,12 +221,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Email"
@@ -287,12 +233,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Rua"
@@ -302,12 +243,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="CEP"
@@ -319,12 +255,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Bairro"
@@ -334,12 +265,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Senha"
@@ -350,12 +276,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
+            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Confirmar Senha"
@@ -367,10 +288,7 @@ export default function RegisterScreen() {
             </View>
 
             <TouchableOpacity
-              style={[
-                styles.registerButton,
-                { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 },
-              ]}
+              style={[styles.registerButton, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }]}
               onPress={handleRegister}
               disabled={loading}
             >
@@ -381,10 +299,8 @@ export default function RegisterScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.push("/login")}>
-              <Text style={[styles.loginText, { color: theme.primary }]}>
-                Já tem uma conta? Faça login
-              </Text>
+            <TouchableOpacity onPress={() => router.push("/login")}> 
+              <Text style={[styles.loginText, { color: theme.primary }]}>Já tem uma conta? Faça login</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

@@ -4,13 +4,21 @@
  */
 
 import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function useThemeColor(
   props: { light?: string; dark?: string },
   colorName: keyof typeof Colors.light & keyof typeof Colors.dark
 ) {
-  const theme = useColorScheme() ?? 'light';
+  let theme = useColorScheme() ?? 'light';
+
+  try {
+    theme = useAppTheme().colorScheme;
+  } catch {
+    // Fallback to system theme if provider is not mounted.
+  }
+
   const colorFromProps = props[theme];
 
   if (colorFromProps) {

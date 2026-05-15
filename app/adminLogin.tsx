@@ -1,8 +1,9 @@
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -13,7 +14,6 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    useColorScheme,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,30 +21,13 @@ import { auth, db } from '../firebaseConfig';
 
 export default function AdminLoginScreen() {
   const insets = useSafeAreaInsets();
-  const systemColorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
+  const { theme, colorScheme, toggleColorScheme } = useAppTheme();
   const router = useRouter();
-
-  useEffect(() => {
-    setIsDarkMode(systemColorScheme === 'dark');
-  }, [systemColorScheme]);
-
-  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  const theme = {
-    background: isDarkMode ? '#121212' : '#F8F6F2',
-    surface: isDarkMode ? '#1E1E1E' : '#FFFFFF',
-    primary: '#D4AF37',
-    text: isDarkMode ? '#F5F5F5' : '#1A1A1A',
-    textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
-    border: isDarkMode ? '#2A2A2A' : '#E5E7EB',
-    error: '#dc3545',
-  };
 
   const handleLogin = async () => {
     if (!email || !senha) {
@@ -85,7 +68,7 @@ export default function AdminLoginScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
       
       <TouchableOpacity
         style={[
@@ -111,10 +94,10 @@ export default function AdminLoginScreen() {
             borderColor: theme.border,
           },
         ]}
-        onPress={toggleDarkMode}
+        onPress={toggleColorScheme}
         activeOpacity={0.7}
       >
-        <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={22} color={theme.primary} />
+        <Ionicons name={colorScheme === 'dark' ? 'sunny' : 'moon'} size={22} color={theme.primary} />
       </TouchableOpacity>
 
       <View style={[styles.content, { paddingTop: insets.top + 40 }]}>

@@ -1,3 +1,4 @@
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { addDoc, collection, deleteDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
@@ -13,7 +14,6 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    useColorScheme,
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,15 +55,8 @@ type TabType = 'produtos' | 'pets';
  */
 export default function AdminDashboardScreen() {
   const insets = useSafeAreaInsets();
-  const systemColorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(systemColorScheme === 'dark');
+  const { theme, colorScheme, toggleColorScheme } = useAppTheme();
   const router = useRouter();
-
-  useEffect(() => {
-    setIsDarkMode(systemColorScheme === 'dark');
-  }, [systemColorScheme]);
-
-  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
 
   // Estados gerais
   const [activeTab, setActiveTab] = useState<TabType>('produtos');
@@ -85,16 +78,6 @@ export default function AdminDashboardScreen() {
     nomeDono: '', celularDono: '', emailDono: '', cpfDono: '',
     cep: '', rua: '', bairro: '', numero: '', cidade: ''
   });
-
-  const theme = {
-    background: isDarkMode ? '#121212' : '#F8F6F2',
-    surface: isDarkMode ? '#1E1E1E' : '#FFFFFF',
-    primary: '#D4AF37',
-    text: isDarkMode ? '#F5F5F5' : '#1A1A1A',
-    textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
-    border: isDarkMode ? '#2A2A2A' : '#E5E7EB',
-    error: '#dc3545',
-  };
 
   // Carregar dados ao montar e trocar de aba
   useEffect(() => {
@@ -634,7 +617,7 @@ export default function AdminDashboardScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
 
       <TouchableOpacity
         style={[
@@ -663,10 +646,10 @@ export default function AdminDashboardScreen() {
             borderColor: theme.border,
           },
         ]}
-        onPress={toggleDarkMode}
+        onPress={toggleColorScheme}
         activeOpacity={0.7}
       >
-        <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={22} color={theme.primary} />
+        <Ionicons name={colorScheme === 'dark' ? 'sunny' : 'moon'} size={22} color={theme.primary} />
       </TouchableOpacity>
 
       <View style={[styles.header, { paddingTop: insets.top + 60 }]}>
