@@ -1,9 +1,11 @@
-import { useAppTheme } from '@/hooks/use-app-theme';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useRef, useState } from 'react';
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
   Image,
   ImageSourcePropType,
@@ -16,11 +18,11 @@ import {
   Text,
   TouchableOpacity,
   View
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { auth, db } from '../../firebaseConfig';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { auth, db } from "../../firebaseConfig";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 /**
  * INTERFACES DE TIPO
@@ -32,10 +34,10 @@ interface Produto {
   image: ImageSourcePropType;
   tag?: string;
   cartId?: string;
-  category: 'caes' | 'gatos' | 'aves' | 'peixes' | 'outros';
+  category: "caes" | "gatos" | "aves" | "peixes" | "outros";
 }
 
-type CategoryRoute = '/caes' | '/gatos' | '/aves' | '/peixes';
+type CategoryRoute = "/caes" | "/gatos" | "/aves" | "/peixes";
 
 interface Categoria {
   id: string;
@@ -48,155 +50,425 @@ interface Categoria {
  * CONFIGURAÇÕES E ASSETS
  */
 const IMAGES = {
-  racao: require('../../assets/img/racao.png'),
-  racaogato: require('../../assets/img/racaogato.png'),
-  brinquedos: require('../../assets/img/brinquedos.png'),
-  coleira: require('../../assets/img/coleira.png'),
-  cama: require('../../assets/img/cama.png'),
-  shamppo: require('../../assets/img/shamppo.png'),
-  banner: require('../../assets/img/banner.png'),
-  logo: require('../../assets/img/logo.png'),
-  caixadeareia: require('../../assets/img/caixadeareia.png'),
-  arranhador: require('../../assets/img/arranhador.png'),
-  bebedouro: require('../../assets/img/bebedouro.png'),
-  petisco: require('../../assets/img/petisco.png'),
-  petiscocachorro: require('../../assets/img/petiscocachorro.png'),
-  caixadetransportegato: require('../../assets/img/caixadetransportegato.png'),
-  caixadetransportecachorro: require('../../assets/img/caixadetransportecachorro.png'),
-  casadecachorro: require('../../assets/img/casadecachorro.webp'),
-  camadepet: require('../../assets/img/camadepet.png'),
-  tapetehigienico: require('../../assets/img/tapetehigienico.png'),
-  comedourosimples: require('../../assets/img/comedouropet.png'),
-  comedouroduplo: require('../../assets/img/comedouroduplo.png'),
-  aquario: require('../../assets/img/aquario.png'),
-  racaopeixes: require('../../assets/img/racaopeixe.png'),
-  filtrodeagua: require('../../assets/img/filtroaquario.png'),
+  racao: require("../../assets/img/racao.png"),
+  racaogato: require("../../assets/img/racaogato.png"),
+  brinquedos: require("../../assets/img/brinquedos.png"),
+  coleira: require("../../assets/img/coleira.png"),
+  cama: require("../../assets/img/cama.png"),
+  shamppo: require("../../assets/img/shamppo.png"),
+  banner: require("../../assets/img/banner.png"),
+  logo: require("../../assets/img/logo.png"),
+  caixadeareia: require("../../assets/img/caixadeareia.png"),
+  arranhador: require("../../assets/img/arranhador.png"),
+  bebedouro: require("../../assets/img/bebedouro.png"),
+  petisco: require("../../assets/img/petisco.png"),
+  petiscocachorro: require("../../assets/img/petiscocachorro.png"),
+  caixadetransportegato: require("../../assets/img/caixadetransportegato.png"),
+  caixadetransportecachorro: require("../../assets/img/caixadetransportecachorro.png"),
+  casadecachorro: require("../../assets/img/casadecachorro.webp"),
+  camadepet: require("../../assets/img/camadepet.png"),
+  tapetehigienico: require("../../assets/img/tapetehigienico.png"),
+  comedourosimples: require("../../assets/img/comedouropet.png"),
+  comedouroduplo: require("../../assets/img/comedouroduplo.png"),
+  aquario: require("../../assets/img/aquario.png"),
+  racaopeixes: require("../../assets/img/racaopeixe.png"),
+  filtrodeagua: require("../../assets/img/filtroaquario.png"),
 
   // os itens abaixo estõ sem imagem
-  bombadeoxigenioaquario: require('../../assets/img/camadepet.png'),
-  iluminacaoaquario: require('../../assets/img/camadepet.png'),
-  plantaaquario: require('../../assets/img/camadepet.png'),
-  pedradecorativaaquario: require('../../assets/img/camadepet.png'),
-  esconderijoaquario: require('../../assets/img/camadepet.png'),
-  racaopassaros: require('../../assets/img/camadepet.png'),
-  racaopassaropremium: require('../../assets/img/camadepet.png'),
-  bebedouroaves: require('../../assets/img/camadepet.png'),
-  comedouroaves: require('../../assets/img/camadepet.png'),
-  kitcomedouro: require('../../assets/img/camadepet.png'),
-  blancopassaros: require('../../assets/img/camadepet.png')
-
+  bombadeoxigenioaquario: require("../../assets/img/camadepet.png"),
+  iluminacaoaquario: require("../../assets/img/camadepet.png"),
+  plantaaquario: require("../../assets/img/camadepet.png"),
+  pedradecorativaaquario: require("../../assets/img/camadepet.png"),
+  esconderijoaquario: require("../../assets/img/camadepet.png"),
+  racaopassaros: require("../../assets/img/camadepet.png"),
+  racaopassaropremium: require("../../assets/img/camadepet.png"),
+  bebedouroaves: require("../../assets/img/camadepet.png"),
+  comedouroaves: require("../../assets/img/camadepet.png"),
+  kitcomedouro: require("../../assets/img/camadepet.png"),
+  blancopassaros: require("../../assets/img/camadepet.png"),
 };
 
 const PRODUTOS_DATA: Produto[] = [
-  { id: '1', nome: 'Ração Premium Cães', preco: 'R$ 189,90', image: IMAGES.racao, tag: 'Popular', category: 'caes' },
-  { id: '2', nome: 'Ração Premium Gatos', preco: 'R$ 159,90', image: IMAGES.racaogato, tag: 'Saudável', category: 'gatos' },
-  { id: '3', nome: 'Brinquedo Interativo', preco: 'R$ 45,90', image: IMAGES.brinquedos, tag: 'Diversão', category: 'caes' },
-  { id: '4', nome: 'Coleira Antipulgas', preco: 'R$ 189,90', image: IMAGES.coleira, tag: 'Saúde', category: 'caes' },
-  { id: '5', nome: 'Cama Ortopédica', preco: 'R$ 159,90', image: IMAGES.cama, tag: 'Conforto', category: 'caes' },
-  { id: '6', nome: 'Shampoo Hidratante', preco: 'R$ 45,90', image: IMAGES.shamppo, tag: 'Higiene', category: 'caes' },
-  { id: '7', nome: 'Aranhador Para Gatos', preco: 'R$ 40,00', image: IMAGES.arranhador, tag: 'Diversão', category: 'gatos' },
-  { id: '8', nome: 'Bebedouro Elétrico', preco: 'R$ 60,00', image: IMAGES.bebedouro, tag: 'Saudável', category: 'gatos' },
-  { id: '9', nome: 'Petisco(Gato)', preco: 'R$ 15,00', image: IMAGES.petisco, tag: 'Popular', category: 'gatos' },
-  { id: '10', nome: 'Petisco(cachorro)', preco: 'R$ 15,00', image: IMAGES.petiscocachorro, tag: 'Popular', category: 'caes' },
-  { id: '12', nome: 'Caixa De Transporte (Gato)', preco: 'R$ 50,00 ', image: IMAGES.caixadetransportegato, tag: 'Conforto', category: 'gatos' },
-  { id: '12', nome: 'Caixa De Transporte (Cachorro)', preco: 'R$ 60,00 ', image: IMAGES.caixadetransportecachorro, tag: 'Conforto', category: 'caes' },
-  { id: '13', nome: 'Caixa De Areia', preco: 'R$ 26,90 ', image: IMAGES.caixadeareia, tag: 'Higiene', category: 'gatos' },
-  { id: '14', nome: 'Casa de Cachorro', preco: 'R$ 89,80 ', image: IMAGES.casadecachorro, tag: 'Conforto', category: 'caes' },
-  { id: '15', nome: 'Cama de Pet', preco: 'R$ 39,98 ', image: IMAGES.camadepet, tag: 'Higiene', category: 'caes' },
-  { id: '16', nome: 'Tapete higienico', preco: 'R$ 37,99 ', image: IMAGES.tapetehigienico, tag: 'Higiene', category: 'caes' },
-  { id: '17', nome: 'Comedouro Simples', preco: 'R$ 15,90 ', image: IMAGES.comedourosimples, tag: 'Popular', category: 'caes' },
-  { id: '18', nome: 'Comedouro Duplo', preco: 'R$ 20,00 ', image: IMAGES.comedouroduplo, tag: 'Popular', category: 'caes' },
-  { id: '11', nome: 'Aquário Para Peixes (50L)', preco: 'R$ 250,00 ', image: IMAGES.aquario, tag: 'Popular', category: 'peixes' },
-  { id: '19', nome: 'Ração Para Peixes', preco: 'R$ 46,10 ', image: IMAGES.racaopeixes, tag: 'Saudável', category: 'peixes' },
-  { id: '20', nome: 'Filtro de Agua Aquario', preco: 'R$ 96,90 ', image: IMAGES.filtrodeagua, tag: 'Higiene', category: 'peixes' },
-  { id: '21', nome: 'Bomba de oxigênio', preco: 'R$ 57,80 ', image: IMAGES.bombadeoxigenioaquario, tag: 'Saúde', category: 'peixes' },
-  { id: '22', nome: 'Iluminação LED para aquário', preco: 'R$ 39,00 ', image: IMAGES.iluminacaoaquario, tag: 'Popular', category: 'peixes' },
-  { id: '23', nome: 'Plantas Artificiais para Aquario', preco: 'R$ 15,59 ', image: IMAGES.plantaaquario, tag: 'Popular', category: 'peixes' },
-  { id: '24', nome: 'Pedras Decorativas para Aquario', preco: 'R$ 2,90 ', image: IMAGES.pedradecorativaaquario, tag: 'Popular', category: 'peixes' },
-  { id: '25', nome: 'Esconderijo de Rocha para Aquario', preco: 'R$ 78,70 ', image: IMAGES.esconderijoaquario, tag: 'Popular', category: 'peixes' },
-  { id: '26', nome: 'Ração para Pássaros', preco: 'R$ 21,50 ', image: IMAGES.racaopassaros, tag: 'Saúde', category: 'aves' },
-  { id: '27', nome: 'Ração para Pássaros Premium', preco: 'R$ 299,90 ', image: IMAGES.racaopassaropremium, tag: 'Saúde', category: 'aves' },
-  { id: '28', nome: 'Bebedouro para Pássaros', preco: 'R$ 11,90 ', image: IMAGES.bebedouroaves, tag: 'Higiene', category: 'aves' },
-  { id: '29', nome: 'Comedouro para Pássaros', preco: 'R$ 14,99 ', image: IMAGES.comedouroaves, tag: 'Higiene', category: 'aves' },
-  { id: '30', nome: 'Kit Bebedouro e Comedouro Pássaros', preco: 'R$ 25,00 ', image: IMAGES.kitcomedouro, tag: 'Higiene', category: 'aves' },
-  { id: '31', nome: 'Balanço para Pássaros', preco: 'R$ 7,90 ', image: IMAGES.blancopassaros, tag: 'Popular', category: 'aves' },
+  {
+    id: "1",
+    nome: "Ração Premium Cães",
+    preco: "R$ 189,90",
+    image: IMAGES.racao,
+    tag: "Popular",
+    category: "caes",
+  },
+  {
+    id: "2",
+    nome: "Ração Premium Gatos",
+    preco: "R$ 159,90",
+    image: IMAGES.racaogato,
+    tag: "Saudável",
+    category: "gatos",
+  },
+  {
+    id: "3",
+    nome: "Brinquedo Interativo",
+    preco: "R$ 45,90",
+    image: IMAGES.brinquedos,
+    tag: "Diversão",
+    category: "caes",
+  },
+  {
+    id: "4",
+    nome: "Coleira Antipulgas",
+    preco: "R$ 189,90",
+    image: IMAGES.coleira,
+    tag: "Saúde",
+    category: "caes",
+  },
+  {
+    id: "5",
+    nome: "Cama Ortopédica",
+    preco: "R$ 159,90",
+    image: IMAGES.cama,
+    tag: "Conforto",
+    category: "caes",
+  },
+  {
+    id: "6",
+    nome: "Shampoo Hidratante",
+    preco: "R$ 45,90",
+    image: IMAGES.shamppo,
+    tag: "Higiene",
+    category: "caes",
+  },
+  {
+    id: "7",
+    nome: "Aranhador Para Gatos",
+    preco: "R$ 40,00",
+    image: IMAGES.arranhador,
+    tag: "Diversão",
+    category: "gatos",
+  },
+  {
+    id: "8",
+    nome: "Bebedouro Elétrico",
+    preco: "R$ 60,00",
+    image: IMAGES.bebedouro,
+    tag: "Saudável",
+    category: "gatos",
+  },
+  {
+    id: "9",
+    nome: "Petisco(Gato)",
+    preco: "R$ 15,00",
+    image: IMAGES.petisco,
+    tag: "Popular",
+    category: "gatos",
+  },
+  {
+    id: "10",
+    nome: "Petisco(cachorro)",
+    preco: "R$ 15,00",
+    image: IMAGES.petiscocachorro,
+    tag: "Popular",
+    category: "caes",
+  },
+  {
+    id: "12",
+    nome: "Caixa De Transporte (Gato)",
+    preco: "R$ 50,00 ",
+    image: IMAGES.caixadetransportegato,
+    tag: "Conforto",
+    category: "gatos",
+  },
+  {
+    id: "12",
+    nome: "Caixa De Transporte (Cachorro)",
+    preco: "R$ 60,00 ",
+    image: IMAGES.caixadetransportecachorro,
+    tag: "Conforto",
+    category: "caes",
+  },
+  {
+    id: "13",
+    nome: "Caixa De Areia",
+    preco: "R$ 26,90 ",
+    image: IMAGES.caixadeareia,
+    tag: "Higiene",
+    category: "gatos",
+  },
+  {
+    id: "14",
+    nome: "Casa de Cachorro",
+    preco: "R$ 89,80 ",
+    image: IMAGES.casadecachorro,
+    tag: "Conforto",
+    category: "caes",
+  },
+  {
+    id: "15",
+    nome: "Cama de Pet",
+    preco: "R$ 39,98 ",
+    image: IMAGES.camadepet,
+    tag: "Higiene",
+    category: "caes",
+  },
+  {
+    id: "16",
+    nome: "Tapete higienico",
+    preco: "R$ 37,99 ",
+    image: IMAGES.tapetehigienico,
+    tag: "Higiene",
+    category: "caes",
+  },
+  {
+    id: "17",
+    nome: "Comedouro Simples",
+    preco: "R$ 15,90 ",
+    image: IMAGES.comedourosimples,
+    tag: "Popular",
+    category: "caes",
+  },
+  {
+    id: "18",
+    nome: "Comedouro Duplo",
+    preco: "R$ 20,00 ",
+    image: IMAGES.comedouroduplo,
+    tag: "Popular",
+    category: "caes",
+  },
+  {
+    id: "11",
+    nome: "Aquário Para Peixes (50L)",
+    preco: "R$ 250,00 ",
+    image: IMAGES.aquario,
+    tag: "Popular",
+    category: "peixes",
+  },
+  {
+    id: "19",
+    nome: "Ração Para Peixes",
+    preco: "R$ 46,10 ",
+    image: IMAGES.racaopeixes,
+    tag: "Saudável",
+    category: "peixes",
+  },
+  {
+    id: "20",
+    nome: "Filtro de Agua Aquario",
+    preco: "R$ 96,90 ",
+    image: IMAGES.filtrodeagua,
+    tag: "Higiene",
+    category: "peixes",
+  },
+  {
+    id: "21",
+    nome: "Bomba de oxigênio",
+    preco: "R$ 57,80 ",
+    image: IMAGES.bombadeoxigenioaquario,
+    tag: "Saúde",
+    category: "peixes",
+  },
+  {
+    id: "22",
+    nome: "Iluminação LED para aquário",
+    preco: "R$ 39,00 ",
+    image: IMAGES.iluminacaoaquario,
+    tag: "Popular",
+    category: "peixes",
+  },
+  {
+    id: "23",
+    nome: "Plantas Artificiais para Aquario",
+    preco: "R$ 15,59 ",
+    image: IMAGES.plantaaquario,
+    tag: "Popular",
+    category: "peixes",
+  },
+  {
+    id: "24",
+    nome: "Pedras Decorativas para Aquario",
+    preco: "R$ 2,90 ",
+    image: IMAGES.pedradecorativaaquario,
+    tag: "Popular",
+    category: "peixes",
+  },
+  {
+    id: "25",
+    nome: "Esconderijo de Rocha para Aquario",
+    preco: "R$ 78,70 ",
+    image: IMAGES.esconderijoaquario,
+    tag: "Popular",
+    category: "peixes",
+  },
+  {
+    id: "26",
+    nome: "Ração para Pássaros",
+    preco: "R$ 21,50 ",
+    image: IMAGES.racaopassaros,
+    tag: "Saúde",
+    category: "aves",
+  },
+  {
+    id: "27",
+    nome: "Ração para Pássaros Premium",
+    preco: "R$ 299,90 ",
+    image: IMAGES.racaopassaropremium,
+    tag: "Saúde",
+    category: "aves",
+  },
+  {
+    id: "28",
+    nome: "Bebedouro para Pássaros",
+    preco: "R$ 11,90 ",
+    image: IMAGES.bebedouroaves,
+    tag: "Higiene",
+    category: "aves",
+  },
+  {
+    id: "29",
+    nome: "Comedouro para Pássaros",
+    preco: "R$ 14,99 ",
+    image: IMAGES.comedouroaves,
+    tag: "Higiene",
+    category: "aves",
+  },
+  {
+    id: "30",
+    nome: "Kit Bebedouro e Comedouro Pássaros",
+    preco: "R$ 25,00 ",
+    image: IMAGES.kitcomedouro,
+    tag: "Higiene",
+    category: "aves",
+  },
+  {
+    id: "31",
+    nome: "Balanço para Pássaros",
+    preco: "R$ 7,90 ",
+    image: IMAGES.blancopassaros,
+    tag: "Popular",
+    category: "aves",
+  },
 ];
 
 const CATEGORIES: Categoria[] = [
-  { id: 'c1', name: 'Cães', icon: 'paw', route: '/caes' },
-  { id: 'c2', name: 'Gatos', icon: 'logo-octocat', route: '/gatos' },
-  { id: 'c3', name: 'Aves', icon: 'egg', route: '/aves' },
-  { id: 'c4', name: 'Peixes', icon: 'fish', route: '/peixes' },
+  { id: "c1", name: "Cães", icon: "paw", route: "/caes" },
+  { id: "c2", name: "Gatos", icon: "logo-octocat", route: "/gatos" },
+  { id: "c3", name: "Aves", icon: "egg", route: "/aves" },
+  { id: "c4", name: "Peixes", icon: "fish", route: "/peixes" },
 ];
 
 export default function Home() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
-  
-  const [activeTab, setActiveTab] = useState('home');
+
+  const [activeTab, setActiveTab] = useState("home");
   const [cart, setCart] = useState<Produto[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [profileMenuPosition, setProfileMenuPosition] = useState({ top: 0, right: 0 });
+  const [profileMenuPosition, setProfileMenuPosition] = useState({
+    top: 0,
+    right: 0,
+  });
   const profileButtonRef = useRef<View>(null);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      const user = auth.currentUser;
+    // Monitora o estado de login e verifica permissões de administrador
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setIsLoggedIn(!!user);
       if (user) {
         try {
-          const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+          const userDoc = await getDoc(doc(db, "usuarios", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            if (userData.tipo === 'admin') {
+            if (userData.tipo === "admin") {
               setIsAdmin(true);
+            } else {
+              setIsAdmin(false);
             }
           }
         } catch (error) {
-          console.error('Erro ao verificar admin:', error);
+          console.error("Erro ao verificar admin:", error);
         }
+      } else {
+        setIsAdmin(false);
       }
-    };
-    checkAdmin();
+    });
+
+    return () => unsubscribe();
   }, []);
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setShowProfileMenu(false);
+      Alert.alert("Sucesso", "Você saiu da conta.");
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível sair.");
+    }
+  };
+
   const addToCart = (product: Produto) => {
-    const newItem = { ...product, cartId: Math.random().toString(36).substr(2, 9) };
+    const newItem = {
+      ...product,
+      cartId: Math.random().toString(36).substr(2, 9),
+    };
     setCart([...cart, newItem]);
-    setActiveTab('carrinho');
+    setActiveTab("carrinho");
   };
 
   const removeFromCart = (cartId: string | undefined) => {
     if (!cartId) return;
-    setCart(cart.filter(item => item.cartId !== cartId));
+    setCart(cart.filter((item) => item.cartId !== cartId));
   };
 
   const calculateTotal = () => {
     const total = cart.reduce((acc, item) => {
-      const priceStr = item.preco.replace('R$ ', '').replace('.', '').replace(',', '.');
+      const priceStr = item.preco
+        .replace("R$ ", "")
+        .replace(".", "")
+        .replace(",", ".");
       return acc + parseFloat(priceStr);
     }, 0);
-    return total.toFixed(2).replace('.', ',');
+    return total.toFixed(2).replace(".", ",");
   };
 
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
       <View style={styles.headerLeft}>
-        <Image source={IMAGES.logo} style={styles.headerLogo} resizeMode="contain" />
+        <Image
+          source={IMAGES.logo}
+          style={styles.headerLogo}
+          resizeMode="contain"
+        />
         <View>
-          <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>Olá, Pet Lover! </Text>
-          <Text style={[styles.brandText, { color: theme.text }]}>Golden Paw</Text>
+          <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
+            Olá, Pet Lover!{" "}
+          </Text>
+          <Text style={[styles.brandText, { color: theme.text }]}>
+            Golden Paw
+          </Text>
         </View>
       </View>
       <View style={styles.headerActions}>
-        <TouchableOpacity onPress={() => (router.push as any)('/adminLogin')} style={[styles.iconButton, { backgroundColor: theme.surface }]}>
-          <Ionicons name="settings" size={22} color={theme.primary} />
+        {/* Mostra botão de admin apenas se o usuário for administrador */}
+        {isAdmin && (
+          <TouchableOpacity
+            onPress={() => (router.push as any)("/adminDashboard")}
+            style={[styles.iconButton, { backgroundColor: theme.surface }]}
+          >
+            <Ionicons name="settings" size={22} color={theme.primary} />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          onPress={toggleColorScheme}
+          style={[styles.iconButton, { backgroundColor: theme.surface }]}
+        >
+          <Ionicons
+            name={colorScheme === "dark" ? "sunny" : "moon"}
+            size={22}
+            color={theme.primary}
+          />
         </TouchableOpacity>
-        <TouchableOpacity onPress={toggleColorScheme} style={[styles.iconButton, { backgroundColor: theme.surface }]}> 
-          <Ionicons name={colorScheme === 'dark' ? 'sunny' : 'moon'} size={22} color={theme.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           ref={profileButtonRef}
           onLayout={(event: LayoutChangeEvent) => {
             const layout = event.nativeEvent.layout;
@@ -205,69 +477,146 @@ export default function Home() {
               right: 20,
             });
           }}
-          onPress={() => setShowProfileMenu(!showProfileMenu)} 
+          onPress={() => setShowProfileMenu(!showProfileMenu)}
           style={[styles.iconButton, { backgroundColor: theme.surface }]}
         >
-          <Ionicons name="person-outline" size={22} color={theme.text} />
+          <Ionicons
+            name={isLoggedIn ? "person" : "person-outline"}
+            size={22}
+            color={theme.text}
+          />
         </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
+      <StatusBar
+        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
+      />
       {renderHeader()}
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {activeTab === 'home' && (
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {activeTab === "home" && (
           <View>
-            <View style={[styles.heroBanner, { backgroundColor: theme.primary }]}>
-              <Image source={IMAGES.banner} style={styles.heroBackgroundImage} resizeMode="cover" />
+            <View
+              style={[styles.heroBanner, { backgroundColor: theme.primary }]}
+            >
+              <Image
+                source={IMAGES.banner}
+                style={styles.heroBackgroundImage}
+                resizeMode="cover"
+              />
               <View style={styles.heroOverlay} />
               <View style={styles.heroContent}>
-                <Text style={styles.heroTitle}>Tudo para o seu melhor amigo</Text>
-                <Text style={styles.heroSubtitle}>Descontos de até 30% em rações selecionadas.</Text>
-                <TouchableOpacity style={styles.heroButton} onPress={() => setActiveTab('produtos')}>
+                <Text style={styles.heroTitle}>
+                  Tudo para o seu melhor amigo
+                </Text>
+                <Text style={styles.heroSubtitle}>
+                  Descontos de até 30% em rações selecionadas.
+                </Text>
+                <TouchableOpacity
+                  style={styles.heroButton}
+                  onPress={() => setActiveTab("produtos")}
+                >
                   <Text style={styles.heroButtonText}>Comprar Agora</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Categorias</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Categorias
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesScroll}
+            >
               {CATEGORIES.map((cat) => (
                 <TouchableOpacity
                   key={cat.id}
                   style={styles.categoryItem}
                   onPress={() => router.push(cat.route as CategoryRoute)}
                 >
-                  <View style={[styles.categoryIcon, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
-                    <Ionicons name={cat.icon as any} size={28} color={theme.primary} />
+                  <View
+                    style={[
+                      styles.categoryIcon,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={cat.icon as any}
+                      size={28}
+                      color={theme.primary}
+                    />
                   </View>
-                  <Text style={[styles.categoryName, { color: theme.textSecondary }]}>{cat.name}</Text>
+                  <Text
+                    style={[
+                      styles.categoryName,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {cat.name}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
 
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Destaques</Text>
-              <TouchableOpacity onPress={() => setActiveTab('produtos')}>
-                <Text style={{ color: theme.primary, fontWeight: '600' }}>Ver tudo</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Destaques
+              </Text>
+              <TouchableOpacity onPress={() => setActiveTab("produtos")}>
+                <Text style={{ color: theme.primary, fontWeight: "600" }}>
+                  Ver tudo
+                </Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
               {PRODUTOS_DATA.slice(0, 4).map((item) => (
-                <View key={`feat-${item.id}`} style={[styles.featuredCard, { backgroundColor: theme.surface }]}>
+                <View
+                  key={`feat-${item.id}`}
+                  style={[
+                    styles.featuredCard,
+                    { backgroundColor: theme.surface },
+                  ]}
+                >
                   <View style={styles.tagBadge}>
                     <Text style={styles.tagText}>{item.tag}</Text>
                   </View>
-                  <Image source={item.image} style={styles.featuredImage} resizeMode="contain" />
-                  <Text style={[styles.productName, { color: theme.text }]} numberOfLines={1}>{item.nome}</Text>
-                  <Text style={[styles.productPrice, { color: theme.primary }]}>{item.preco}</Text>
-                  <TouchableOpacity 
-                    style={[styles.addButton, { backgroundColor: theme.primary }]} 
+                  <Image
+                    source={item.image}
+                    style={styles.featuredImage}
+                    resizeMode="contain"
+                  />
+                  <Text
+                    style={[styles.productName, { color: theme.text }]}
+                    numberOfLines={1}
+                  >
+                    {item.nome}
+                  </Text>
+                  <Text style={[styles.productPrice, { color: theme.primary }]}>
+                    {item.preco}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.addButton,
+                      { backgroundColor: theme.primary },
+                    ]}
                     onPress={() => addToCart(item)}
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -280,19 +629,45 @@ export default function Home() {
           </View>
         )}
 
-        {activeTab === 'produtos' && (
+        {activeTab === "produtos" && (
           <View style={styles.gridContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 20 }]}>Nossa Loja</Text>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.text, marginBottom: 20 },
+              ]}
+            >
+              Nossa Loja
+            </Text>
             <View style={styles.grid}>
               {PRODUTOS_DATA.map((item) => (
-                <View key={`grid-${item.id}`} style={[styles.gridCard, { backgroundColor: theme.surface }]}>
-                  <Image source={item.image} style={styles.gridImage} resizeMode="contain" />
+                <View
+                  key={`grid-${item.id}`}
+                  style={[styles.gridCard, { backgroundColor: theme.surface }]}
+                >
+                  <Image
+                    source={item.image}
+                    style={styles.gridImage}
+                    resizeMode="contain"
+                  />
                   <View style={styles.gridInfo}>
-                    <Text style={[styles.productName, { color: theme.text }]} numberOfLines={1}>{item.nome}</Text>
-                    <Text style={[styles.productPrice, { color: theme.primary }]}>{item.preco}</Text>
+                    <Text
+                      style={[styles.productName, { color: theme.text }]}
+                      numberOfLines={1}
+                    >
+                      {item.nome}
+                    </Text>
+                    <Text
+                      style={[styles.productPrice, { color: theme.primary }]}
+                    >
+                      {item.preco}
+                    </Text>
                   </View>
-                  <TouchableOpacity 
-                    style={[styles.gridAddButton, { backgroundColor: theme.primary }]} 
+                  <TouchableOpacity
+                    style={[
+                      styles.gridAddButton,
+                      { backgroundColor: theme.primary },
+                    ]}
                     onPress={() => addToCart(item)}
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -305,38 +680,100 @@ export default function Home() {
           </View>
         )}
 
-        {activeTab === 'carrinho' && (
+        {activeTab === "carrinho" && (
           <View style={styles.cartContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 20 }]}>Meu Carrinho</Text>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.text, marginBottom: 20 },
+              ]}
+            >
+              Meu Carrinho
+            </Text>
             {cart.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="cart-outline" size={80} color={theme.textSecondary} />
-                <Text style={[styles.emptyStateTitle, { color: theme.text }]}>Vazio</Text>
-                <TouchableOpacity style={[styles.emptyButton, { backgroundColor: theme.primary }]} onPress={() => setActiveTab('produtos')}>
+                <Ionicons
+                  name="cart-outline"
+                  size={80}
+                  color={theme.textSecondary}
+                />
+                <Text style={[styles.emptyStateTitle, { color: theme.text }]}>
+                  Vazio
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.emptyButton,
+                    { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => setActiveTab("produtos")}
+                >
                   <Text style={styles.emptyButtonText}>Ir para a Loja</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.cartList}>
                 {cart.map((item) => (
-                  <View key={item.cartId} style={[styles.cartItem, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                    <Image source={item.image} style={styles.cartItemImage} resizeMode="contain" />
+                  <View
+                    key={item.cartId}
+                    style={[
+                      styles.cartItem,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <Image
+                      source={item.image}
+                      style={styles.cartItemImage}
+                      resizeMode="contain"
+                    />
                     <View style={styles.cartItemInfo}>
-                      <Text style={[styles.productName, { color: theme.text }]}>{item.nome}</Text>
-                      <Text style={[styles.productPrice, { color: theme.primary }]}>{item.preco}</Text>
+                      <Text style={[styles.productName, { color: theme.text }]}>
+                        {item.nome}
+                      </Text>
+                      <Text
+                        style={[styles.productPrice, { color: theme.primary }]}
+                      >
+                        {item.preco}
+                      </Text>
                     </View>
-                    <TouchableOpacity onPress={() => removeFromCart(item.cartId)}>
-                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                    <TouchableOpacity
+                      onPress={() => removeFromCart(item.cartId)}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={20}
+                        color="#EF4444"
+                      />
                     </TouchableOpacity>
                   </View>
                 ))}
-                <View style={[styles.cartFooter, { borderTopColor: theme.border }]}>
+                <View
+                  style={[styles.cartFooter, { borderTopColor: theme.border }]}
+                >
                   <View style={styles.totalRow}>
-                    <Text style={[styles.totalLabel, { color: theme.textSecondary }]}>Total:</Text>
-                    <Text style={[styles.totalValue, { color: theme.text }]}>R$ {calculateTotal()}</Text>
+                    <Text
+                      style={[
+                        styles.totalLabel,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      Total:
+                    </Text>
+                    <Text style={[styles.totalValue, { color: theme.text }]}>
+                      R$ {calculateTotal()}
+                    </Text>
                   </View>
-                  <TouchableOpacity style={[styles.checkoutButton, { backgroundColor: theme.primary }]}>
-                    <Text style={styles.checkoutButtonText}>Finalizar Compra</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.checkoutButton,
+                      { backgroundColor: theme.primary },
+                    ]}
+                  >
+                    <Text style={styles.checkoutButtonText}>
+                      Finalizar Compra
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -345,48 +782,134 @@ export default function Home() {
         )}
       </ScrollView>
 
-      <View style={[styles.bottomTab, { backgroundColor: theme.surface, paddingBottom: insets.bottom + 10, borderTopColor: theme.border }]}>
+      <View
+        style={[
+          styles.bottomTab,
+          {
+            backgroundColor: theme.surface,
+            paddingBottom: insets.bottom + 10,
+            borderTopColor: theme.border,
+          },
+        ]}
+      >
         {[
-          { id: 'home', icon: 'home' as const, label: 'Início' },
-          { id: 'produtos', icon: 'search' as const, label: 'Loja' },
-          { id: 'carrinho', icon: 'cart' as const, label: 'Carrinho' },
+          { id: "home", icon: "home" as const, label: "Início" },
+          { id: "produtos", icon: "search" as const, label: "Loja" },
+          { id: "carrinho", icon: "cart" as const, label: "Carrinho" },
         ].map((tab) => (
-          <TouchableOpacity key={tab.id} onPress={() => setActiveTab(tab.id)} style={styles.tabItem}>
-            <Ionicons 
-              name={activeTab === tab.id ? tab.icon : `${tab.icon}-outline` as any} 
-              size={24} 
-              color={activeTab === tab.id ? theme.primary : theme.textSecondary} 
+          <TouchableOpacity
+            key={tab.id}
+            onPress={() => setActiveTab(tab.id)}
+            style={styles.tabItem}
+          >
+            <Ionicons
+              name={
+                activeTab === tab.id ? tab.icon : (`${tab.icon}-outline` as any)
+              }
+              size={24}
+              color={activeTab === tab.id ? theme.primary : theme.textSecondary}
             />
-            <Text style={[styles.tabLabel, { color: activeTab === tab.id ? theme.primary : theme.textSecondary }]}>{tab.label}</Text>
+            <Text
+              style={[
+                styles.tabLabel,
+                {
+                  color:
+                    activeTab === tab.id ? theme.primary : theme.textSecondary,
+                },
+              ]}
+            >
+              {tab.label}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {showProfileMenu && (
         <>
-          <Pressable 
-            style={styles.dropdownOverlay} 
+          <Pressable
+            style={styles.dropdownOverlay}
             onPress={() => setShowProfileMenu(false)}
           />
-          <View style={[styles.dropdownMenu, { backgroundColor: theme.surface, top: profileMenuPosition.top, right: profileMenuPosition.right }]}>
-            <TouchableOpacity
-              style={[styles.dropdownOption, { borderBottomColor: theme.border }]}
-              onPress={() => {
-                setShowProfileMenu(false);
-                router.push('/register');
-              }}
-            >
-              <Text style={[styles.dropdownOptionText, { color: theme.text }]}>Cadastrar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.dropdownOption, { borderBottomColor: theme.border }]}
-              onPress={() => {
-                setShowProfileMenu(false);
-                router.push('/login');
-              }}
-            >
-              <Text style={[styles.dropdownOptionText, { color: theme.text }]}>Login</Text>
-            </TouchableOpacity>
+          <View
+            style={[
+              styles.dropdownMenu,
+              {
+                backgroundColor: theme.surface,
+                top: profileMenuPosition.top,
+                right: profileMenuPosition.right,
+              },
+            ]}
+          >
+            {isLoggedIn ? (
+              // Menu se o usuário estiver logado
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.dropdownOption,
+                    { borderBottomColor: theme.border },
+                  ]}
+                  onPress={() => {
+                    setShowProfileMenu(false);
+                    router.push("/profile");
+                  }}
+                >
+                  <Text
+                    style={[styles.dropdownOptionText, { color: theme.text }]}
+                  >
+                    Minha Conta
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.dropdownOption,
+                    { borderBottomColor: theme.border },
+                  ]}
+                  onPress={handleLogout}
+                >
+                  <Text
+                    style={[styles.dropdownOptionText, { color: "#EF4444" }]}
+                  >
+                    Sair
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              // Menu se o usuário não estiver logado
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.dropdownOption,
+                    { borderBottomColor: theme.border },
+                  ]}
+                  onPress={() => {
+                    setShowProfileMenu(false);
+                    router.push("/register");
+                  }}
+                >
+                  <Text
+                    style={[styles.dropdownOptionText, { color: theme.text }]}
+                  >
+                    Cadastrar
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.dropdownOption,
+                    { borderBottomColor: theme.border },
+                  ]}
+                  onPress={() => {
+                    setShowProfileMenu(false);
+                    router.push("/login");
+                  }}
+                >
+                  <Text
+                    style={[styles.dropdownOptionText, { color: theme.text }]}
+                  >
+                    Login
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </>
       )}
@@ -397,81 +920,227 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingBottom: 120 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 20 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center' },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  headerLeft: { flexDirection: "row", alignItems: "center" },
   headerLogo: { width: 45, height: 45, marginRight: 12, borderRadius: 10 },
-  welcomeText: { fontSize: 12, fontWeight: '500' },
-  brandText: { fontSize: 18, fontWeight: '800' },
-  headerActions: { flexDirection: 'row', gap: 10 },
-  iconButton: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  heroBanner: { 
-    marginHorizontal: 20, 
-    borderRadius: 24, 
-    height: 220, 
-    overflow: 'hidden', 
-    marginBottom: 25, 
-    position: 'relative',
-    width: SCREEN_WIDTH - 40 
+  welcomeText: { fontSize: 12, fontWeight: "500" },
+  brandText: { fontSize: 18, fontWeight: "800" },
+  headerActions: { flexDirection: "row", gap: 10 },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  heroBackgroundImage: { 
-    ...StyleSheet.absoluteFillObject, 
-    width: '100%', 
-    height: '100%' 
+  heroBanner: {
+    marginHorizontal: 20,
+    borderRadius: 24,
+    height: 220,
+    overflow: "hidden",
+    marginBottom: 25,
+    position: "relative",
+    width: SCREEN_WIDTH - 40,
   },
-  heroOverlay: { 
-    ...StyleSheet.absoluteFillObject, 
-    backgroundColor: 'rgba(0,0,0,0.4)' 
+  heroBackgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
   },
-  heroContent: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    zIndex: 2, 
-    padding: 25 
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
-  heroTitle: { color: '#FFF', fontSize: 24, fontWeight: '800', marginBottom: 8 },
-  heroSubtitle: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginBottom: 20 },
-  heroButton: { backgroundColor: '#FFF', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, alignSelf: 'flex-start' },
-  heroButtonText: { color: '#D4AF37', fontWeight: 'bold', fontSize: 14 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 20, marginBottom: 15 },
+  heroContent: {
+    flex: 1,
+    justifyContent: "center",
+    zIndex: 2,
+    padding: 25,
+  },
+  heroTitle: {
+    color: "#FFF",
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  heroSubtitle: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  heroButton: {
+    backgroundColor: "#FFF",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignSelf: "flex-start",
+  },
+  heroButtonText: { color: "#D4AF37", fontWeight: "bold", fontSize: 14 },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    paddingHorizontal: 20,
+    marginBottom: 15,
+  },
   categoriesScroll: { paddingHorizontal: 15, marginBottom: 20 },
-  categoryItem: { alignItems: 'center', marginHorizontal: 8 },
-  categoryIcon: { width: 64, height: 64, borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  categoryName: { fontSize: 12, fontWeight: '600' },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 15 },
+  categoryItem: { alignItems: "center", marginHorizontal: 8 },
+  categoryIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  categoryName: { fontSize: 12, fontWeight: "600" },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 15,
+  },
   horizontalScroll: { paddingHorizontal: 15, paddingBottom: 10 },
-  featuredCard: { width: 160, borderRadius: 20, padding: 15, marginHorizontal: 8, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-  featuredImage: { width: '100%', height: 100, marginBottom: 12 },
-  tagBadge: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(212, 175, 55, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, zIndex: 1 },
-  tagText: { color: '#D4AF37', fontSize: 10, fontWeight: '700' },
-  productName: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
-  productPrice: { fontSize: 16, fontWeight: '800' },
-  addButton: { position: 'absolute', bottom: 12, right: 12, width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  featuredCard: {
+    width: 160,
+    borderRadius: 20,
+    padding: 15,
+    marginHorizontal: 8,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  featuredImage: { width: "100%", height: 100, marginBottom: 12 },
+  tagBadge: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    backgroundColor: "rgba(212, 175, 55, 0.2)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    zIndex: 1,
+  },
+  tagText: { color: "#D4AF37", fontSize: 10, fontWeight: "700" },
+  productName: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
+  productPrice: { fontSize: 16, fontWeight: "800" },
+  addButton: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   gridContainer: { paddingHorizontal: 20 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridCard: { width: '47%', borderRadius: 20, padding: 12, marginBottom: 18, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  gridImage: { width: '100%', height: 120, marginBottom: 10 },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  gridCard: {
+    width: "47%",
+    borderRadius: 20,
+    padding: 12,
+    marginBottom: 18,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  gridImage: { width: "100%", height: 120, marginBottom: 10 },
   gridInfo: { paddingHorizontal: 4 },
-  gridAddButton: { marginTop: 10, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  bottomTab: { position: 'absolute', bottom: 0, width: '100%', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 12, borderTopWidth: 1 },
-  tabItem: { alignItems: 'center' },
-  tabLabel: { fontSize: 10, fontWeight: '600', marginTop: 4 },
+  gridAddButton: {
+    marginTop: 10,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bottomTab: {
+    position: "absolute",
+    bottom: 0,
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  tabItem: { alignItems: "center" },
+  tabLabel: { fontSize: 10, fontWeight: "600", marginTop: 4 },
   cartContainer: { paddingHorizontal: 20 },
   cartList: { marginBottom: 20 },
-  cartItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 15, borderWidth: 1, marginBottom: 10 },
+  cartItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 15,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
   cartItemImage: { width: 50, height: 50, marginRight: 15 },
   cartItemInfo: { flex: 1 },
   cartFooter: { marginTop: 20, paddingTop: 20, borderTopWidth: 1 },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  totalLabel: { fontSize: 16, fontWeight: '600' },
-  totalValue: { fontSize: 20, fontWeight: '800' },
-  checkoutButton: { height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
-  checkoutButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-  emptyStateTitle: { fontSize: 20, fontWeight: '800', marginTop: 10, marginBottom: 20 },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  totalLabel: { fontSize: 16, fontWeight: "600" },
+  totalValue: { fontSize: 20, fontWeight: "800" },
+  checkoutButton: {
+    height: 55,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkoutButtonText: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    marginTop: 10,
+    marginBottom: 20,
+  },
   emptyButton: { paddingHorizontal: 30, paddingVertical: 15, borderRadius: 15 },
-  emptyButtonText: { color: '#FFF', fontWeight: 'bold' },
-  dropdownOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 98 },
-  dropdownMenu: { position: 'absolute', width: 160, borderRadius: 12, overflow: 'hidden', zIndex: 99, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3 },
-  dropdownOption: { padding: 15, borderBottomWidth: 1, alignItems: 'center' },
-  dropdownOptionText: { fontSize: 16, fontWeight: '600' },
+  emptyButtonText: { color: "#FFF", fontWeight: "bold" },
+  dropdownOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 98,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    width: 160,
+    borderRadius: 12,
+    overflow: "hidden",
+    zIndex: 99,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
+  dropdownOption: { padding: 15, borderBottomWidth: 1, alignItems: "center" },
+  dropdownOptionText: { fontSize: 16, fontWeight: "600" },
 });

@@ -131,7 +131,6 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    // Agora o cadastro só avança se a senha for forte
     if (!validate()) return;
 
     setLoading(true);
@@ -157,18 +156,14 @@ export default function RegisterScreen() {
         tipo: "cliente",
         criadoEm: new Date().toISOString(),
       });
-      router.replace("/(tabs)");
+
+      // Redirecionamento após sucesso
+      Alert.alert("Sucesso", "Cadastro realizado! Por favor, faça login.", [
+        { text: "OK", onPress: () => router.replace("/login") },
+      ]);
     } catch (error: any) {
-      if (error.code === "auth/email-already-in-use") {
-        setErrors({ ...errors, email: "Este e-mail já está em uso." });
-      } else if (error.code === "auth/weak-password") {
-        setErrors({
-          ...errors,
-          password: "O Firebase considerou esta senha fraca.",
-        });
-      } else {
-        Alert.alert("Erro", "Falha ao cadastrar no banco de dados.");
-      }
+      // ... seu tratamento de erro atual
+      Alert.alert("Erro", "Falha ao cadastrar.");
     } finally {
       setLoading(false);
     }
