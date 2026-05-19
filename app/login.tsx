@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useAppTheme } from '@/hooks/use-app-theme';
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 
@@ -56,7 +56,8 @@ export default function LoginScreen() {
     } catch (error: any) {
       console.error(error);
       let message = "E-mail ou senha incorretos.";
-      if (error.code === "auth/user-not-found") message = "Usuário não encontrado.";
+      if (error.code === "auth/user-not-found")
+        message = "Usuário não encontrado.";
       if (error.code === "auth/wrong-password") message = "Senha incorreta.";
       Alert.alert("Erro no Login", message);
     } finally {
@@ -65,8 +66,12 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
-      <StatusBar barStyle={colorScheme === "dark" ? "light-content" : "dark-content"} />
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
+      <StatusBar
+        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
+      />
 
       <TouchableOpacity
         style={[
@@ -95,23 +100,39 @@ export default function LoginScreen() {
         onPress={toggleColorScheme}
         activeOpacity={0.7}
       >
-        <Ionicons name={colorScheme === "dark" ? "sunny" : "moon"} size={22} color={theme.primary} />
+        <Ionicons
+          name={colorScheme === "dark" ? "sunny" : "moon"}
+          size={22}
+          color={theme.primary}
+        />
       </TouchableOpacity>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 80 }]}> 
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: insets.top + 80 },
+          ]}
+        >
           <View style={styles.content}>
             <Image
               source={IMAGES.logo}
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={[styles.title, { color: theme.text }]}>Bem-vindo de volta!</Text>
+            <Text style={[styles.title, { color: theme.text }]}>
+              Bem-vindo de volta!
+            </Text>
 
-            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
+            <View
+              style={[
+                styles.inputContainer,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Email"
@@ -123,7 +144,12 @@ export default function LoginScreen() {
               />
             </View>
 
-            <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
+            <View
+              style={[
+                styles.inputContainer,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
               <TextInput
                 style={[styles.input, { color: theme.text }]}
                 placeholder="Senha"
@@ -135,7 +161,10 @@ export default function LoginScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.loginButton, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }]}
+              style={[
+                styles.loginButton,
+                { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 },
+              ]}
               onPress={handleLogin}
               disabled={loading}
             >
@@ -147,7 +176,9 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.push("/register")}>
-              <Text style={[styles.linkText, { color: theme.primary }]}>Não tem uma conta? Cadastre-se</Text>
+              <Text style={[styles.linkText, { color: theme.primary }]}>
+                Não tem uma conta? Cadastre-se
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

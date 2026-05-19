@@ -11,15 +11,17 @@ import {
   ImageSourcePropType,
   LayoutChangeEvent,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { auth, db } from "../../firebaseConfig";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
