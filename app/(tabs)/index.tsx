@@ -172,7 +172,7 @@ const PRODUTOS_DATA: Produto[] = [
     category: "caes",
   },
   {
-    id: "12",
+    id: "11-gato",
     nome: "Caixa De Transporte (Gato)",
     preco: "R$ 50,00 ",
     image: IMAGES.caixadetransportegato,
@@ -180,7 +180,7 @@ const PRODUTOS_DATA: Produto[] = [
     category: "gatos",
   },
   {
-    id: "12",
+    id: "12-cachorro",
     nome: "Caixa De Transporte (Cachorro)",
     preco: "R$ 60,00 ",
     image: IMAGES.caixadetransportecachorro,
