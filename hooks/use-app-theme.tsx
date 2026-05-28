@@ -54,7 +54,7 @@ const AppThemeContext = createContext<AppThemeContextValue | undefined>(undefine
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   const systemColorScheme = useRNColorScheme() === 'dark' ? 'dark' : 'light';
-  const [colorScheme, setColorSchemeState] = useState<ThemeMode>(systemColorScheme);
+  const [colorScheme, setColorSchemeState] = useState<ThemeMode>('light');
   const [userPreference, setUserPreference] = useState<ThemeMode | null>(null);
 
   useEffect(() => {

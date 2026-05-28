@@ -77,10 +77,10 @@ const IMAGES = {
   filtrodeagua: require("../../assets/img/filtroaquario.png"),
 
   // os itens abaixo estõ sem imagem
-  bombadeoxigenioaquario: require("../../assets/img/camadepet.png"),
-  iluminacaoaquario: require("../../assets/img/camadepet.png"),
-  plantaaquario: require("../../assets/img/camadepet.png"),
-  pedradecorativaaquario: require("../../assets/img/camadepet.png"),
+  bombadeoxigenioaquario: require("../../assets/img/bombaoxigenio.png"),
+  iluminacaoaquario: require("../../assets/img/ledaquario.png"),
+  plantaaquario: require("../../assets/img/plantasaquario.png"),
+  pedradecorativaaquario: require("../../assets/img/pedrasaquario.png"),
   esconderijoaquario: require("../../assets/img/camadepet.png"),
   racaopassaros: require("../../assets/img/camadepet.png"),
   racaopassaropremium: require("../../assets/img/camadepet.png"),
@@ -286,7 +286,7 @@ const PRODUTOS_DATA: Produto[] = [
   {
     id: "24",
     nome: "Pedras Decorativas para Aquario",
-    preco: "R$ 2,90 ",
+    preco: "R$ 20,90 ",
     image: IMAGES.pedradecorativaaquario,
     tag: "Popular",
     category: "peixes",
@@ -1021,7 +1021,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  featuredImage: { width: "100%", height: 100, marginBottom: 12 },
+  featuredImage: { width: "100%", height: 130, marginBottom: 12 },
   tagBadge: {
     position: "absolute",
     top: 10,
@@ -1062,7 +1062,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  gridImage: { width: "100%", height: 120, marginBottom: 10 },
+  gridImage: { width: "100%", height: 150, marginBottom: 10 },
   gridInfo: { paddingHorizontal: 4 },
   gridAddButton: {
     marginTop: 10,
