@@ -75,19 +75,17 @@ const IMAGES = {
   aquario: require("../../assets/img/aquario.png"),
   racaopeixes: require("../../assets/img/racaopeixe.png"),
   filtrodeagua: require("../../assets/img/filtroaquario.png"),
-
-  // os itens abaixo estõ sem imagem
   bombadeoxigenioaquario: require("../../assets/img/bombaoxigenio.png"),
   iluminacaoaquario: require("../../assets/img/ledaquario.png"),
   plantaaquario: require("../../assets/img/plantasaquario.png"),
   pedradecorativaaquario: require("../../assets/img/pedrasaquario.png"),
-  esconderijoaquario: require("../../assets/img/camadepet.png"),
-  racaopassaros: require("../../assets/img/camadepet.png"),
-  racaopassaropremium: require("../../assets/img/camadepet.png"),
-  bebedouroaves: require("../../assets/img/camadepet.png"),
-  comedouroaves: require("../../assets/img/camadepet.png"),
-  kitcomedouro: require("../../assets/img/camadepet.png"),
-  blancopassaros: require("../../assets/img/camadepet.png"),
+  esconderijoaquario: require("../../assets/img/esconderijopedra.png"),
+  racaopassaros: require("../../assets/img/racaopassaro.png"),
+  racaopassaropremium: require("../../assets/img/racaopassaropremium.png"),
+  bebedouroaves: require("../../assets/img/bebedouropassaro.png"),
+  comedouroaves: require("../../assets/img/comedouropassaro.png"),
+  kitcomedouro: require("../../assets/img/kitcomedouroebebedouro.png"),
+  blancopassaros: require("../../assets/img/balancopassaro.png"),
 };
 
 const PRODUTOS_DATA: Produto[] = [
@@ -294,7 +292,7 @@ const PRODUTOS_DATA: Produto[] = [
   {
     id: "25",
     nome: "Esconderijo de Rocha para Aquario",
-    preco: "R$ 78,70 ",
+    preco: "R$ 55,70 ",
     image: IMAGES.esconderijoaquario,
     tag: "Popular",
     category: "peixes",
@@ -310,7 +308,7 @@ const PRODUTOS_DATA: Produto[] = [
   {
     id: "27",
     nome: "Ração para Pássaros Premium",
-    preco: "R$ 299,90 ",
+    preco: "R$ 99,90 ",
     image: IMAGES.racaopassaropremium,
     tag: "Saúde",
     category: "aves",
@@ -1021,7 +1019,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  featuredImage: { width: "100%", height: 130, marginBottom: 12 },
+  featuredImage: { width: "100%", height: 110, marginBottom: 12 },
   tagBadge: {
     position: "absolute",
     top: 10,
