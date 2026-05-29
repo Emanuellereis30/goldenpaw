@@ -347,6 +347,67 @@ const PRODUTOS_DATA: Produto[] = [
   },
 ];
 
+const FEATURED_PRODUCT_IDS = ["1", "2", "26", "3", "4"];
+
+const ADOPTION_PETS = [
+  {
+    id: "a1",
+    nome: "Luna",
+    age: "2 anos",
+    type: "Gata carinhosa",
+    description: "Castrada, vacinada e adora colo. Perfeita para apartamento.",
+  },
+  {
+    id: "a2",
+    nome: "Thor",
+    age: "1 ano",
+    type: "Cachorro brincalhão",
+    description: "Energia positiva e ótimo companheiro para famílias.",
+  },
+  {
+    id: "a3",
+    nome: "Mila",
+    age: "3 anos",
+    type: "Caõ de porte médio",
+    description: "Amigável, já está castrado e preparado para adoção.",
+  },
+  {
+    id: "a4",
+    nome: "Nina",
+    age: "6 meses",
+    type: "Filhote tímida",
+    description: "Gosta de carinho e precisa de um lar tranquilo.",
+  },
+  {
+    id: "a5",
+    nome: "Bento",
+    age: "4 anos",
+    type: "Cachorro calmo",
+    description: "Sociável e obediente, ideal para quem busca um amigo leal.",
+  },
+  {
+    id: "a6",
+    nome: "Mia",
+    age: "8 meses",
+    type: "Gatinha brincalhona",
+    description: "Adora brincar com bolinhas e é muito carinhosa.",
+  },
+  {
+    id: "a7",
+    nome: "Zeus",
+    age: "2 anos",
+    type: "Cão protetor",
+    description: "Leal e guarda bem a casa, já vacinado e castrado.",
+  },
+  {
+    id: "a8",
+    nome: "Lola",
+    age: "1 ano",
+    type: "Gata delicada",
+    description: "Calma e charmosa, adora estar perto de pessoas.",
+  }
+];
+
 const CATEGORIES: Categoria[] = [
   { id: "c1", name: "Cães", icon: "paw", route: "/caes" },
   { id: "c2", name: "Gatos", icon: "logo-octocat", route: "/gatos" },
@@ -587,13 +648,16 @@ export default function Home() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalScroll}
             >
-              {PRODUTOS_DATA.slice(0, 4).map((item) => (
-                <View
-                  key={`feat-${item.id}`}
-                  style={[
-                    styles.featuredCard,
-                    { backgroundColor: theme.surface },
-                  ]}
+              {FEATURED_PRODUCT_IDS.map((id) => {
+                const item = PRODUTOS_DATA.find((product) => product.id === id);
+                if (!item) return null;
+                return (
+                  <View
+                    key={`feat-${item.id}`}
+                    style={[
+                      styles.featuredCard,
+                      { backgroundColor: theme.surface },
+                    ]}
                 >
                   <View style={styles.tagBadge}>
                     <Text style={styles.tagText}>{item.tag}</Text>
@@ -624,8 +688,30 @@ export default function Home() {
                     <Ionicons name="add" size={20} color="#FFF" />
                   </TouchableOpacity>
                 </View>
-              ))}
+              );
+            })}
             </ScrollView>
+          </View>
+        )}
+
+        {activeTab === "adocao" && (
+          <View style={styles.adoptionContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Adoção</Text>
+            <Text style={[styles.adoptionDescription, { color: theme.textSecondary }]}>Conheça animais que estão esperando um lar cheio de amor.</Text>
+            <View style={styles.adoptionGrid}>
+              {ADOPTION_PETS.map((pet) => (
+                <View key={pet.id} style={[styles.adoptionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
+                  <View style={[styles.adoptionImage, { backgroundColor: theme.primary + '20' }]}> 
+                    <Text style={[styles.adoptionImageText, { color: theme.primary }]}>Foto do animal</Text>
+                  </View>
+                  <View style={styles.adoptionDetails}>
+                    <Text style={[styles.adoptionPetName, { color: theme.text }]}>{pet.nome}</Text>
+                    <Text style={[styles.adoptionPetMeta, { color: theme.textSecondary }]}>{pet.type} • {pet.age}</Text>
+                    <Text style={[styles.adoptionDescriptionText, { color: theme.textSecondary }]}>{pet.description}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           </View>
         )}
 
@@ -795,6 +881,7 @@ export default function Home() {
         {[
           { id: "home", icon: "home" as const, label: "Início" },
           { id: "produtos", icon: "search" as const, label: "Loja" },
+          { id: "adocao", icon: "paw" as const, label: "Adoção" },
           { id: "carrinho", icon: "cart" as const, label: "Carrinho" },
         ].map((tab) => (
           <TouchableOpacity
@@ -1030,6 +1117,35 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     zIndex: 1,
   },
+  adoptionContainer: { paddingHorizontal: 20, paddingBottom: 40 },
+  adoptionDescription: { fontSize: 15, marginBottom: 20 },
+  adoptionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  adoptionCard: {
+    width: "48%",
+    borderRadius: 22,
+    overflow: "hidden",
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  adoptionImage: {
+    width: "100%",
+    height: 180,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  adoptionImageText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  adoptionDetails: { padding: 14 },
+  adoptionPetName: { fontSize: 16, fontWeight: "800", marginBottom: 4 },
+  adoptionPetMeta: { fontSize: 13, marginBottom: 8 },
+  adoptionDescriptionText: { fontSize: 13, lineHeight: 18 },
+
   tagText: { color: "#D4AF37", fontSize: 10, fontWeight: "700" },
   productName: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
   productPrice: { fontSize: 16, fontWeight: "800" },
