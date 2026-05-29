@@ -15,6 +15,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -408,6 +409,27 @@ const ADOPTION_PETS = [
   }
 ];
 
+const VETERINARY_CLINICS = [
+  {
+    id: "v1",
+    name: "Clínica Vet Golden",
+    address: "Av. Pet Lovers, 234 - Centro",
+    distance: "1,2 km",
+  },
+  {
+    id: "v2",
+    name: "Hospital Veterinário Andarilho",
+    address: "R. das Flores, 112 - Jardim Pet",
+    distance: "2,8 km",
+  },
+  {
+    id: "v3",
+    name: "ClinVet 24h",
+    address: "Av. Bem Estar, 78 - Vila Animal",
+    distance: "3,5 km",
+  },
+];
+
 const CATEGORIES: Categoria[] = [
   { id: "c1", name: "Cães", icon: "paw", route: "/caes" },
   { id: "c2", name: "Gatos", icon: "logo-octocat", route: "/gatos" },
@@ -430,6 +452,18 @@ export default function Home() {
     right: 0,
   });
   const profileButtonRef = useRef<View>(null);
+  const [addressQuery, setAddressQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  const handleSearchClinics = () => {
+    const query = addressQuery.trim().toLowerCase();
+    const results = VETERINARY_CLINICS.filter((clinic) =>
+      clinic.name.toLowerCase().includes(query) ||
+      clinic.address.toLowerCase().includes(query)
+    );
+
+    setSearchResults(results.length ? results : VETERINARY_CLINICS);
+  };
 
   useEffect(() => {
     // Monitora o estado de login e verifica permissões de administrador
@@ -866,6 +900,64 @@ export default function Home() {
             )}
           </View>
         )}
+
+        {activeTab === "veterinaria" && (
+          <View style={styles.vetContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Clínicas Veterinárias</Text>
+            <Text style={[styles.adoptionDescription, { color: theme.textSecondary }]}>Busque o atendimento mais próximo e veja clínicas disponíveis na sua região.</Text>
+
+            <TextInput
+              style={[
+                styles.searchInput,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                  color: theme.text,
+                },
+              ]}
+              placeholder="Digite endereço ou bairro"
+              placeholderTextColor={theme.textSecondary}
+              value={addressQuery}
+              onChangeText={setAddressQuery}
+            />
+            <TouchableOpacity
+              style={[styles.searchButton, { backgroundColor: theme.primary }]}
+              onPress={handleSearchClinics}
+            >
+              <Text style={styles.searchButtonText}>Buscar clínicas</Text>
+            </TouchableOpacity>
+
+            <View style={[styles.mapContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
+              <Text style={[styles.mapTitle, { color: theme.text }]}>Mapa da região</Text>
+              <View style={[styles.mapPlaceholder, { backgroundColor: theme.background, borderColor: theme.border }]}> 
+                <View style={styles.mapMarker} />
+                <Text style={[styles.mapPlaceholderText, { color: theme.textSecondary }]}>Mapa simulado de clínicas próximas</Text>
+              </View>
+            </View>
+
+            <View style={styles.vetList}>
+              {searchResults.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyStateTitle, { color: theme.textSecondary }]}>Digite um endereço para ver clínicas próximas.</Text>
+                </View>
+              ) : (
+                searchResults.map((clinic) => (
+                  <View
+                    key={clinic.id}
+                    style={[
+                      styles.vetCard,
+                      { backgroundColor: theme.surface, borderColor: theme.border },
+                    ]}
+                  >
+                    <Text style={[styles.vetName, { color: theme.text }]}>{clinic.name}</Text>
+                    <Text style={[styles.vetMeta, { color: theme.textSecondary }]}>{clinic.address}</Text>
+                    <Text style={[styles.vetMeta, { color: theme.textSecondary }]}>Aprox. {clinic.distance}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       <View
@@ -881,8 +973,9 @@ export default function Home() {
         {[
           { id: "home", icon: "home" as const, label: "Início" },
           { id: "produtos", icon: "search" as const, label: "Loja" },
-          { id: "adocao", icon: "paw" as const, label: "Adoção" },
           { id: "carrinho", icon: "cart" as const, label: "Carrinho" },
+          { id: "adocao", icon: "paw" as const, label: "Adoção" },
+          { id: "veterinaria", icon: "medkit" as const, label: "Clínica" },
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
@@ -1237,6 +1330,54 @@ const styles = StyleSheet.create({
   },
   emptyButton: { paddingHorizontal: 30, paddingVertical: 15, borderRadius: 15 },
   emptyButtonText: { color: "#FFF", fontWeight: "bold" },
+  searchInput: {
+    height: 50,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    fontSize: 15,
+  },
+  searchButton: {
+    height: 50,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  searchButtonText: {
+    color: "#FFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  vetContainer: { paddingHorizontal: 20, paddingBottom: 40 },
+  mapContainer: { borderRadius: 22, padding: 16, marginBottom: 20, borderWidth: 1 },
+  mapTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  mapPlaceholder: {
+    height: 220,
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  mapPlaceholderText: { fontSize: 13, textAlign: "center", lineHeight: 20 },
+  mapMarker: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#D4AF37",
+    marginBottom: 12,
+  },
+  vetList: { marginTop: 10 },
+  vetCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+  },
+  vetName: { fontSize: 15, fontWeight: "800", marginBottom: 6 },
+  vetMeta: { fontSize: 13 },
   dropdownOverlay: {
     position: "absolute",
     top: 0,
