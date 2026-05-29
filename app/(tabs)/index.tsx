@@ -1,5 +1,6 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -454,15 +455,86 @@ export default function Home() {
   const profileButtonRef = useRef<View>(null);
   const [addressQuery, setAddressQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [mapError, setMapError] = useState("");
 
-  const handleSearchClinics = () => {
+  const GOOGLE_MAPS_API_KEY =
+    Constants?.expoConfig?.extra?.googleMapsApiKey ?? "";
+  const useGoogleMaps = Boolean(GOOGLE_MAPS_API_KEY);
+
+  function getStaticMapUrl(lat: string, lon: string) {
+    const width = Math.min(640, Math.floor(SCREEN_WIDTH - 40));
+    const height = 260;
+
+    if (useGoogleMaps) {
+      const marker = `color:red|label:P|${lat},${lon}`;
+      return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lon}&zoom=13&size=${width}x${height}&scale=2&markers=${marker}&key=${GOOGLE_MAPS_API_KEY}`;
+    }
+
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=13&size=${width}x${height}&markers=${lat},${lon},red-pushpin`;
+  }
+
+  const [mapUrl, setMapUrl] = useState<string>(
+    getStaticMapUrl("-23.55052", "-46.633308"),
+  );
+
+  const geocodeAddress = async (query: string) => {
+    if (useGoogleMaps) {
+      try {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+            query,
+          )}&key=${GOOGLE_MAPS_API_KEY}`,
+        );
+        const data = await response.json();
+        if (data.status === "OK" && data.results.length > 0) {
+          const location = data.results[0].geometry.location;
+          setMapUrl(getStaticMapUrl(location.lat.toString(), location.lng.toString()));
+          setMapError("");
+          return;
+        }
+        setMapError("Endereço não encontrado. Exibindo mapa padrão.");
+        return;
+      } catch (error) {
+        console.error("Geocoding error:", error);
+        setMapError("Não foi possível carregar o mapa. Tente novamente.");
+        return;
+      }
+    }
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          query,
+        )}&format=json&limit=1`,
+      );
+      const data = await response.json();
+      if (data.length > 0 && data[0].lat && data[0].lon) {
+        setMapUrl(getStaticMapUrl(data[0].lat, data[0].lon));
+        setMapError("");
+      } else {
+        setMapError("Endereço não encontrado. Exibindo mapa padrão.");
+      }
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      setMapError("Não foi possível carregar o mapa. Tente novamente.");
+    }
+  };
+
+  const handleSearchClinics = async () => {
     const query = addressQuery.trim().toLowerCase();
+    setMapLoading(true);
+    if (query) {
+      await geocodeAddress(query);
+    }
+
     const results = VETERINARY_CLINICS.filter((clinic) =>
       clinic.name.toLowerCase().includes(query) ||
       clinic.address.toLowerCase().includes(query)
     );
 
     setSearchResults(results.length ? results : VETERINARY_CLINICS);
+    setMapLoading(false);
   };
 
   useEffect(() => {
@@ -930,9 +1002,19 @@ export default function Home() {
             <View style={[styles.mapContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
               <Text style={[styles.mapTitle, { color: theme.text }]}>Mapa da região</Text>
               <View style={[styles.mapPlaceholder, { backgroundColor: theme.background, borderColor: theme.border }]}> 
-                <View style={styles.mapMarker} />
-                <Text style={[styles.mapPlaceholderText, { color: theme.textSecondary }]}>Mapa simulado de clínicas próximas</Text>
+                {mapLoading ? (
+                  <Text style={[styles.mapPlaceholderText, { color: theme.textSecondary }]}>Carregando mapa...</Text>
+                ) : (
+                  <Image
+                    source={{ uri: mapUrl }}
+                    style={styles.mapImage}
+                    resizeMode="cover"
+                  />
+                )}
               </View>
+              {mapError ? (
+                <Text style={[styles.mapErrorText, { color: theme.primary }]}> {mapError}</Text>
+              ) : null}
             </View>
 
             <View style={styles.vetList}>
@@ -1354,21 +1436,16 @@ const styles = StyleSheet.create({
   mapContainer: { borderRadius: 22, padding: 16, marginBottom: 20, borderWidth: 1 },
   mapTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
   mapPlaceholder: {
-    height: 220,
+    height: 260,
     borderRadius: 18,
-    borderWidth: 1,
+    overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    width: "100%",
   },
-  mapPlaceholderText: { fontSize: 13, textAlign: "center", lineHeight: 20 },
-  mapMarker: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#D4AF37",
-    marginBottom: 12,
-  },
+  mapImage: { width: "100%", height: "100%" },
+  mapPlaceholderText: { fontSize: 13, textAlign: "center", lineHeight: 20, paddingHorizontal: 16 },
+  mapErrorText: { marginTop: 10, fontSize: 12 },
   vetList: { marginTop: 10 },
   vetCard: {
     borderRadius: 18,

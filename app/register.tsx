@@ -2,21 +2,21 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  SafeAreaView,
-  useSafeAreaInsets,
+    SafeAreaView,
+    useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -51,6 +51,14 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/login");
+    }
+  };
 
   // Máscaras (mantidas conforme sua preferência)
   const maskCpf = (v: string) => {
@@ -189,8 +197,31 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity
-            style={styles.themeToggle}
+            style={[
+              styles.backButton,
+              {
+                top: insets.top + 10,
+                backgroundColor: theme.buttonBackground ?? theme.surface,
+                borderColor: theme.primary + "40",
+              },
+            ]}
+            onPress={handleBack}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="chevron-back" size={24} color={theme.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.themeToggleButton,
+              {
+                top: insets.top + 10,
+                backgroundColor: theme.surface,
+                borderColor: theme.border,
+              },
+            ]}
             onPress={toggleColorScheme}
+            activeOpacity={0.7}
           >
             <Ionicons
               name={colorScheme === "dark" ? "sunny" : "moon"}
@@ -433,7 +464,38 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
     alignItems: "center",
   },
-  themeToggle: { alignSelf: "flex-end", marginBottom: 10, padding: 5 },
+  backButton: {
+    position: "absolute",
+    left: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  themeToggleButton: {
+    position: "absolute",
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   logo: { width: 100, height: 60, marginBottom: 10 },
   title: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
   inputWrapper: { width: "100%", marginBottom: 12 },
