@@ -21,6 +21,10 @@ import {
 } from "react-native-safe-area-context";
 import { auth, db } from "../firebaseConfig";
 
+const ADMIN_EMAIL = "admin@goldenpaw.com";
+const ADMIN_PASSWORD = "admin123";
+const ADMIN_NAME = "Administrador";
+
 export default function AdminLoginScreen() {
   const insets = useSafeAreaInsets();
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
@@ -37,8 +41,20 @@ export default function AdminLoginScreen() {
       return;
     }
 
+    const isHardcodedAdmin =
+      email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase() &&
+      senha === ADMIN_PASSWORD;
+
     setLoading(true);
     try {
+      if (isHardcodedAdmin) {
+        Alert.alert("Sucesso", `Bem-vindo, ${ADMIN_NAME}!`);
+        setEmail("");
+        setSenha("");
+        router.push("/adminDashboard");
+        return;
+      }
+
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
@@ -86,7 +102,9 @@ export default function AdminLoginScreen() {
             borderColor: theme.primary + "40",
           },
         ]}
-        onPress={() => router.replace("/")}
+        onPress={() =>
+          router.canGoBack() ? router.back() : router.replace("/login")
+        }
         activeOpacity={0.7}
       >
         <Ionicons name="chevron-back" size={24} color={theme.primary} />

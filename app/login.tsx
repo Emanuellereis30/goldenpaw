@@ -2,19 +2,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -25,6 +25,9 @@ import { auth } from "../firebaseConfig";
 const IMAGES = {
   logo: require("../assets/img/logo.png"),
 };
+
+const ADMIN_EMAIL = "admin@goldenpaw.com";
+const ADMIN_PASSWORD = "admin123";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -49,10 +52,19 @@ export default function LoginScreen() {
       return;
     }
 
+    const isAdminCredentials =
+      email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase() &&
+      password === ADMIN_PASSWORD;
+
     setLoading(true);
     try {
+      if (isAdminCredentials) {
+        router.push("/adminDashboard");
+        return;
+      }
+
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace("/(tabs)");
+      router.push("/(tabs)");
     } catch (error: any) {
       console.error(error);
       let message = "E-mail ou senha incorretos.";
@@ -123,7 +135,7 @@ export default function LoginScreen() {
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={[styles.title, { color: theme.text }]}>
+            <Text style={[styles.title, { color: theme.text }]}> 
               Bem-vindo de volta!
             </Text>
 
@@ -176,7 +188,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.push("/register")}>
-              <Text style={[styles.linkText, { color: theme.primary }]}>
+              <Text style={[styles.linkText, { color: theme.primary }]}> 
                 Não tem uma conta? Cadastre-se
               </Text>
             </TouchableOpacity>

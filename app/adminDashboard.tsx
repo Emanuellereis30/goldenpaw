@@ -35,6 +35,7 @@ interface Produto {
   id: string;
   nome: string;
   preco: string;
+  kg?: string;
   image: string;
   tag?: string;
 }
@@ -79,9 +80,21 @@ export default function AdminDashboardScreen() {
   const [produtoForm, setProdutoForm] = useState({
     nome: "",
     preco: "",
+    kg: "",
     image: "",
     tag: "",
   });
+
+  const ehRacaoPeloNome = (nome: string) => {
+    const nomeNormalizado = nome
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+
+    return nomeNormalizado.includes("racao");
+  };
+
+  const ehRacao = ehRacaoPeloNome(produtoForm.nome);
 
   // Pets
   const [pets, setPets] = useState<Pet[]>([]);
@@ -103,6 +116,160 @@ export default function AdminDashboardScreen() {
     numero: "",
     cidade: "",
   });
+
+  const racasPorTipo: Record<string, string[]> = {
+    cachorro: [
+      "Vira-lata",
+      "Shih Tzu",
+      "Poodle",
+      "Pinscher",
+      "Labrador",
+      "Golden Retriever",
+      "Bulldog Francês",
+      "Pastor Alemão",
+      "Yorkshire",
+      "Rottweiler",
+      "Beagle",
+      "Dachshund",
+      "Husky Siberiano",
+      "Spitz Alemão",
+      "Border Collie",
+      "Chihuahua",
+      "Pug",
+      "Boxer",
+      "Pitbull",
+      "Maltês",
+    ],
+    gato: [
+      "SRD",
+      "Persa",
+      "Siamês",
+      "Maine Coon",
+      "Angorá",
+      "Bengal",
+      "Sphynx",
+      "Ragdoll",
+      "British Shorthair",
+      "Scottish Fold",
+      "Exótico",
+      "Azul Russo",
+      "Himalaio",
+    ],
+    ave: [
+      "Calopsita",
+      "Periquito",
+      "Canário",
+      "Papagaio",
+      "Agapornis",
+      "Cacatua",
+      "Mandarim",
+      "Manon",
+      "Ring Neck",
+      "Arara",
+    ],
+    peixe: [
+      "Betta",
+      "Guppy",
+      "Molinésia",
+      "Platy",
+      "Kinguio",
+      "Acará Bandeira",
+      "Tetra Neon",
+      "Oscar",
+      "Espada",
+      "Cascudo",
+    ],
+  };
+
+  const limparNumeros = (text: string, limite: number) =>
+    text.replace(/\D/g, "").slice(0, limite);
+
+  const formatarCelular = (text: string) => {
+    const numeros = limparNumeros(text, 11);
+
+    if (numeros.length <= 2) return numeros;
+    if (numeros.length <= 7) return `(${numeros.slice(0, 2)}) ${numeros.slice(2)}`;
+
+    return `(${numeros.slice(0, 2)}) ${numeros.slice(2, 7)}-${numeros.slice(7)}`;
+  };
+
+  const formatarCpf = (text: string) => {
+    const numeros = limparNumeros(text, 11);
+
+    if (numeros.length <= 3) return numeros;
+    if (numeros.length <= 6) return `${numeros.slice(0, 3)}.${numeros.slice(3)}`;
+    if (numeros.length <= 9) {
+      return `${numeros.slice(0, 3)}.${numeros.slice(3, 6)}.${numeros.slice(6)}`;
+    }
+
+    return `${numeros.slice(0, 3)}.${numeros.slice(3, 6)}.${numeros.slice(6, 9)}-${numeros.slice(9)}`;
+  };
+
+  const formatarCep = (text: string) => {
+    const numeros = limparNumeros(text, 8);
+
+    if (numeros.length <= 5) return numeros;
+
+    return `${numeros.slice(0, 5)}-${numeros.slice(5)}`;
+  };
+
+  const validarUrl = (url: string) => /^https?:\/\/.+\..+/.test(url.trim());
+
+  const validarEmail = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  const formatarPrecoDinheiro = (text: string) => {
+    const apenasNumeros = text.replace(/\D/g, "").slice(0, 8);
+
+    if (!apenasNumeros) return "";
+
+    const valor = Number(apenasNumeros) / 100;
+
+    return valor.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const formatarKg = (text: string) => {
+    const valor = text.replace(/[^0-9,.]/g, "").replace(",", ".");
+    const kgNumero = Number(valor);
+
+    if (!valor) return "";
+    if (kgNumero > 50) return "50";
+    if (kgNumero < 0) return "0";
+
+    return valor.replace(".", ",");
+  };
+
+  const buscarEnderecoPorCep = async (cep: string) => {
+    const cepLimpo = limparNumeros(cep, 8);
+    const cepFormatado = formatarCep(cep);
+
+    setPetForm((prev) => ({ ...prev, cep: cepFormatado }));
+
+    if (cepLimpo.length !== 8) return;
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        Alert.alert("Erro", "CEP não encontrado");
+        return;
+      }
+
+      setPetForm((prev) => ({
+        ...prev,
+        cep: formatarCep(cepLimpo),
+        rua: data.logradouro || "",
+        bairro: data.bairro || "",
+        cidade: data.localidade || "",
+      }));
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível buscar o endereço pelo CEP");
+    }
+  };
 
   // Carregar dados ao montar e trocar de aba
   useEffect(() => {
@@ -154,16 +321,36 @@ export default function AdminDashboardScreen() {
       return;
     }
 
+    if (ehRacao && !produtoForm.kg) {
+      Alert.alert("Erro", "Informe o KG da ração");
+      return;
+    }
+
+    if (ehRacao && Number(produtoForm.kg.replace(",", ".")) > 50) {
+      Alert.alert("Erro", "O KG da ração não pode passar de 50kg");
+      return;
+    }
+
+    const produtoParaSalvar = {
+      ...produtoForm,
+      kg: ehRacao ? produtoForm.kg : "",
+    };
+
+    if (!validarUrl(produtoForm.image)) {
+      Alert.alert("Erro", "Na imagem coloque apenas um link válido começando com http:// ou https://");
+      return;
+    }
+
     try {
       if (editingProduto) {
-        await updateDoc(doc(db, "produtos", editingProduto.id), produtoForm);
+        await updateDoc(doc(db, "produtos", editingProduto.id), produtoParaSalvar);
         Alert.alert("Sucesso", "Produto atualizado!");
       } else {
-        await addDoc(collection(db, "produtos"), produtoForm);
+        await addDoc(collection(db, "produtos"), produtoParaSalvar);
         Alert.alert("Sucesso", "Produto adicionado!");
       }
       setShowProdutoModal(false);
-      setProdutoForm({ nome: "", preco: "", image: "", tag: "" });
+      setProdutoForm({ nome: "", preco: "", kg: "", image: "", tag: "" });
       setEditingProduto(null);
       carregarDados();
     } catch (error) {
@@ -176,6 +363,7 @@ export default function AdminDashboardScreen() {
     setProdutoForm({
       nome: produto.nome,
       preco: produto.preco,
+      kg: produto.kg || "",
       image: produto.image || "",
       tag: produto.tag || "",
     });
@@ -205,8 +393,23 @@ export default function AdminDashboardScreen() {
 
   // ============ FUNÇÕES DE PETS ============
   const handleSavePet = async () => {
-    if (!petForm.nome || !petForm.nomeDono) {
-      Alert.alert("Erro", "Preencha o nome do pet e o nome do dono");
+    if (!petForm.nome || !petForm.raca || !petForm.nomeDono) {
+      Alert.alert("Erro", "Preencha o nome do pet, raça e o nome do dono");
+      return;
+    }
+
+    if (petForm.celularDono && limparNumeros(petForm.celularDono, 11).length !== 11) {
+      Alert.alert("Erro", "O celular precisa ter 11 números com DDD");
+      return;
+    }
+
+    if (petForm.cpfDono && limparNumeros(petForm.cpfDono, 11).length !== 11) {
+      Alert.alert("Erro", "O CPF precisa ter 11 números");
+      return;
+    }
+
+    if (petForm.emailDono && !validarEmail(petForm.emailDono)) {
+      Alert.alert("Erro", "Digite um e-mail válido");
       return;
     }
 
@@ -251,7 +454,12 @@ export default function AdminDashboardScreen() {
 
   const handleEditPet = (pet: Pet) => {
     setEditingPet(pet);
-    setPetForm(pet);
+    setPetForm({
+      ...pet,
+      celularDono: formatarCelular(pet.celularDono || ""),
+      cpfDono: formatarCpf(pet.cpfDono || ""),
+      cep: formatarCep(pet.cep || ""),
+    });
     setShowPetModal(true);
   };
 
@@ -308,29 +516,97 @@ export default function AdminDashboardScreen() {
               placeholder="Ex: Ração Premium 10kg"
               placeholderTextColor={theme.textSecondary}
               value={produtoForm.nome}
-              onChangeText={(text) =>
-                setProdutoForm({ ...produtoForm, nome: text })
-              }
+              onChangeText={(text) => {
+                const produtoEhRacao = ehRacaoPeloNome(text);
+                setProdutoForm({
+                  ...produtoForm,
+                  nome: text,
+                  kg: produtoEhRacao ? produtoForm.kg : "",
+                });
+              }}
             />
+            <Text style={[styles.helperText, { color: ehRacao ? theme.primary : theme.textSecondary }]}> 
+              {ehRacao
+                ? "Produto reconhecido como ração. O campo KG será obrigatório."
+                : "Digite Ração no nome para liberar o campo KG automaticamente."}
+            </Text>
 
-            <Text style={[styles.label, { color: theme.text }]}>Preço *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.surface,
-                  color: theme.text,
-                  borderColor: theme.border,
-                },
-              ]}
-              placeholder="R$ 0,00"
-              placeholderTextColor={theme.textSecondary}
-              value={produtoForm.preco}
-              onChangeText={(text) =>
-                setProdutoForm({ ...produtoForm, preco: text })
-              }
-              keyboardType="decimal-pad"
-            />
+            <View style={styles.productInputRow}>
+              <View style={styles.productInputColumn}>
+                <Text style={[styles.label, { color: theme.text }]}>
+                  {ehRacao ? "Preço por KG (R$) *" : "Preço (R$) *"}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  placeholder="Ex: 12,00"
+                  placeholderTextColor={theme.textSecondary}
+                  value={produtoForm.preco}
+                  onChangeText={(text) =>
+                    setProdutoForm({
+                      ...produtoForm,
+                      preco: formatarPrecoDinheiro(text),
+                    })
+                  }
+                  keyboardType="numeric"
+                />
+                <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+                  Exemplo: 12,00
+                </Text>
+              </View>
+
+              {ehRacao && (
+                <View style={styles.productInputColumn}>
+                  <Text style={[styles.label, { color: theme.text }]}>
+                    KG da Ração *
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.surface,
+                        color: theme.text,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    placeholder="Ex: 10"
+                    placeholderTextColor={theme.textSecondary}
+                    value={produtoForm.kg}
+                    onChangeText={(text) =>
+                      setProdutoForm({
+                        ...produtoForm,
+                        kg: formatarKg(text),
+                      })
+                    }
+                    keyboardType="decimal-pad"
+                    maxLength={5}
+                  />
+                  <View style={styles.kgHelperRow}>
+                    <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+                      Informe a quantidade total em quilogramas.
+                    </Text>
+                    <Text
+                      style={[
+                        styles.kgLimitBadge,
+                        {
+                          color: theme.primary,
+                          borderColor: theme.border,
+                          backgroundColor: theme.surface,
+                        },
+                      ]}
+                    >
+                      Max: 50kg
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
 
             <Text style={[styles.label, { color: theme.text }]}>
               Link da Imagem (URL) *
@@ -347,10 +623,15 @@ export default function AdminDashboardScreen() {
               placeholder="https://exemplo.com/imagem.jpg"
               placeholderTextColor={theme.textSecondary}
               value={produtoForm.image}
+              autoCapitalize="none"
+              keyboardType="url"
               onChangeText={(text) =>
-                setProdutoForm({ ...produtoForm, image: text })
+                setProdutoForm({ ...produtoForm, image: text.trim() })
               }
             />
+            <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+              Informe uma URL válida da imagem do produto.
+            </Text>
 
             <Text style={[styles.label, { color: theme.text }]}>
               Tag (Opcional)
@@ -371,6 +652,9 @@ export default function AdminDashboardScreen() {
                 setProdutoForm({ ...produtoForm, tag: text })
               }
             />
+            <Text style={[styles.helperText, { color: theme.textSecondary }]}>
+              Adicione uma tag para facilitar a identificação do produto.
+            </Text>
 
             <TouchableOpacity
               style={[styles.submitButton, { backgroundColor: theme.primary }]}
@@ -380,6 +664,37 @@ export default function AdminDashboardScreen() {
                 {editingProduto ? "Atualizar" : "Salvar"} Produto
               </Text>
             </TouchableOpacity>
+
+            <View
+              style={[
+                styles.tipsBox,
+                {
+                  borderColor: theme.primary + "80",
+                  backgroundColor: theme.primary + "10",
+                },
+              ]}
+            >
+              <View style={styles.tipsTitleRow}>
+                <Ionicons name="bulb-outline" size={18} color={theme.primary} />
+                <Text style={[styles.tipsTitle, { color: theme.primary }]}>
+                  Dicas:
+                </Text>
+              </View>
+              <Text style={[styles.tipText, { color: theme.text }]}>
+                • O preço deve ser informado no formato: 12,00
+              </Text>
+              {ehRacao && (
+                <Text style={[styles.tipText, { color: theme.text }]}>
+                  • O KG da ração aparece automaticamente quando o nome tiver Ração
+                </Text>
+              )}
+              <Text style={[styles.tipText, { color: theme.text }]}>
+                • O link da imagem deve começar com http:// ou https://
+              </Text>
+              <Text style={[styles.tipText, { color: theme.text }]}>
+                • A tag é opcional, mas ajuda na organização
+              </Text>
+            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -437,7 +752,7 @@ export default function AdminDashboardScreen() {
                       borderColor: theme.border,
                     },
                   ]}
-                  onPress={() => setPetForm({ ...petForm, tipo })}
+                  onPress={() => setPetForm({ ...petForm, tipo, raca: "" })}
                 >
                   <Text
                     style={[
@@ -452,39 +767,59 @@ export default function AdminDashboardScreen() {
             </View>
 
             <Text style={[styles.label, { color: theme.text }]}>Raça *</Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.surface,
-                  color: theme.text,
-                  borderColor: theme.border,
-                },
-              ]}
-              placeholder="Raça do pet"
-              placeholderTextColor={theme.textSecondary}
-              value={petForm.raca}
-              onChangeText={(text) => setPetForm({ ...petForm, raca: text })}
-            />
+            <View style={styles.breedSelector}>
+              {(racasPorTipo[petForm.tipo] || []).map((raca) => (
+                <TouchableOpacity
+                  key={raca}
+                  style={[
+                    styles.breedButton,
+                    {
+                      backgroundColor:
+                        petForm.raca === raca ? theme.primary : theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => setPetForm({ ...petForm, raca })}
+                >
+                  <Text
+                    style={[
+                      styles.breedButtonText,
+                      { color: petForm.raca === raca ? "#000" : theme.text },
+                    ]}
+                  >
+                    {raca}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={[styles.label, { color: theme.text }]}>Idade</Text>
-            <TextInput
+            <View
               style={[
-                styles.input,
-                {
-                  backgroundColor: theme.surface,
-                  color: theme.text,
-                  borderColor: theme.border,
-                },
+                styles.ageSelector,
+                { backgroundColor: theme.surface, borderColor: theme.border },
               ]}
-              placeholder="0"
-              placeholderTextColor={theme.textSecondary}
-              value={petForm.idade?.toString()}
-              onChangeText={(text) =>
-                setPetForm({ ...petForm, idade: parseInt(text) || 0 })
-              }
-              keyboardType="numeric"
-            />
+            >
+              <TouchableOpacity
+                style={[styles.ageButton, { backgroundColor: theme.primary }]}
+                onPress={() =>
+                  setPetForm({ ...petForm, idade: Math.max(0, petForm.idade - 1) })
+                }
+              >
+                <Ionicons name="remove" size={20} color="#000" />
+              </TouchableOpacity>
+
+              <Text style={[styles.ageText, { color: theme.text }]}>
+                {petForm.idade}
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.ageButton, { backgroundColor: theme.primary }]}
+                onPress={() => setPetForm({ ...petForm, idade: petForm.idade + 1 })}
+              >
+                <Ionicons name="add" size={20} color="#000" />
+              </TouchableOpacity>
+            </View>
 
             <View style={{ height: 20 }} />
             <Text style={[styles.sectionTitle, { color: theme.primary }]}>
@@ -529,8 +864,9 @@ export default function AdminDashboardScreen() {
                   placeholderTextColor={theme.textSecondary}
                   value={petForm.celularDono}
                   onChangeText={(text) =>
-                    setPetForm({ ...petForm, celularDono: text })
+                    setPetForm({ ...petForm, celularDono: formatarCelular(text) })
                   }
+                  maxLength={15}
                   keyboardType="phone-pad"
                 />
               </View>
@@ -549,8 +885,9 @@ export default function AdminDashboardScreen() {
                   placeholderTextColor={theme.textSecondary}
                   value={petForm.cpfDono}
                   onChangeText={(text) =>
-                    setPetForm({ ...petForm, cpfDono: text })
+                    setPetForm({ ...petForm, cpfDono: formatarCpf(text) })
                   }
+                  maxLength={14}
                   keyboardType="numeric"
                 />
               </View>
@@ -570,7 +907,7 @@ export default function AdminDashboardScreen() {
               placeholderTextColor={theme.textSecondary}
               value={petForm.emailDono}
               onChangeText={(text) =>
-                setPetForm({ ...petForm, emailDono: text })
+                setPetForm({ ...petForm, emailDono: text.trim().toLowerCase() })
               }
               keyboardType="email-address"
               autoCapitalize="none"
@@ -601,7 +938,8 @@ export default function AdminDashboardScreen() {
                   placeholder="00000-000"
                   placeholderTextColor={theme.textSecondary}
                   value={petForm.cep}
-                  onChangeText={(text) => setPetForm({ ...petForm, cep: text })}
+                  onChangeText={buscarEnderecoPorCep}
+                  maxLength={9}
                   keyboardType="numeric"
                 />
               </View>
@@ -622,8 +960,9 @@ export default function AdminDashboardScreen() {
                   placeholderTextColor={theme.textSecondary}
                   value={petForm.numero}
                   onChangeText={(text) =>
-                    setPetForm({ ...petForm, numero: text })
+                    setPetForm({ ...petForm, numero: limparNumeros(text, 6) })
                   }
+                  keyboardType="numeric"
                 />
               </View>
             </View>
@@ -735,7 +1074,7 @@ export default function AdminDashboardScreen() {
             style={[styles.addButton, { backgroundColor: theme.primary }]}
             onPress={() => {
               setEditingProduto(null);
-              setProdutoForm({ nome: "", preco: "", image: "", tag: "" });
+              setProdutoForm({ nome: "", preco: "", kg: "", image: "", tag: "" });
               setShowProdutoModal(true);
             }}
           >
@@ -759,7 +1098,9 @@ export default function AdminDashboardScreen() {
                   <Text
                     style={[styles.itemDetail, { color: theme.textSecondary }]}
                   >
-                    R$ {produto.preco}
+                    {ehRacaoPeloNome(produto.nome)
+                      ? `KG: ${produto.kg || "0"} | Preço/kg: R$ ${produto.preco}`
+                      : `Preço: R$ ${produto.preco}`}
                   </Text>
                 </View>
                 <View style={styles.itemActions}>
@@ -1109,6 +1450,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   row: { flexDirection: "row", justifyContent: "space-between" },
+  productInputRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 16,
+  },
+  productInputColumn: {
+    flex: 1,
+  },
+  helperText: {
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  kgHelperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  kgLimitBadge: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 12,
+    fontWeight: "700",
+    overflow: "hidden",
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  tipsBox: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 18,
+  },
+  tipsTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  tipsTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  tipText: {
+    fontSize: 13,
+    lineHeight: 22,
+  },
   typeSelector: {
     flexDirection: "row",
     gap: 8,
@@ -1131,5 +1522,36 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   submitButtonText: { color: "#000", fontWeight: "700", fontSize: 16 },
+  breedSelector: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
+  breedButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  breedButtonText: { fontSize: 12, fontWeight: "600" },
+  ageSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  ageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ageText: { fontSize: 18, fontWeight: "700" },
   emptyText: { textAlign: "center", marginTop: 20, fontSize: 14 },
 });
