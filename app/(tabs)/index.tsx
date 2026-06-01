@@ -1,4 +1,5 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
+import { useCart } from "@/hooks/use-cart";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
@@ -6,23 +7,23 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Dimensions,
-  Image,
-  ImageSourcePropType,
-  LayoutChangeEvent,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    Image,
+    ImageSourcePropType,
+    LayoutChangeEvent,
+    Pressable,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  SafeAreaView,
-  useSafeAreaInsets,
+    SafeAreaView,
+    useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { auth, db } from "../../firebaseConfig";
 
@@ -39,6 +40,7 @@ interface Produto {
   image: ImageSourcePropType;
   tag?: string;
   cartId?: string;
+  quantity?: number;
   category: "caes" | "gatos" | "aves" | "peixes" | "outros";
 }
 
@@ -447,7 +449,7 @@ export default function Home() {
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState("home");
-  const [cart, setCart] = useState<Produto[]>([]);
+  const { cart, addToCart, removeFromCart, increaseQuantity, decreaseQuantity, calculateTotal, totalItems, createOrder } = useCart();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -576,30 +578,7 @@ export default function Home() {
     }
   };
 
-  const addToCart = (product: Produto) => {
-    const newItem = {
-      ...product,
-      cartId: Math.random().toString(36).substr(2, 9),
-    };
-    setCart([...cart, newItem]);
-    setActiveTab("carrinho");
-  };
 
-  const removeFromCart = (cartId: string | undefined) => {
-    if (!cartId) return;
-    setCart(cart.filter((item) => item.cartId !== cartId));
-  };
-
-  const calculateTotal = () => {
-    const total = cart.reduce((acc, item) => {
-      const priceStr = item.preco
-        .replace("R$ ", "")
-        .replace(".", "")
-        .replace(",", ".");
-      return acc + parseFloat(priceStr);
-    }, 0);
-    return total.toFixed(2).replace(".", ",");
-  };
 
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -887,7 +866,7 @@ export default function Home() {
             >
               Meu Carrinho
             </Text>
-            {cart.length === 0 ? (
+            {totalItems === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons
                   name="cart-outline"
@@ -935,9 +914,16 @@ export default function Home() {
                         {item.preco}
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => removeFromCart(item.cartId)}
-                    >
+                    <View style={styles.quantityControl}>
+                      <TouchableOpacity onPress={() => decreaseQuantity(item.cartId)}>
+                        <Ionicons name="remove-circle-outline" size={22} color={theme.primary} />
+                      </TouchableOpacity>
+                      <Text style={[{ marginHorizontal: 8, color: theme.text }]}>{item.quantity ?? 1}</Text>
+                      <TouchableOpacity onPress={() => increaseQuantity(item.cartId)}>
+                        <Ionicons name="add-circle-outline" size={22} color={theme.primary} />
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity onPress={() => removeFromCart(item.cartId)} style={{ marginLeft: 8 }}>
                       <Ionicons
                         name="trash-outline"
                         size={20}
@@ -967,6 +953,7 @@ export default function Home() {
                       styles.checkoutButton,
                       { backgroundColor: theme.primary },
                     ]}
+                    onPress={() => router.push('/payment')}
                   >
                     <Text style={styles.checkoutButtonText}>
                       Finalizar Compra
@@ -1057,7 +1044,7 @@ export default function Home() {
           },
         ]}
       >
-        {[
+            {[
           { id: "home", icon: "home" as const, label: "Início" },
           { id: "produtos", icon: "search" as const, label: "Loja" },
           { id: "carrinho", icon: "cart" as const, label: "Carrinho" },
@@ -1087,6 +1074,11 @@ export default function Home() {
             >
               {tab.label}
             </Text>
+            {tab.id === "carrinho" && totalItems > 0 && (
+              <View style={[styles.cartBadge, { backgroundColor: theme.primary }]}> 
+                <Text style={styles.cartBadgeText}>{totalItems}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -1480,4 +1472,18 @@ const styles = StyleSheet.create({
   },
   dropdownOption: { padding: 15, borderBottomWidth: 1, alignItems: "center" },
   dropdownOptionText: { fontSize: 16, fontWeight: "600" },
+  cartBadge: {
+    position: "absolute",
+    top: -6,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  cartBadgeText: { color: "#FFF", fontSize: 10, fontWeight: "700" },
+  quantityControl: { flexDirection: "row", alignItems: "center" },
 });

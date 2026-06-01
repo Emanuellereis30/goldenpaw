@@ -1,5 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
+import { createContext, useContext, useMemo, useState } from 'react';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -53,15 +52,11 @@ type AppThemeContextValue = {
 const AppThemeContext = createContext<AppThemeContextValue | undefined>(undefined);
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemColorScheme = useRNColorScheme() === 'dark' ? 'dark' : 'light';
   const [colorScheme, setColorSchemeState] = useState<ThemeMode>('light');
   const [userPreference, setUserPreference] = useState<ThemeMode | null>(null);
 
-  useEffect(() => {
-    if (userPreference === null) {
-      setColorSchemeState(systemColorScheme);
-    }
-  }, [systemColorScheme, userPreference]);
+  // Por padrão, manter o app em 'light' até que o usuário escolha
+  // uma preferência manual. Não aplicar automaticamente o tema do sistema.
 
   const setColorScheme = (mode: ThemeMode) => {
     setUserPreference(mode);
