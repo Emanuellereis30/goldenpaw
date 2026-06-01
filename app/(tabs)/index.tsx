@@ -1,3 +1,4 @@
+import RemindersScreen from "@/app/components/RemindersScreen";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useCart } from "@/hooks/use-cart";
 import { Ionicons } from "@expo/vector-icons";
@@ -965,6 +966,13 @@ export default function Home() {
           </View>
         )}
 
+        {activeTab === "lembretes" && (
+          <RemindersScreen
+            isLoggedIn={isLoggedIn}
+            onNavigateToLogin={() => router.push("/login")}
+          />
+        )}
+
         {activeTab === "veterinaria" && (
           <View style={styles.vetContainer}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Clínicas Veterinárias</Text>
@@ -1050,6 +1058,7 @@ export default function Home() {
           { id: "carrinho", icon: "cart" as const, label: "Carrinho" },
           { id: "adocao", icon: "paw" as const, label: "Adoção" },
           { id: "veterinaria", icon: "medkit" as const, label: "Clínica" },
+          { id: "lembretes", icon: "time" as const, label: "Lembretes" },
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
