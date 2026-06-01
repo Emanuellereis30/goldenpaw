@@ -26,6 +26,7 @@ import {
 } from "react-native-safe-area-context";
 import { auth, db } from "../../firebaseConfig";
 
+
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 /**
@@ -354,10 +355,11 @@ const FEATURED_PRODUCT_IDS = ["1", "2", "26", "3", "4"];
 const ADOPTION_PETS = [
   {
     id: "a1",
-    nome: "Luna",
+    nome: "Lua",
     age: "2 anos",
     type: "Gata carinhosa",
     description: "Castrada, vacinada e adora colo. Perfeita para apartamento.",
+     image: require("../../assets/pets/lua.png"),
   },
   {
     id: "a2",
@@ -365,6 +367,7 @@ const ADOPTION_PETS = [
     age: "1 ano",
     type: "Cachorro brincalhão",
     description: "Energia positiva e ótimo companheiro para famílias.",
+     image: require("../../assets/pets/thor.png"),
   },
   {
     id: "a3",
@@ -807,9 +810,11 @@ export default function Home() {
             <View style={styles.adoptionGrid}>
               {ADOPTION_PETS.map((pet) => (
                 <View key={pet.id} style={[styles.adoptionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
-                  <View style={[styles.adoptionImage, { backgroundColor: theme.primary + '20' }]}> 
-                    <Text style={[styles.adoptionImageText, { color: theme.primary }]}>Foto do animal</Text>
-                  </View>
+                  <Image
+                     source={pet.image}
+                     style={styles.adoptionImage}
+                      resizeMode="cover"
+                  />
                   <View style={styles.adoptionDetails}>
                     <Text style={[styles.adoptionPetName, { color: theme.text }]}>{pet.nome}</Text>
                     <Text style={[styles.adoptionPetMeta, { color: theme.textSecondary }]}>{pet.type} • {pet.age}</Text>
@@ -1308,9 +1313,7 @@ const styles = StyleSheet.create({
   },
   adoptionImage: {
     width: "100%",
-    height: 180,
-    justifyContent: "center",
-    alignItems: "center",
+    height: 230,
   },
   adoptionImageText: {
     fontSize: 14,
