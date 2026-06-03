@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Clipboard, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { auth } from '../firebaseConfig';
 
 type PaymentMethod = 'card' | 'pix' | 'boleto';
 
@@ -57,6 +58,7 @@ export default function PaymentScreen() {
   const { theme } = useAppTheme();
   const router = useRouter();
   const [processing, setProcessing] = useState(false);
+  const user = auth.currentUser;
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [cep, setCep] = useState('');
   const [cardName, setCardName] = useState('');
@@ -99,6 +101,12 @@ export default function PaymentScreen() {
   };
 
   const handlePay = async () => {
+    if (!user) {
+      Alert.alert('Login necessário', 'Faça login para continuar com o pagamento.');
+      router.replace('/login');
+      return;
+    }
+
     if (cart.length === 0) {
       Alert.alert('Carrinho vazio', 'Adicione produtos antes de realizar o pagamento.');
       return;
@@ -141,6 +149,20 @@ export default function PaymentScreen() {
       }
     }, 1500);
   };
+
+  if (!user) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center', flex: 1 }]}> 
+        <Text style={[styles.title, { color: theme.text, textAlign: 'center', marginBottom: 16 }]}>Faça login para acessar o pagamento</Text>
+        <TouchableOpacity
+          style={[styles.checkoutButton, { backgroundColor: theme.primary, paddingHorizontal: 24, paddingVertical: 12 }]}
+          onPress={() => router.replace('/login')}
+        >
+          <Text style={styles.checkoutButtonText}>Ir para Login</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const subtotal = parseFloat(calculateTotal().replace(',', '.'));
   const deliveryFee = deliveryInfo?.fee ?? 15.0;

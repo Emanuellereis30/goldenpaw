@@ -32,6 +32,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
 
   const addToCart = (product: Omit<CartItem, 'cartId' | 'quantity'>) => {
+    if (!auth.currentUser) {
+      Alert.alert('Login necessário', 'Faça login para adicionar produtos ao carrinho.');
+      return;
+    }
+
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -91,6 +96,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const totalItems = cart.reduce((acc, item) => acc + (item.quantity ?? 1), 0);
 
   const createOrder = async (status = 'pending') => {
+    if (!auth.currentUser) {
+      Alert.alert('Login necessário', 'Faça login para finalizar a compra.');
+      return;
+    }
+
     if (cart.length === 0) {
       Alert.alert('Carrinho vazio', 'Adicione produtos antes de finalizar a compra.');
       return;
@@ -98,7 +108,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const order = {
-        userId: auth.currentUser ? auth.currentUser.uid : null,
+        userId: auth.currentUser.uid,
         items: cart.map((item) => ({ id: item.id, nome: item.nome, preco: item.preco, quantity: item.quantity })),
         total: calculateTotal(),
         createdAt: serverTimestamp(),
