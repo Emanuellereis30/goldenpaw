@@ -8,26 +8,25 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Dimensions,
-    Image,
-    ImageSourcePropType,
-    LayoutChangeEvent,
-    Pressable,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Image,
+  ImageSourcePropType,
+  LayoutChangeEvent,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { auth, db } from "../../firebaseConfig";
-
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -362,7 +361,7 @@ const ADOPTION_PETS = [
     age: "2 anos",
     type: "Gata carinhosa",
     description: "Castrada, vacinada e adora colo. Perfeita para apartamento.",
-     image: require("../../assets/pets/lua.png"),
+    image: require("../../assets/pets/lua.png"),
   },
   {
     id: "a2",
@@ -370,7 +369,7 @@ const ADOPTION_PETS = [
     age: "1 ano",
     type: "Cachorro brincalhão",
     description: "Energia positiva e ótimo companheiro para famílias.",
-     image: require("../../assets/pets/thor.png"),
+    image: require("../../assets/pets/thor.png"),
   },
   {
     id: "a3",
@@ -413,7 +412,7 @@ const ADOPTION_PETS = [
     age: "1 ano",
     type: "Gata delicada",
     description: "Calma e charmosa, adora estar perto de pessoas.",
-  }
+  },
 ];
 
 const VETERINARY_CLINICS = [
@@ -450,7 +449,16 @@ export default function Home() {
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
 
   const [activeTab, setActiveTab] = useState("home");
-  const { cart, addToCart, removeFromCart, increaseQuantity, decreaseQuantity, calculateTotal, totalItems, createOrder } = useCart();
+  const {
+    cart,
+    addToCart,
+    removeFromCart,
+    increaseQuantity,
+    decreaseQuantity,
+    calculateTotal,
+    totalItems,
+    createOrder,
+  } = useCart();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -495,7 +503,9 @@ export default function Home() {
         const data = await response.json();
         if (data.status === "OK" && data.results.length > 0) {
           const location = data.results[0].geometry.location;
-          setMapUrl(getStaticMapUrl(location.lat.toString(), location.lng.toString()));
+          setMapUrl(
+            getStaticMapUrl(location.lat.toString(), location.lng.toString()),
+          );
           setMapError("");
           return;
         }
@@ -534,9 +544,10 @@ export default function Home() {
       await geocodeAddress(query);
     }
 
-    const results = VETERINARY_CLINICS.filter((clinic) =>
-      clinic.name.toLowerCase().includes(query) ||
-      clinic.address.toLowerCase().includes(query)
+    const results = VETERINARY_CLINICS.filter(
+      (clinic) =>
+        clinic.name.toLowerCase().includes(query) ||
+        clinic.address.toLowerCase().includes(query),
     );
 
     setSearchResults(results.length ? results : VETERINARY_CLINICS);
@@ -578,8 +589,6 @@ export default function Home() {
       Alert.alert("Erro", "Não foi possível sair.");
     }
   };
-
-
 
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -747,58 +756,96 @@ export default function Home() {
                       styles.featuredCard,
                       { backgroundColor: theme.surface },
                     ]}
-                >
-                  <View style={styles.tagBadge}>
-                    <Text style={styles.tagText}>{item.tag}</Text>
+                  >
+                    <View style={styles.tagBadge}>
+                      <Text style={styles.tagText}>{item.tag}</Text>
+                    </View>
+                    <Image
+                      source={item.image}
+                      style={styles.featuredImage}
+                      resizeMode="contain"
+                    />
+                    <Text
+                      style={[styles.productName, { color: theme.text }]}
+                      numberOfLines={1}
+                    >
+                      {item.nome}
+                    </Text>
+                    <Text
+                      style={[styles.productPrice, { color: theme.primary }]}
+                    >
+                      {item.preco}
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.addButton,
+                        { backgroundColor: theme.primary },
+                      ]}
+                      onPress={() => addToCart(item)}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="add" size={20} color="#FFF" />
+                    </TouchableOpacity>
                   </View>
-                  <Image
-                    source={item.image}
-                    style={styles.featuredImage}
-                    resizeMode="contain"
-                  />
-                  <Text
-                    style={[styles.productName, { color: theme.text }]}
-                    numberOfLines={1}
-                  >
-                    {item.nome}
-                  </Text>
-                  <Text style={[styles.productPrice, { color: theme.primary }]}>
-                    {item.preco}
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.addButton,
-                      { backgroundColor: theme.primary },
-                    ]}
-                    onPress={() => addToCart(item)}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Ionicons name="add" size={20} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
+                );
+              })}
             </ScrollView>
           </View>
         )}
 
         {activeTab === "adocao" && (
           <View style={styles.adoptionContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Adoção</Text>
-            <Text style={[styles.adoptionDescription, { color: theme.textSecondary }]}>Conheça animais que estão esperando um lar cheio de amor.</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Adoção
+            </Text>
+            <Text
+              style={[
+                styles.adoptionDescription,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Conheça animais que estão esperando um lar cheio de amor.
+            </Text>
             <View style={styles.adoptionGrid}>
               {ADOPTION_PETS.map((pet) => (
-                <View key={pet.id} style={[styles.adoptionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
+                <View
+                  key={pet.id}
+                  style={[
+                    styles.adoptionCard,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
                   <Image
-                     source={pet.image}
-                     style={styles.adoptionImage}
-                      resizeMode="cover"
+                    source={pet.image}
+                    style={styles.adoptionImage}
+                    resizeMode="cover"
                   />
                   <View style={styles.adoptionDetails}>
-                    <Text style={[styles.adoptionPetName, { color: theme.text }]}>{pet.nome}</Text>
-                    <Text style={[styles.adoptionPetMeta, { color: theme.textSecondary }]}>{pet.type} • {pet.age}</Text>
-                    <Text style={[styles.adoptionDescriptionText, { color: theme.textSecondary }]}>{pet.description}</Text>
+                    <Text
+                      style={[styles.adoptionPetName, { color: theme.text }]}
+                    >
+                      {pet.nome}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.adoptionPetMeta,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {pet.type} • {pet.age}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.adoptionDescriptionText,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {pet.description}
+                    </Text>
                   </View>
                 </View>
               ))}
@@ -916,15 +963,34 @@ export default function Home() {
                       </Text>
                     </View>
                     <View style={styles.quantityControl}>
-                      <TouchableOpacity onPress={() => decreaseQuantity(item.cartId)}>
-                        <Ionicons name="remove-circle-outline" size={22} color={theme.primary} />
+                      <TouchableOpacity
+                        onPress={() => decreaseQuantity(item.cartId)}
+                      >
+                        <Ionicons
+                          name="remove-circle-outline"
+                          size={22}
+                          color={theme.primary}
+                        />
                       </TouchableOpacity>
-                      <Text style={[{ marginHorizontal: 8, color: theme.text }]}>{item.quantity ?? 1}</Text>
-                      <TouchableOpacity onPress={() => increaseQuantity(item.cartId)}>
-                        <Ionicons name="add-circle-outline" size={22} color={theme.primary} />
+                      <Text
+                        style={[{ marginHorizontal: 8, color: theme.text }]}
+                      >
+                        {item.quantity ?? 1}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => increaseQuantity(item.cartId)}
+                      >
+                        <Ionicons
+                          name="add-circle-outline"
+                          size={22}
+                          color={theme.primary}
+                        />
                       </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={() => removeFromCart(item.cartId)} style={{ marginLeft: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => removeFromCart(item.cartId)}
+                      style={{ marginLeft: 8 }}
+                    >
                       <Ionicons
                         name="trash-outline"
                         size={20}
@@ -954,7 +1020,7 @@ export default function Home() {
                       styles.checkoutButton,
                       { backgroundColor: theme.primary },
                     ]}
-                    onPress={() => router.push('/payment')}
+                    onPress={() => router.push("/payment")}
                   >
                     <Text style={styles.checkoutButtonText}>
                       Finalizar Compra
@@ -975,8 +1041,18 @@ export default function Home() {
 
         {activeTab === "veterinaria" && (
           <View style={styles.vetContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Clínicas Veterinárias</Text>
-            <Text style={[styles.adoptionDescription, { color: theme.textSecondary }]}>Busque o atendimento mais próximo e veja clínicas disponíveis na sua região.</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              Clínicas Veterinárias
+            </Text>
+            <Text
+              style={[
+                styles.adoptionDescription,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Busque o atendimento mais próximo e veja clínicas disponíveis na
+              sua região.
+            </Text>
 
             <TextInput
               style={[
@@ -999,11 +1075,33 @@ export default function Home() {
               <Text style={styles.searchButtonText}>Buscar clínicas</Text>
             </TouchableOpacity>
 
-            <View style={[styles.mapContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}> 
-              <Text style={[styles.mapTitle, { color: theme.text }]}>Mapa da região</Text>
-              <View style={[styles.mapPlaceholder, { backgroundColor: theme.background, borderColor: theme.border }]}> 
+            <View
+              style={[
+                styles.mapContainer,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.mapTitle, { color: theme.text }]}>
+                Mapa da região
+              </Text>
+              <View
+                style={[
+                  styles.mapPlaceholder,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 {mapLoading ? (
-                  <Text style={[styles.mapPlaceholderText, { color: theme.textSecondary }]}>Carregando mapa...</Text>
+                  <Text
+                    style={[
+                      styles.mapPlaceholderText,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Carregando mapa...
+                  </Text>
                 ) : (
                   <Image
                     source={{ uri: mapUrl }}
@@ -1013,14 +1111,24 @@ export default function Home() {
                 )}
               </View>
               {mapError ? (
-                <Text style={[styles.mapErrorText, { color: theme.primary }]}> {mapError}</Text>
+                <Text style={[styles.mapErrorText, { color: theme.primary }]}>
+                  {" "}
+                  {mapError}
+                </Text>
               ) : null}
             </View>
 
             <View style={styles.vetList}>
               {searchResults.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Text style={[styles.emptyStateTitle, { color: theme.textSecondary }]}>Digite um endereço para ver clínicas próximas.</Text>
+                  <Text
+                    style={[
+                      styles.emptyStateTitle,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Digite um endereço para ver clínicas próximas.
+                  </Text>
                 </View>
               ) : (
                 searchResults.map((clinic) => (
@@ -1028,12 +1136,25 @@ export default function Home() {
                     key={clinic.id}
                     style={[
                       styles.vetCard,
-                      { backgroundColor: theme.surface, borderColor: theme.border },
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
                     ]}
                   >
-                    <Text style={[styles.vetName, { color: theme.text }]}>{clinic.name}</Text>
-                    <Text style={[styles.vetMeta, { color: theme.textSecondary }]}>{clinic.address}</Text>
-                    <Text style={[styles.vetMeta, { color: theme.textSecondary }]}>Aprox. {clinic.distance}</Text>
+                    <Text style={[styles.vetName, { color: theme.text }]}>
+                      {clinic.name}
+                    </Text>
+                    <Text
+                      style={[styles.vetMeta, { color: theme.textSecondary }]}
+                    >
+                      {clinic.address}
+                    </Text>
+                    <Text
+                      style={[styles.vetMeta, { color: theme.textSecondary }]}
+                    >
+                      Aprox. {clinic.distance}
+                    </Text>
                   </View>
                 ))
               )}
@@ -1052,7 +1173,7 @@ export default function Home() {
           },
         ]}
       >
-            {[
+        {[
           { id: "home", icon: "home" as const, label: "Início" },
           { id: "produtos", icon: "search" as const, label: "Loja" },
           { id: "carrinho", icon: "cart" as const, label: "Carrinho" },
@@ -1084,7 +1205,9 @@ export default function Home() {
               {tab.label}
             </Text>
             {tab.id === "carrinho" && totalItems > 0 && (
-              <View style={[styles.cartBadge, { backgroundColor: theme.primary }]}> 
+              <View
+                style={[styles.cartBadge, { backgroundColor: theme.primary }]}
+              >
                 <Text style={styles.cartBadgeText}>{totalItems}</Text>
               </View>
             )}
@@ -1124,7 +1247,7 @@ export default function Home() {
                   <Text
                     style={[styles.dropdownOptionText, { color: theme.text }]}
                   >
-                    Minha Conta
+                    Perfil do Usuário
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1437,7 +1560,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   vetContainer: { paddingHorizontal: 20, paddingBottom: 40 },
-  mapContainer: { borderRadius: 22, padding: 16, marginBottom: 20, borderWidth: 1 },
+  mapContainer: {
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
   mapTitle: { fontSize: 16, fontWeight: "700", marginBottom: 12 },
   mapPlaceholder: {
     height: 260,
@@ -1448,7 +1576,12 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   mapImage: { width: "100%", height: "100%" },
-  mapPlaceholderText: { fontSize: 13, textAlign: "center", lineHeight: 20, paddingHorizontal: 16 },
+  mapPlaceholderText: {
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 16,
+  },
   mapErrorText: { marginTop: 10, fontSize: 12 },
   vetList: { marginTop: 10 },
   vetCard: {

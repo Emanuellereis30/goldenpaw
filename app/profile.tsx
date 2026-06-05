@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import {
   collection,
   doc,
@@ -7,7 +7,7 @@ import {
   getDocs,
   updateDoc,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -46,52 +46,52 @@ export default function ProfileScreen() {
     },
   });
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const user = auth.currentUser;
-      if (user) {
-        try {
-          // Busca os dados do utilizador
-          const docRef = doc(db, "usuarios", user.uid);
-          const docSnap = await getDoc(docRef);
+  useFocusEffect(
+    useCallback(() => {
+      const fetchUserData = async () => {
+        const user = auth.currentUser;
+        if (user) {
+          try {
+            const docRef = doc(db, "usuarios", user.uid);
+            const docSnap = await getDoc(docRef);
 
-          if (docSnap.exists()) {
-            const docData = docSnap.data();
-            const actualData = docData.userData || docData;
+            if (docSnap.exists()) {
+              const docData = docSnap.data();
+              const actualData = docData.userData || docData;
 
-            setFormData({
-              nome: actualData.nome || "",
-              telefone: actualData.telefone || "",
-              cpf: actualData.cpf || "",
-              email: actualData.email || "",
-              endereco: {
-                rua: actualData.endereco?.rua || "",
-                numero: actualData.endereco?.numero || "",
-                bairro: actualData.endereco?.bairro || "",
-                cep: actualData.endereco?.cep || "",
-                cidade: actualData.endereco?.cidade || "",
-                uf: actualData.endereco?.uf || "",
-              },
-            });
+              setFormData({
+                nome: actualData.nome || "",
+                telefone: actualData.telefone || "",
+                cpf: actualData.cpf || "",
+                email: actualData.email || "",
+                endereco: {
+                  rua: actualData.endereco?.rua || "",
+                  numero: actualData.endereco?.numero || "",
+                  bairro: actualData.endereco?.bairro || "",
+                  cep: actualData.endereco?.cep || "",
+                  cidade: actualData.endereco?.cidade || "",
+                  uf: actualData.endereco?.uf || "",
+                },
+              });
+            }
+
+            const petsRef = collection(db, "usuarios", user.uid, "pets");
+            const petsSnap = await getDocs(petsRef);
+            const petsList = petsSnap.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }));
+            setPets(petsList);
+          } catch (e) {
+            console.error(e);
+            Alert.alert("Erro", "Falha ao carregar perfil.");
           }
-
-          // Busca a lista de pets
-          const petsRef = collection(db, "usuarios", user.uid, "pets");
-          const petsSnap = await getDocs(petsRef);
-          const petsList = petsSnap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-          setPets(petsList);
-        } catch (e) {
-          console.error(e);
-          Alert.alert("Erro", "Falha ao carregar perfil.");
         }
-      }
-      setLoading(false);
-    };
-    fetchUserData();
-  }, []);
+        setLoading(false);
+      };
+      fetchUserData();
+    }, []),
+  );
 
   const handleUpdate = async () => {
     setSaving(true);
@@ -130,7 +130,7 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: theme.text }]}>
-            Perfil do Utilizador
+            Perfil do Usuário
           </Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
             Informações cadastrais
@@ -329,64 +329,78 @@ export default function ProfileScreen() {
           Nenhum pet registado.
         </Text>
       ) : (
-        pets.map((pet) => (
-          <TouchableOpacity
-            key={pet.id}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              padding: 12,
-              backgroundColor: theme.surface,
-              borderRadius: 10,
-              marginBottom: 10,
-              borderWidth: 1,
-              borderColor: theme.border,
-            }}
-            onPress={() => router.push(`/pet/${pet.id}` as any)}
-          >
-            {pet.fotoUrl ? (
-              <Image
-                source={{ uri: pet.fotoUrl }}
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 25,
-                  marginRight: 12,
-                }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 25,
-                  backgroundColor: theme.border,
-                  marginRight: 12,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Feather name="github" size={24} color={theme.textSecondary} />
+        pets.map((pet) => {
+          console.log("Pet:", pet.nome, "fotoUrl:", pet.fotoUrl);
+          return (
+            <TouchableOpacity
+              key={pet.id}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                padding: 12,
+                backgroundColor: theme.surface,
+                borderRadius: 10,
+                marginBottom: 10,
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}
+              onPress={() => router.push(`/pet/${pet.id}` as any)}
+            >
+              {pet.fotoUrl ? (
+                <Image
+                  source={{ uri: pet.fotoUrl }}
+                  style={{
+                    width: 50,
+                    height: 50,
+                    borderRadius: 25,
+                    marginRight: 12,
+                  }}
+                  onError={(e) =>
+                    console.log("Erro imagem:", e.nativeEvent.error)
+                  }
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 50,
+                    height: 50,
+                    borderRadius: 25,
+                    backgroundColor: theme.border,
+                    marginRight: 12,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Feather
+                    name="github"
+                    size={24}
+                    color={theme.textSecondary}
+                  />
+                </View>
+              )}
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "bold",
+                    color: theme.text,
+                  }}
+                >
+                  {pet.nome}
+                </Text>
+                <Text style={{ fontSize: 13, color: theme.textSecondary }}>
+                  {pet.especie} • {pet.raca}
+                </Text>
               </View>
-            )}
-            <View>
-              <Text
-                style={{ fontSize: 16, fontWeight: "bold", color: theme.text }}
-              >
-                {pet.nome}
-              </Text>
-              <Text style={{ fontSize: 13, color: theme.textSecondary }}>
-                {pet.especie} • {pet.raca}
-              </Text>
-            </View>
-            <Feather
-              name="chevron-right"
-              size={20}
-              color={theme.textSecondary}
-              style={{ marginLeft: "auto" }}
-            />
-          </TouchableOpacity>
-        ))
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={theme.textSecondary}
+                style={{ marginLeft: "auto" }}
+              />
+            </TouchableOpacity>
+          );
+        })
       )}
     </ScrollView>
   );

@@ -1,28 +1,27 @@
 import { Feather } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { auth, db, storage } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
 import { useAppTheme } from "../hooks/use-app-theme";
 
 export default function AddPetScreen() {
   const { theme } = useAppTheme();
   const [saving, setSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
 
   // Estados dos Campos
   const [nome, setNome] = useState("");
@@ -57,27 +56,47 @@ export default function AddPetScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
-      base64: true, // Pede ao Expo para converter a imagem para texto Base64
     });
 
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
-      setImageBase64(result.assets[0].base64 || null);
     }
   };
 
-  const uploadImageAsync = async (base64String: string, petId: string) => {
+  const uploadImageAsync = async (uri: string, petId: string) => {
     const user = auth.currentUser;
     if (!user) throw new Error("Utilizador não autenticado");
 
-    const fileRef = ref(storage, `pets/${user.uid}/${petId}.jpg`);
-
-    // Envia o texto Base64 para o Storage
-    await uploadString(fileRef, base64String, "base64", {
-      contentType: "image/jpeg",
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: "base64",
     });
 
-    return await getDownloadURL(fileRef);
+    const storagePath = `pets%2F${user.uid}%2F${petId}.jpg`;
+    const bucket = "petshop-2c06a.firebasestorage.app";
+    const token = await user.getIdToken();
+
+    // Converte base64 para binário antes de enviar
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const response = await fetch(
+      `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?name=${storagePath}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "image/jpeg",
+          Authorization: `Bearer ${token}`,
+        },
+        body: bytes,
+      },
+    );
+
+    const data = await response.json();
+    console.log("Firebase response:", JSON.stringify(data));
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${storagePath}?alt=media&token=${data.downloadTokens}`;
   };
 
   // ── FUNÇÕES DE DATA E IDADE ───────────────────────────────────────────────
@@ -192,9 +211,8 @@ export default function AddPetScreen() {
       const petsRef = collection(db, "usuarios", user.uid, "pets");
       const docRef = await addDoc(petsRef, finalPetData);
 
-      // Usando o imageBase64 para o upload
-      if (imageBase64) {
-        const fotoUrl = await uploadImageAsync(imageBase64, docRef.id);
+      if (imageUri) {
+        const fotoUrl = await uploadImageAsync(imageUri, docRef.id);
         const petDocRef = doc(db, "usuarios", user.uid, "pets", docRef.id);
         await updateDoc(petDocRef, { fotoUrl });
       }

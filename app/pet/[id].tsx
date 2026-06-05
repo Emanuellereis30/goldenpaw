@@ -1,21 +1,21 @@
 import { Feather } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams } from "expo-router";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { auth, db, storage } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 import { useAppTheme } from "../../hooks/use-app-theme";
 
 export default function PetProfileScreen() {
@@ -28,7 +28,7 @@ export default function PetProfileScreen() {
 
   // Estados para Imagem
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [newImageUri, setNewImageUri] = useState<string | null>(null);
 
   // Estados dos Campos do Pet
   const [nome, setNome] = useState("");
@@ -120,7 +120,7 @@ export default function PetProfileScreen() {
     fetchPet();
   }, [id]);
 
-  // ── SELECIONAR FOTO EM BASE64 ─────────────────────────────────────────────
+  // ── SELECIONAR FOTO ───────────────────────────────────────────────────────
   const pickImage = async () => {
     if (!editing) return;
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -128,13 +128,48 @@ export default function PetProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
-      base64: true,
     });
 
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
-      setImageBase64(result.assets[0].base64 || null);
+      setNewImageUri(result.assets[0].uri);
     }
+  };
+
+  // ── UPLOAD COM EXPO FILE SYSTEM ───────────────────────────────────────────
+  const uploadImageAsync = async (uri: string, petId: string) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Utilizador não autenticado");
+
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: "base64",
+    });
+
+    const storagePath = `pets%2F${user.uid}%2F${petId}.jpg`;
+    const bucket = "petshop-2c06a.firebasestorage.app";
+    const token = await user.getIdToken();
+
+    // Converte base64 para binário antes de enviar
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const response = await fetch(
+      `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?name=${storagePath}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "image/jpeg",
+          Authorization: `Bearer ${token}`,
+        },
+        body: bytes,
+      },
+    );
+
+    const data = await response.json();
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${storagePath}?alt=media&token=${data.downloadTokens}`;
   };
 
   // ── MÁSCARA DE DATA E IDADE AUTOMÁTICA ────────────────────────────────────
@@ -184,9 +219,8 @@ export default function PetProfileScreen() {
     }
   };
 
-  // ── SALVAR ALTERAÇÕES (SALVAR E ATUALIZAR) ────────────────────────────────
+  // ── SALVAR ALTERAÇÕES ─────────────────────────────────────────────────────
   const handleUpdate = async () => {
-    // Validação de campos obrigatórios
     const missingFields = [];
     if (!nome) missingFields.push("Nome");
     if (!especie) missingFields.push("Espécie");
@@ -221,15 +255,11 @@ export default function PetProfileScreen() {
     try {
       const user = auth.currentUser;
       if (user && id) {
-        let fotoUrl = imageUri; // Mantém a URL da foto existente por padrão
+        let fotoUrl = imageUri; // Mantém a URL existente por padrão
 
-        // Se uma nova foto foi selecionada em Base64, faz o upload estável
-        if (imageBase64) {
-          const fileRef = ref(storage, `pets/${user.uid}/${id}.jpg`);
-          await uploadString(fileRef, imageBase64, "base64", {
-            contentType: "image/jpeg",
-          });
-          fotoUrl = await getDownloadURL(fileRef);
+        // Só faz upload se o utilizador escolheu uma nova foto
+        if (newImageUri) {
+          fotoUrl = await uploadImageAsync(newImageUri, id as string);
         }
 
         const updatedPetData = {
@@ -256,7 +286,7 @@ export default function PetProfileScreen() {
 
         Alert.alert("Sucesso", "Perfil do pet atualizado com sucesso!");
         setEditing(false);
-        setImageBase64(null);
+        setNewImageUri(null);
       }
     } catch (error) {
       console.error(error);
@@ -859,7 +889,10 @@ export default function PetProfileScreen() {
         >
           <TouchableOpacity
             style={[styles.cancelBtn, { borderColor: theme.border }]}
-            onPress={() => setEditing(false)}
+            onPress={() => {
+              setEditing(false);
+              setNewImageUri(null);
+            }}
             disabled={saving}
           >
             <Text style={{ color: theme.textSecondary, fontWeight: "bold" }}>
