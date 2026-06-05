@@ -60,7 +60,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (isAdminCredentials) {
-        router.push("/adminDashboard");
+        router.push("/(tabs)/admin");
         return;
       }
 

@@ -794,65 +794,6 @@ export default function Home() {
           </View>
         )}
 
-        {activeTab === "adocao" && (
-          <View style={styles.adoptionContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Adoção
-            </Text>
-            <Text
-              style={[
-                styles.adoptionDescription,
-                { color: theme.textSecondary },
-              ]}
-            >
-              Conheça animais que estão esperando um lar cheio de amor.
-            </Text>
-            <View style={styles.adoptionGrid}>
-              {ADOPTION_PETS.map((pet) => (
-                <View
-                  key={pet.id}
-                  style={[
-                    styles.adoptionCard,
-                    {
-                      backgroundColor: theme.surface,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <Image
-                    source={pet.image}
-                    style={styles.adoptionImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.adoptionDetails}>
-                    <Text
-                      style={[styles.adoptionPetName, { color: theme.text }]}
-                    >
-                      {pet.nome}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.adoptionPetMeta,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {pet.type} • {pet.age}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.adoptionDescriptionText,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {pet.description}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
         {activeTab === "produtos" && (
           <View style={styles.gridContainer}>
             <Text
@@ -1183,7 +1124,13 @@ export default function Home() {
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
-            onPress={() => setActiveTab(tab.id)}
+            onPress={() => {
+              if (tab.id === "adocao") {
+                (router.push as any)("/adocao");
+              } else {
+                setActiveTab(tab.id);
+              }
+            }}
             style={styles.tabItem}
           >
             <Ionicons
