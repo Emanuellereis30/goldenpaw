@@ -357,19 +357,19 @@ const FEATURED_PRODUCT_IDS = ["1", "2", "26", "3", "4"];
 const ADOPTION_PETS = [
   {
     id: "a1",
-    nome: "Lua",
+    nome: "Teddy",
     age: "2 anos",
     type: "Gata carinhosa",
     description: "Castrada, vacinada e adora colo. Perfeita para apartamento.",
-    image: require("../../assets/pets/lua.png"),
+    image: require("../../assets/pets/teddy.png"),
   },
   {
     id: "a2",
-    nome: "Thor",
+    nome: "Princesa",
     age: "1 ano",
     type: "Cachorro brincalhão",
     description: "Energia positiva e ótimo companheiro para famílias.",
-    image: require("../../assets/pets/thor.png"),
+    image: require("../../assets/pets/princesa.png"),
   },
   {
     id: "a3",
@@ -377,6 +377,7 @@ const ADOPTION_PETS = [
     age: "3 anos",
     type: "Caõ de porte médio",
     description: "Amigável, já está castrado e preparado para adoção.",
+    image: require("../../assets/pets/mila.png"),
   },
   {
     id: "a4",
@@ -384,6 +385,7 @@ const ADOPTION_PETS = [
     age: "6 meses",
     type: "Filhote tímida",
     description: "Gosta de carinho e precisa de um lar tranquilo.",
+    image: require("../../assets/pets/nina.png"),
   },
   {
     id: "a5",
@@ -391,6 +393,7 @@ const ADOPTION_PETS = [
     age: "4 anos",
     type: "Cachorro calmo",
     description: "Sociável e obediente, ideal para quem busca um amigo leal.",
+    image: require("../../assets/pets/bento.png"),
   },
   {
     id: "a6",
@@ -398,6 +401,7 @@ const ADOPTION_PETS = [
     age: "8 meses",
     type: "Gatinha brincalhona",
     description: "Adora brincar com bolinhas e é muito carinhosa.",
+    image: require("../../assets/pets/mia.png"),
   },
   {
     id: "a7",
@@ -405,6 +409,7 @@ const ADOPTION_PETS = [
     age: "2 anos",
     type: "Cão protetor",
     description: "Leal e guarda bem a casa, já vacinado e castrado.",
+    image: require("../../assets/pets/zeus.png"),
   },
   {
     id: "a8",
@@ -412,6 +417,7 @@ const ADOPTION_PETS = [
     age: "1 ano",
     type: "Gata delicada",
     description: "Calma e charmosa, adora estar perto de pessoas.",
+    image: require("../../assets/pets/lola.png"),
   },
 ];
 
