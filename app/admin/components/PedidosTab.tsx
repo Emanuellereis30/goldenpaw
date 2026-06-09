@@ -1,6 +1,13 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  updateDoc,
+} from "firebase/firestore";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,17 +19,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { db } from "../../../firebaseConfig";
 import { adminStyles } from "../styles/adminStyles";
 import { Pedido } from "../types/admin.types";
 
-interface PedidosTabProps {
-  pedidos: Pedido[];
-  loading: boolean;
-  onUpdateStatus: (id: string, status: Pedido["status"]) => Promise<void>;
-  onDeletePedido: (id: string) => Promise<void>;
-}
-
-const statusColors: Record<Pedido["status"], string> = {
+const statusColors: Record<string, string> = {
   pendente: "#f59e0b",
   confirmado: "#3b82f6",
   enviado: "#8b5cf6",
@@ -30,7 +31,7 @@ const statusColors: Record<Pedido["status"], string> = {
   cancelado: "#ef4444",
 };
 
-const statusLabels: Record<Pedido["status"], string> = {
+const statusLabels: Record<string, string> = {
   pendente: "Pendente",
   confirmado: "Confirmado",
   enviado: "Enviado",
@@ -38,22 +39,48 @@ const statusLabels: Record<Pedido["status"], string> = {
   cancelado: "Cancelado",
 };
 
-export default function PedidosTab({
-  pedidos,
-  loading,
-  onUpdateStatus,
-  onDeletePedido,
-}: PedidosTabProps) {
+export default function PedidosTab() {
   const { theme } = useAppTheme();
+
+  // Estados do Firebase
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Estados da Interface
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
 
+  // Buscar dados em tempo real
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "pedidos"), (snapshot) => {
+      const docs = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as Pedido[];
+      setPedidos(docs);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Funções do Firebase
+  const onUpdateStatus = async (id: string, status: Pedido["status"]) => {
+    await updateDoc(doc(db, "pedidos", id), { status });
+  };
+
+  const onDeletePedido = async (id: string) => {
+    await deleteDoc(doc(db, "pedidos", id));
+  };
+
+  // Filtro protegido contra dados indefinidos (null/undefined)
   const filteredPedidos = pedidos.filter(
     (p) =>
-      p.clienteNome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.id.toLowerCase().includes(searchQuery.toLowerCase()),
+      (p?.clienteNome || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (p?.id || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleSelectPedido = (pedido: Pedido) => {
@@ -131,72 +158,83 @@ export default function PedidosTab({
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {filteredPedidos.length > 0 ? (
-            filteredPedidos.map((pedido) => (
-              <TouchableOpacity
-                key={pedido.id}
-                style={[
-                  adminStyles.itemCard,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-                onPress={() => handleSelectPedido(pedido)}
-                activeOpacity={0.7}
-              >
-                <View style={adminStyles.itemInfo}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <Text style={[adminStyles.itemName, { color: theme.text }]}>
-                      {pedido.clienteNome}
-                    </Text>
+            filteredPedidos.map((pedido) => {
+              // Prevenções garantidas para cada campo
+              const status = pedido?.status || "pendente";
+              const itens = pedido?.itens || [];
+              const metodoPgto = pedido?.metodoPagamento || "Não informado";
+
+              return (
+                <TouchableOpacity
+                  key={pedido.id}
+                  style={[
+                    adminStyles.itemCard,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => handleSelectPedido(pedido)}
+                  activeOpacity={0.7}
+                >
+                  <View style={adminStyles.itemInfo}>
                     <View
-                      style={[
-                        {
-                          backgroundColor: statusColors[pedido.status],
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Text
+                        style={[adminStyles.itemName, { color: theme.text }]}
+                      >
+                        {pedido.clienteNome || "Cliente Desconhecido"}
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: statusColors[status],
                           paddingHorizontal: 8,
                           paddingVertical: 2,
                           borderRadius: 4,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={{
-                          color: "#FFF",
-                          fontSize: 10,
-                          fontWeight: "bold",
                         }}
                       >
-                        {statusLabels[pedido.status]}
-                      </Text>
+                        <Text
+                          style={{
+                            color: "#FFF",
+                            fontSize: 10,
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {statusLabels[status]}
+                        </Text>
+                      </View>
                     </View>
+                    <Text
+                      style={[
+                        adminStyles.itemDetail,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {pedido.data || "Data não definida"} às{" "}
+                      {pedido.horario || "--:--"}
+                    </Text>
+                    <Text
+                      style={[
+                        adminStyles.itemDetail,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {itens.length} item(ns) • R$ {pedido.total || "0,00"}
+                    </Text>
                   </View>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {pedido.data} às {pedido.horario}
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {pedido.itens.length} item(ns) • R$ {pedido.total}
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={theme.textSecondary}
-                />
-              </TouchableOpacity>
-            ))
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color={theme.textSecondary}
+                  />
+                </TouchableOpacity>
+              );
+            })
           ) : (
             <Text
               style={[adminStyles.emptyText, { color: theme.textSecondary }]}
@@ -229,12 +267,12 @@ export default function PedidosTab({
           <ScrollView style={adminStyles.modalContent}>
             {selectedPedido && (
               <View style={adminStyles.modalForm}>
-                {/* ID do Pedido */}
                 <Text
                   style={[adminStyles.sectionTitle, { color: theme.primary }]}
                 >
                   Informações do Pedido
                 </Text>
+
                 <Text style={[adminStyles.label, { color: theme.text }]}>
                   ID do Pedido
                 </Text>
@@ -247,7 +285,6 @@ export default function PedidosTab({
                   {selectedPedido.id}
                 </Text>
 
-                {/* Cliente */}
                 <Text style={[adminStyles.label, { color: theme.text }]}>
                   Cliente
                 </Text>
@@ -257,10 +294,9 @@ export default function PedidosTab({
                     { color: theme.textSecondary, marginBottom: 16 },
                   ]}
                 >
-                  {selectedPedido.clienteNome}
+                  {selectedPedido.clienteNome || "N/A"}
                 </Text>
 
-                {/* Data e Hora */}
                 <View style={adminStyles.productInputRow}>
                   <View style={adminStyles.productInputColumn}>
                     <Text style={[adminStyles.label, { color: theme.text }]}>
@@ -272,7 +308,7 @@ export default function PedidosTab({
                         { color: theme.textSecondary },
                       ]}
                     >
-                      {selectedPedido.data}
+                      {selectedPedido.data || "N/A"}
                     </Text>
                   </View>
                   <View style={adminStyles.productInputColumn}>
@@ -285,12 +321,11 @@ export default function PedidosTab({
                         { color: theme.textSecondary },
                       ]}
                     >
-                      {selectedPedido.horario}
+                      {selectedPedido.horario || "N/A"}
                     </Text>
                   </View>
                 </View>
 
-                {/* Itens do Pedido */}
                 <Text
                   style={[
                     adminStyles.sectionTitle,
@@ -299,7 +334,7 @@ export default function PedidosTab({
                 >
                   Itens do Pedido
                 </Text>
-                {selectedPedido.itens.map((item, index) => (
+                {(selectedPedido.itens || []).map((item, index) => (
                   <View
                     key={index}
                     style={[
@@ -338,7 +373,6 @@ export default function PedidosTab({
                   </View>
                 ))}
 
-                {/* Endereço */}
                 <Text
                   style={[
                     adminStyles.sectionTitle,
@@ -353,10 +387,9 @@ export default function PedidosTab({
                     { color: theme.textSecondary, marginBottom: 16 },
                   ]}
                 >
-                  {selectedPedido.endereco}
+                  {selectedPedido.endereco || "Não informado"}
                 </Text>
 
-                {/* Método de Pagamento */}
                 <Text style={[adminStyles.label, { color: theme.text }]}>
                   Método de Pagamento
                 </Text>
@@ -366,32 +399,30 @@ export default function PedidosTab({
                     { color: theme.textSecondary, marginBottom: 16 },
                   ]}
                 >
-                  {selectedPedido.metodoPagamento.charAt(0).toUpperCase() +
-                    selectedPedido.metodoPagamento.slice(1)}
+                  {(
+                    selectedPedido.metodoPagamento || "Não informado"
+                  ).toUpperCase()}
                 </Text>
 
-                {/* Status */}
                 <Text style={[adminStyles.label, { color: theme.text }]}>
                   Status
                 </Text>
                 <View
-                  style={[
-                    {
-                      backgroundColor: statusColors[selectedPedido.status],
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 8,
-                      marginBottom: 16,
-                      alignSelf: "flex-start",
-                    },
-                  ]}
+                  style={{
+                    backgroundColor:
+                      statusColors[selectedPedido.status || "pendente"],
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    marginBottom: 16,
+                    alignSelf: "flex-start",
+                  }}
                 >
                   <Text style={{ color: "#FFF", fontWeight: "bold" }}>
-                    {statusLabels[selectedPedido.status]}
+                    {statusLabels[selectedPedido.status || "pendente"]}
                   </Text>
                 </View>
 
-                {/* Total */}
                 <View
                   style={[
                     adminStyles.dashboardCard,
@@ -414,11 +445,10 @@ export default function PedidosTab({
                       { fontSize: 24, fontWeight: "700", color: theme.primary },
                     ]}
                   >
-                    R$ {selectedPedido.total}
+                    R$ {selectedPedido.total || "0,00"}
                   </Text>
                 </View>
 
-                {/* Botões de Ação */}
                 <TouchableOpacity
                   style={[
                     adminStyles.submitButton,
@@ -451,25 +481,21 @@ export default function PedidosTab({
       {/* Modal de Alterar Status */}
       <Modal visible={showStatusModal} animationType="fade" transparent>
         <View
-          style={[
-            {
-              flex: 1,
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              justifyContent: "center",
-              alignItems: "center",
-              paddingHorizontal: 20,
-            },
-          ]}
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 20,
+          }}
         >
           <View
-            style={[
-              {
-                backgroundColor: theme.surface,
-                borderRadius: 12,
-                padding: 20,
-                width: "100%",
-              },
-            ]}
+            style={{
+              backgroundColor: theme.surface,
+              borderRadius: 12,
+              padding: 20,
+              width: "100%",
+            }}
           >
             <Text
               style={[
@@ -491,21 +517,19 @@ export default function PedidosTab({
             ).map((status) => (
               <TouchableOpacity
                 key={status}
-                style={[
-                  {
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    borderRadius: 8,
-                    marginBottom: 8,
-                    backgroundColor: statusColors[status] + "20",
-                    borderWidth: 1,
-                    borderColor: statusColors[status],
-                  },
-                ]}
+                style={{
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 8,
+                  marginBottom: 8,
+                  backgroundColor: statusColors[status] + "20",
+                  borderWidth: 1,
+                  borderColor: statusColors[status],
+                }}
                 onPress={() => handleStatusChange(status)}
               >
                 <Text
-                  style={[{ color: statusColors[status], fontWeight: "600" }]}
+                  style={{ color: statusColors[status], fontWeight: "600" }}
                 >
                   {statusLabels[status]}
                 </Text>

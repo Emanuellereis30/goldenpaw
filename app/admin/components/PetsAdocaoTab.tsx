@@ -1,7 +1,21 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState } from "react";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  updateDoc,
+} from "firebase/firestore";
+import {
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytesResumable,
+} from "firebase/storage";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,338 +28,245 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { db } from "../../../firebaseConfig";
 import { adminStyles } from "../styles/adminStyles";
-import { Pet, RequisicaoAdocao } from "../types/admin.types";
 
-interface PetsAdocaoTabProps {
-  pets: Pet[];
-  requisicoes?: RequisicaoAdocao[];
-  loading: boolean;
-  onAddPet: (pet: Omit<Pet, "id">) => Promise<void>;
-  onEditPet: (id: string, pet: Omit<Pet, "id">) => Promise<void>;
-  onDeletePet: (id: string) => Promise<void>;
-  onUpdateRequisicao?: (
-    id: string,
-    status: "aprovado" | "rejeitado",
-    visualizado: boolean,
-  ) => Promise<void>;
-}
-
-const racasPorTipo: Record<string, string[]> = {
-  cachorro: [
-    "Vira-lata",
-    "Shih Tzu",
-    "Poodle",
-    "Pinscher",
-    "Labrador",
-    "Golden Retriever",
-    "Bulldog Francês",
-    "Pastor Alemão",
-    "Yorkshire",
-    "Rottweiler",
-    "Beagle",
-    "Dachshund",
-    "Husky Siberiano",
-    "Spitz Alemão",
-    "Border Collie",
-    "Chihuahua",
-    "Pug",
-    "Boxer",
-    "Pitbull",
-    "Maltês",
-  ],
-  gato: [
-    "SRD",
-    "Persa",
-    "Siamês",
-    "Maine Coon",
-    "Angorá",
-    "Bengal",
-    "Sphynx",
-    "Ragdoll",
-    "British Shorthair",
-    "Scottish Fold",
-    "Exótico",
-    "Azul Russo",
-    "Himalaio",
-  ],
-  ave: [
-    "Calopsita",
-    "Periquito",
-    "Canário",
-    "Papagaio",
-    "Agapornis",
-    "Cacatua",
-    "Mandarim",
-    "Manon",
-    "Ring Neck",
-    "Arara",
-  ],
-  peixe: [
-    "Betta",
-    "Guppy",
-    "Molinésia",
-    "Platy",
-    "Kinguio",
-    "Acará Bandeira",
-    "Tetra Neon",
-    "Oscar",
-    "Espada",
-    "Cascudo",
-  ],
+const uriToBlob = async (uri: string): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      resolve(xhr.response);
+    };
+    xhr.onerror = function (e) {
+      console.log(e);
+      reject(new TypeError("Falha na requisição de rede"));
+    };
+    xhr.responseType = "blob";
+    xhr.open("GET", uri, true);
+    xhr.send(null);
+  });
 };
 
-const getStatusColor = (status: string, theme: any): string => {
-  switch (status) {
-    case "pendente":
-      return "#FFA500"; // Orange
-    case "aprovado":
-      return "#4CAF50"; // Green
-    case "rejeitado":
-      return "#F44336"; // Red
-    default:
-      return theme.textSecondary;
-  }
-};
-
-const getStatusLabel = (status: string): string => {
-  switch (status) {
-    case "pendente":
-      return "Pendente";
-    case "aprovado":
-      return "Aprovado";
-    case "rejeitado":
-      return "Rejeitado";
-    default:
-      return status;
-  }
-};
-
-const formatDate = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("pt-BR");
-  } catch {
-    return dateString;
-  }
-};
-
-export default function PetsAdocaoTab({
-  pets,
-  requisicoes = [],
-  loading,
-  onAddPet,
-  onEditPet,
-  onDeletePet,
-  onUpdateRequisicao,
-}: PetsAdocaoTabProps) {
+export default function PetsAdocaoTab() {
   const { theme } = useAppTheme();
+  const storage = getStorage();
+
+  const [pets, setPets] = useState<any[]>([]);
+  const [requisicoes, setRequisicoes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingSave, setLoadingSave] = useState(false);
+
+  const [currentView, setCurrentView] = useState<"pets" | "requisicoes">(
+    "pets",
+  );
   const [searchQuery, setSearchQuery] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [editingPet, setEditingPet] = useState<Pet | null>(null);
-  const [showRequisicoes, setShowRequisicoes] = useState(true);
-  const [selectedRequisicao, setSelectedRequisicao] =
-    useState<RequisicaoAdocao | null>(null);
-  const [showRequisicaoModal, setShowRequisicaoModal] = useState(false);
-  const [form, setForm] = useState<{
-    nome: string;
-    tipo: "cachorro" | "gato" | "ave" | "peixe";
-    raca: string;
-    idade: number;
-    porte: "pequeno" | "médio" | "grande";
-    sexo: "macho" | "fêmea";
-    tags: string;
-    fotoUrl: string;
-  }>({
+
+  const [showPetModal, setShowPetModal] = useState(false);
+  const [editingPet, setEditingPet] = useState<any | null>(null);
+  const [imagePicked, setImagePicked] = useState(false);
+
+  // O formulário agora separa o número da unidade (anos/meses) e tem campo para tags
+  const [form, setForm] = useState<any>({
     nome: "",
-    tipo: "cachorro",
-    raca: "",
-    idade: 0,
-    porte: "médio",
+    raca: "SRD",
+    idadeNum: 1,
+    idadeUnidade: "anos",
     sexo: "macho",
+    image: "",
+    descricao: "",
+    porte: "médio",
     tags: "",
-    fotoUrl: "",
   });
 
-  const filteredPets = pets.filter(
-    (p) =>
-      p.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.petId.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const [showReqModal, setShowReqModal] = useState(false);
+  const [selectedReq, setSelectedReq] = useState<any | null>(null);
 
-  const pendingRequisicoes = requisicoes.filter((r) => r.status === "pendente");
+  const racasSugeridas = ["SRD", "Poodle", "Pinscher", "Persa", "Siamês"];
 
-  const handleSave = async () => {
-    if (!form.nome || !form.raca) {
-      Alert.alert("Erro", "Preencha o nome do pet e a raça");
-      return;
-    }
-
-    try {
-      const petData = {
-        petId:
-          editingPet?.petId ||
-          "PET-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
-        nome: form.nome,
-        tipo: form.tipo,
-        raca: form.raca,
-        idade: form.idade,
-        porte: form.porte,
-        sexo: form.sexo,
-        tags: form.tags,
-        fotoUrl: form.fotoUrl,
-      };
-
-      if (editingPet) {
-        await onEditPet(editingPet.id, petData);
-        Alert.alert("Sucesso", "Pet atualizado!");
-      } else {
-        await onAddPet(petData);
-        Alert.alert("Sucesso", "Pet adicionado!");
-      }
-
-      setShowModal(false);
-      resetForm();
-    } catch (error) {
-      Alert.alert("Erro", "Falha ao salvar pet");
-    }
-  };
-
-  const resetForm = () => {
-    setForm({
-      nome: "",
-      tipo: "cachorro",
-      raca: "",
-      idade: 0,
-      porte: "médio",
-      sexo: "macho",
-      tags: "",
-      fotoUrl: "",
+  useEffect(() => {
+    const unsubPets = onSnapshot(collection(db, "pets"), (snapshot) => {
+      setPets(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-    setEditingPet(null);
-  };
 
-  const handleEdit = (pet: Pet) => {
-    setEditingPet(pet);
-    setForm({
-      nome: pet.nome,
-      tipo: pet.tipo,
-      raca: pet.raca,
-      idade: pet.idade,
-      porte: pet.porte,
-      sexo: pet.sexo,
-      tags: pet.tags,
-      fotoUrl: pet.fotoUrl,
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = (id: string) => {
-    Alert.alert("Confirmar", "Deseja excluir este pet?", [
-      { text: "Cancelar" },
-      {
-        text: "Excluir",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await onDeletePet(id);
-            Alert.alert("Sucesso", "Pet removido!");
-          } catch (error) {
-            Alert.alert("Erro", "Falha ao excluir pet");
-          }
-        },
+    const unsubRequisicoes = onSnapshot(
+      collection(db, "requisicoes_adocao"),
+      (snapshot) => {
+        setRequisicoes(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoading(false);
       },
-    ]);
-  };
+    );
 
-  const handleRequisicaoPress = async (requisicao: RequisicaoAdocao) => {
-    setSelectedRequisicao(requisicao);
-    setShowRequisicaoModal(true);
-
-    // Mark as visualizado - apenas se não foi visualizado ainda
-    // Não muda o status, apenas marca como visualizado
-    if (!requisicao.visualizado && onUpdateRequisicao) {
-      try {
-        // Manter o status atual (não mudar para aprovado/rejeitado)
-        // Apenas marcar como visualizado
-        const currentStatus = requisicao.status;
-        if (
-          currentStatus === "pendente" ||
-          currentStatus === "aprovado" ||
-          currentStatus === "rejeitado"
-        ) {
-          const statusToPass: "aprovado" | "rejeitado" =
-            currentStatus === "pendente"
-              ? "aprovado"
-              : (currentStatus as "aprovado" | "rejeitado");
-          // Na verdade, vamos apenas marcar como visualizado sem mudar status
-          // Então vamos chamar com o status atual se for válido
-          if (currentStatus !== "pendente") {
-            await onUpdateRequisicao(
-              requisicao.id,
-              currentStatus as "aprovado" | "rejeitado",
-              true,
-            );
-          }
-        }
-      } catch (error) {
-        console.log("Erro ao marcar como visualizado:", error);
-      }
-    }
-  };
-
-  const handleApproveRequisicao = async () => {
-    if (!selectedRequisicao || !onUpdateRequisicao) return;
-
-    try {
-      const req = selectedRequisicao as RequisicaoAdocao;
-      const newStatus: "aprovado" | "rejeitado" = "aprovado";
-      await onUpdateRequisicao(req.id, newStatus, true);
-      Alert.alert("Sucesso", "Requisição aprovada!");
-      setShowRequisicaoModal(false);
-      setSelectedRequisicao(null as any);
-    } catch (error) {
-      Alert.alert("Erro", "Falha ao aprovar requisição");
-    }
-  };
-
-  const handleRejectRequisicao = async () => {
-    if (!selectedRequisicao || !onUpdateRequisicao) return;
-
-    try {
-      const req = selectedRequisicao as RequisicaoAdocao;
-      const newStatus: "aprovado" | "rejeitado" = "rejeitado";
-      await onUpdateRequisicao(req.id, newStatus, true);
-      Alert.alert("Sucesso", "Requisição rejeitada!");
-      setShowRequisicaoModal(false);
-      setSelectedRequisicao(null as any);
-    } catch (error) {
-      Alert.alert("Erro", "Falha ao rejeitar requisição");
-    }
-  };
+    return () => {
+      unsubPets();
+      unsubRequisicoes();
+    };
+  }, []);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert(
-        "Permissão necessária",
-        "Precisamos de acesso à galeria para selecionar a foto.",
+        "Permissão",
+        "Precisamos de acesso à galeria para a foto do pet.",
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setForm((prev: any) => ({ ...prev, image: result.assets[0].uri }));
+      setImagePicked(true);
+    }
+  };
+
+  const uploadImageAsync = async (uri: string): Promise<string> => {
+    const blob = await uriToBlob(uri);
+    const filename = `pets/${Date.now()}-${form.nome.replace(/\s+/g, "").toLowerCase()}.jpg`;
+    const storageRef = ref(storage, filename);
+
+    const uploadTask = uploadBytesResumable(storageRef, blob);
+
+    return new Promise((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        null,
+        (error) => {
+          console.error("Erro no upload:", error);
+          reject(error);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(downloadURL);
+        },
+      );
+    });
+  };
+
+  const handleSavePet = async () => {
+    if (!form.nome || !form.raca || !form.image) {
+      Alert.alert(
+        "Erro",
+        "Preencha todos os campos obrigatórios e adicione uma foto.",
       );
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-      base64: false,
-    });
+    setLoadingSave(true);
 
-    if (!result.canceled && result.assets.length > 0) {
-      setForm((prev) => ({ ...prev, fotoUrl: result.assets[0].uri }));
+    try {
+      let finalImageUrl = form.image;
+
+      if (
+        imagePicked &&
+        (form.image.startsWith("file:") || form.image.startsWith("/"))
+      ) {
+        finalImageUrl = await uploadImageAsync(form.image);
+      }
+
+      // Junta o número e a unidade para guardar no Firebase (ex: "2 meses" ou "1 ano")
+      const idadeFormatada = `${form.idadeNum} ${form.idadeUnidade === "anos" && form.idadeNum === 1 ? "ano" : form.idadeUnidade}`;
+
+      const petData = {
+        nome: form.nome,
+        raca: form.raca,
+        idade: idadeFormatada,
+        sexo: form.sexo,
+        image: finalImageUrl,
+        descricao: form.descricao,
+        porte: form.porte,
+        tags: form.tags,
+      };
+
+      if (editingPet) {
+        await updateDoc(doc(db, "pets", editingPet.id), petData);
+        Alert.alert("Sucesso", "Pet atualizado!");
+      } else {
+        await addDoc(collection(db, "pets"), petData);
+        Alert.alert("Sucesso", "Pet cadastrado!");
+      }
+      setShowPetModal(false);
+      setEditingPet(null);
+      setImagePicked(false);
+      setForm({
+        nome: "",
+        raca: "SRD",
+        idadeNum: 1,
+        idadeUnidade: "anos",
+        sexo: "macho",
+        image: "",
+        descricao: "",
+        porte: "médio",
+        tags: "",
+      });
+    } catch (error) {
+      Alert.alert("Erro", "Falha ao salvar o pet. Verifique a sua ligação.");
+    } finally {
+      setLoadingSave(false);
     }
   };
+
+  const handleEditOpen = (pet: any) => {
+    setEditingPet(pet);
+
+    // Separa a idade guardada no banco de dados para preencher o formulário corretamente
+    const isMeses = pet.idade && pet.idade.includes("mes");
+    const parsedNum = parseInt(pet.idade) || 1;
+
+    setForm({
+      nome: pet.nome,
+      raca: pet.raca || "SRD",
+      idadeNum: parsedNum,
+      idadeUnidade: isMeses ? "meses" : "anos",
+      sexo: pet.sexo || "macho",
+      image: pet.image || "",
+      descricao: pet.descricao || "",
+      porte: pet.porte || "médio",
+      tags: pet.tags || "",
+    });
+
+    setImagePicked(false);
+    setShowPetModal(true);
+  };
+
+  const handleDeletePet = (id: string) => {
+    Alert.alert("Confirmar", "Deseja remover este pet da lista de adoção?", [
+      { text: "Cancelar" },
+      {
+        text: "Remover",
+        style: "destructive",
+        onPress: async () => await deleteDoc(doc(db, "pets", id)),
+      },
+    ]);
+  };
+
+  const handleUpdateRequisicao = async (status: "aprovado" | "rejeitado") => {
+    if (!selectedReq) return;
+    try {
+      await updateDoc(doc(db, "requisicoes_adocao", selectedReq.id), {
+        status,
+        visualizado: true,
+      });
+      Alert.alert("Sucesso", `Requisição ${status} com sucesso!`);
+      setShowReqModal(false);
+    } catch (error) {
+      Alert.alert("Erro", "Falha ao atualizar o status.");
+    }
+  };
+
+  const filteredPets = pets.filter((p) =>
+    (p.nome || "").toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+  const filteredReqs = requisicoes.filter(
+    (r) =>
+      (r.usuarioNome || r.clienteNome || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      (r.petNome || "").toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   if (loading) {
     return (
@@ -368,162 +289,63 @@ export default function PetsAdocaoTab({
           { backgroundColor: theme.background },
         ]}
       >
-        {/* Adoption Requests Section */}
-        {requisicoes.length > 0 && (
-          <View style={{ marginBottom: 16 }}>
-            <TouchableOpacity
+        {/* Toggle / Sub-abas */}
+        <View
+          style={{
+            flexDirection: "row",
+            marginBottom: 16,
+            backgroundColor: theme.surface,
+            borderRadius: 12,
+            padding: 4,
+            borderWidth: 1,
+            borderColor: theme.border,
+          }}
+        >
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              alignItems: "center",
+              borderRadius: 8,
+              backgroundColor:
+                currentView === "pets" ? theme.primary : "transparent",
+            }}
+            onPress={() => setCurrentView("pets")}
+          >
+            <Text
               style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                backgroundColor: theme.surface,
-                borderRadius: 8,
-                borderColor: theme.border,
-                borderWidth: 1,
-                marginHorizontal: 16,
+                fontWeight: "700",
+                color: currentView === "pets" ? "#000" : theme.textSecondary,
               }}
-              onPress={() => setShowRequisicoes(!showRequisicoes)}
             >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-              >
-                <Ionicons
-                  name="document-text"
-                  size={20}
-                  color={theme.primary}
-                />
-                <Text
-                  style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.text, marginBottom: 0 },
-                  ]}
-                >
-                  Requisições de Adoção
-                </Text>
-                {pendingRequisicoes.length > 0 && (
-                  <View
-                    style={{
-                      backgroundColor: "#FFA500",
-                      borderRadius: 12,
-                      paddingHorizontal: 8,
-                      paddingVertical: 2,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "#FFF",
-                        fontSize: 12,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {pendingRequisicoes.length}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Ionicons
-                name={showRequisicoes ? "chevron-up" : "chevron-down"}
-                size={20}
-                color={theme.textSecondary}
-              />
-            </TouchableOpacity>
+              Pets Cadastrados
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              alignItems: "center",
+              borderRadius: 8,
+              backgroundColor:
+                currentView === "requisicoes" ? theme.primary : "transparent",
+            }}
+            onPress={() => setCurrentView("requisicoes")}
+          >
+            <Text
+              style={{
+                fontWeight: "700",
+                color:
+                  currentView === "requisicoes" ? "#000" : theme.textSecondary,
+              }}
+            >
+              Requisições{" "}
+              {requisicoes.filter((r) => r.status === "pendente").length > 0 &&
+                `(${requisicoes.filter((r) => r.status === "pendente").length})`}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-            {showRequisicoes && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{ marginTop: 12 }}
-                contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-              >
-                {requisicoes.map((requisicao) => (
-                  <TouchableOpacity
-                    key={requisicao.id}
-                    style={{
-                      backgroundColor: theme.surface,
-                      borderColor: theme.border,
-                      borderWidth: 1,
-                      borderRadius: 8,
-                      padding: 12,
-                      minWidth: 280,
-                      position: "relative",
-                    }}
-                    onPress={() => handleRequisicaoPress(requisicao)}
-                  >
-                    {!requisicao.visualizado && (
-                      <View
-                        style={{
-                          position: "absolute",
-                          top: 8,
-                          right: 8,
-                          width: 10,
-                          height: 10,
-                          borderRadius: 5,
-                          backgroundColor: theme.primary,
-                        }}
-                      />
-                    )}
-
-                    <View style={{ marginBottom: 8 }}>
-                      <Text
-                        style={[adminStyles.itemName, { color: theme.text }]}
-                      >
-                        {requisicao.nomeCompleto}
-                      </Text>
-                      <Text
-                        style={[
-                          adminStyles.itemDetail,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        Solicitou: {requisicao.petNome}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Text
-                        style={[
-                          adminStyles.itemDetail,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        {formatDate(requisicao.criadoEm)}
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor:
-                            getStatusColor(requisicao.status, theme) + "20",
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: getStatusColor(requisicao.status, theme),
-                            fontSize: 12,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {getStatusLabel(requisicao.status)}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-        )}
-
-        {/* Search Bar */}
         <View
           style={[
             adminStyles.searchBar,
@@ -533,125 +355,262 @@ export default function PetsAdocaoTab({
           <Ionicons name="search" size={20} color={theme.textSecondary} />
           <TextInput
             style={[adminStyles.searchInput, { color: theme.text }]}
-            placeholder="Pesquisar pet..."
+            placeholder={
+              currentView === "pets"
+                ? "Pesquisar pet..."
+                : "Pesquisar por adotante ou pet..."
+            }
             placeholderTextColor={theme.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
 
-        <TouchableOpacity
-          style={[adminStyles.addButton, { backgroundColor: theme.primary }]}
-          onPress={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-        >
-          <Ionicons name="add" size={24} color="#000" />
-          <Text style={adminStyles.addButtonText}>Novo Pet</Text>
-        </TouchableOpacity>
+        {/* VIEW: PETS */}
+        {currentView === "pets" && (
+          <>
+            <TouchableOpacity
+              style={[
+                adminStyles.addButton,
+                { backgroundColor: theme.primary },
+              ]}
+              onPress={() => {
+                setEditingPet(null);
+                setImagePicked(false);
+                setForm({
+                  nome: "",
+                  raca: "SRD",
+                  idadeNum: 1,
+                  idadeUnidade: "anos",
+                  sexo: "macho",
+                  image: "",
+                  descricao: "",
+                  porte: "médio",
+                  tags: "",
+                });
+                setShowPetModal(true);
+              }}
+            >
+              <Ionicons name="add" size={24} color="#000" />
+              <Text style={adminStyles.addButtonText}>
+                Novo Pet para Adoção
+              </Text>
+            </TouchableOpacity>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {filteredPets.length > 0 ? (
-            filteredPets.map((pet) => (
-              <View
-                key={pet.id}
-                style={[
-                  adminStyles.itemCard,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                {pet.fotoUrl && (
-                  <Image
-                    source={{ uri: pet.fotoUrl }}
-                    style={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 8,
-                      marginRight: 12,
-                    }}
-                    resizeMode="cover"
-                  />
-                )}
-                <View style={[adminStyles.itemInfo, { flex: 1 }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {filteredPets.length > 0 ? (
+                filteredPets.map((pet) => (
                   <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
+                    key={pet.id}
+                    style={[
+                      adminStyles.itemCard,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
                   >
-                    <Text style={[adminStyles.itemName, { color: theme.text }]}>
-                      {pet.nome}
-                    </Text>
-                    <View
-                      style={[
-                        adminStyles.idBadge,
-                        { backgroundColor: theme.primary + "40" },
-                      ]}
-                    >
+                    {pet.image && (
+                      <Image
+                        source={{ uri: pet.image }}
+                        style={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: 30,
+                          marginRight: 12,
+                          backgroundColor: theme.border,
+                        }}
+                        resizeMode="cover"
+                      />
+                    )}
+                    <View style={[adminStyles.itemInfo, { flex: 1 }]}>
+                      <View style={adminStyles.idBadge}>
+                        <Text style={adminStyles.idBadgeText}>
+                          ID: {(pet.id || "").substring(0, 5).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <Text
+                          style={[adminStyles.itemName, { color: theme.text }]}
+                        >
+                          {pet.nome}
+                        </Text>
+                        <Ionicons
+                          name={pet.sexo === "macho" ? "male" : "female"}
+                          size={14}
+                          color={pet.sexo === "macho" ? "#3b82f6" : "#ec4899"}
+                        />
+                      </View>
                       <Text
                         style={[
-                          adminStyles.idBadgeText,
-                          { color: theme.primary },
+                          adminStyles.itemDetail,
+                          { color: theme.textSecondary },
                         ]}
                       >
-                        {pet.petId}
+                        {pet.raca} • {pet.idade} • {pet.porte}
                       </Text>
+
+                      {/* EXIBIÇÃO DA TAG SE EXISTIR */}
+                      {pet.tags ? (
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: theme.primary,
+                            fontWeight: "700",
+                            marginTop: 4,
+                          }}
+                        >
+                          {pet.tags}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={adminStyles.itemActions}>
+                      <TouchableOpacity
+                        style={[
+                          adminStyles.actionButton,
+                          { backgroundColor: theme.primary },
+                        ]}
+                        onPress={() => handleEditOpen(pet)}
+                      >
+                        <Ionicons name="pencil" size={18} color="#000" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          adminStyles.actionButton,
+                          { backgroundColor: theme.error },
+                        ]}
+                        onPress={() => handleDeletePet(pet.id)}
+                      >
+                        <Ionicons name="trash" size={18} color="#FFF" />
+                      </TouchableOpacity>
                     </View>
                   </View>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {pet.tipo.charAt(0).toUpperCase() + pet.tipo.slice(1)} •{" "}
-                    {pet.raca}
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {pet.porte} • {pet.sexo} • {pet.idade} anos
-                  </Text>
-                </View>
-                <View style={adminStyles.itemActions}>
+                ))
+              ) : (
+                <Text
+                  style={[
+                    adminStyles.emptyText,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Nenhum pet encontrado
+                </Text>
+              )}
+            </ScrollView>
+          </>
+        )}
+
+        {/* VIEW: REQUISIÇÕES */}
+        {currentView === "requisicoes" && (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {filteredReqs.length > 0 ? (
+              filteredReqs.map((req) => {
+                return (
                   <TouchableOpacity
+                    key={req.id}
                     style={[
-                      adminStyles.actionButton,
-                      { backgroundColor: theme.primary },
+                      adminStyles.itemCard,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
                     ]}
-                    onPress={() => handleEdit(pet)}
+                    onPress={() => {
+                      setSelectedReq(req);
+                      setShowReqModal(true);
+                    }}
                   >
-                    <Ionicons name="pencil" size={18} color="#000" />
+                    <View style={adminStyles.itemInfo}>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <Text
+                          style={[
+                            adminStyles.itemName,
+                            { color: theme.text, marginBottom: 0 },
+                          ]}
+                        >
+                          {req.usuarioNome || req.clienteNome || "Adotante"}
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor:
+                              req.status === "aprovado"
+                                ? "#10b98120"
+                                : req.status === "rejeitado"
+                                  ? "#ef444420"
+                                  : "#f59e0b20",
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderRadius: 4,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontWeight: "bold",
+                              color:
+                                req.status === "aprovado"
+                                  ? "#10b981"
+                                  : req.status === "rejeitado"
+                                    ? "#ef4444"
+                                    : "#f59e0b",
+                            }}
+                          >
+                            {req.status?.toUpperCase() || "PENDENTE"}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text
+                        style={[
+                          adminStyles.itemDetail,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        Queria adotar:{" "}
+                        <Text style={{ fontWeight: "700" }}>{req.petNome}</Text>
+                      </Text>
+                      <Text
+                        style={[
+                          adminStyles.itemDetail,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        Feito em: {req.data || "Recente"}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={theme.textSecondary}
+                    />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      adminStyles.actionButton,
-                      { backgroundColor: theme.error },
-                    ]}
-                    onPress={() => handleDelete(pet.id)}
-                  >
-                    <Ionicons name="trash" size={18} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text
-              style={[adminStyles.emptyText, { color: theme.textSecondary }]}
-            >
-              Nenhum pet encontrado
-            </Text>
-          )}
-        </ScrollView>
+                );
+              })
+            ) : (
+              <Text
+                style={[adminStyles.emptyText, { color: theme.textSecondary }]}
+              >
+                Nenhuma requisição encontrada
+              </Text>
+            )}
+          </ScrollView>
+        )}
       </View>
 
-      {/* Modal de Pet */}
-      <Modal visible={showModal} animationType="slide" transparent>
+      {/* MODAL: REGISTRO DE PET */}
+      <Modal visible={showPetModal} animationType="slide" transparent>
         <SafeAreaView
           style={[adminStyles.modal, { backgroundColor: theme.background }]}
         >
@@ -664,21 +623,14 @@ export default function PetsAdocaoTab({
             <Text style={[adminStyles.modalTitle, { color: theme.text }]}>
               {editingPet ? "Editar Pet" : "Novo Pet"}
             </Text>
-            <TouchableOpacity onPress={() => setShowModal(false)}>
+            <TouchableOpacity onPress={() => setShowPetModal(false)}>
               <Ionicons name="close" size={24} color={theme.text} />
             </TouchableOpacity>
           </View>
-
           <ScrollView style={adminStyles.modalContent}>
             <View style={adminStyles.modalForm}>
-              <Text
-                style={[adminStyles.sectionTitle, { color: theme.primary }]}
-              >
-                Dados do Pet
-              </Text>
-
               <Text style={[adminStyles.label, { color: theme.text }]}>
-                Nome do Pet *
+                Nome *
               </Text>
               <TextInput
                 style={[
@@ -689,56 +641,25 @@ export default function PetsAdocaoTab({
                     borderColor: theme.border,
                   },
                 ]}
+                value={form.nome}
+                onChangeText={(t) => setForm({ ...form, nome: t })}
                 placeholder="Nome do pet"
                 placeholderTextColor={theme.textSecondary}
-                value={form.nome}
-                onChangeText={(text) => setForm({ ...form, nome: text })}
               />
-
-              <Text style={[adminStyles.label, { color: theme.text }]}>
-                Tipo *
-              </Text>
-              <View style={adminStyles.typeSelector}>
-                {["cachorro", "gato", "ave", "peixe"].map((tipo) => (
-                  <TouchableOpacity
-                    key={tipo}
-                    style={[
-                      adminStyles.typeButton,
-                      {
-                        backgroundColor:
-                          form.tipo === tipo ? theme.primary : theme.surface,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                    onPress={() =>
-                      setForm({ ...form, tipo: tipo as any, raca: "" })
-                    }
-                  >
-                    <Text
-                      style={[
-                        adminStyles.typeButtonText,
-                        { color: form.tipo === tipo ? "#000" : theme.text },
-                      ]}
-                    >
-                      {tipo.charAt(0).toUpperCase() + tipo.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
 
               <Text style={[adminStyles.label, { color: theme.text }]}>
                 Raça *
               </Text>
               <View style={adminStyles.breedSelector}>
-                {(racasPorTipo[form.tipo] || []).map((raca) => (
+                {racasSugeridas.map((raca) => (
                   <TouchableOpacity
                     key={raca}
                     style={[
                       adminStyles.breedButton,
                       {
+                        borderColor: theme.border,
                         backgroundColor:
                           form.raca === raca ? theme.primary : theme.surface,
-                        borderColor: theme.border,
                       },
                     ]}
                     onPress={() => setForm({ ...form, raca })}
@@ -754,38 +675,110 @@ export default function PetsAdocaoTab({
                   </TouchableOpacity>
                 ))}
               </View>
+              <TextInput
+                style={[
+                  adminStyles.input,
+                  {
+                    backgroundColor: theme.surface,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  },
+                ]}
+                value={form.raca}
+                onChangeText={(t) => setForm({ ...form, raca: t })}
+                placeholder="Ou digite outra raça..."
+                placeholderTextColor={theme.textSecondary}
+              />
 
+              {/* IDADE: AGORA COM OPÇÃO DE ANOS OU MESES */}
               <Text style={[adminStyles.label, { color: theme.text }]}>
-                Porte *
+                Idade *
               </Text>
-              <View style={adminStyles.typeSelector}>
-                {["pequeno", "médio", "grande"].map((p) => (
+              <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
+                <View
+                  style={[
+                    adminStyles.ageSelector,
+                    {
+                      borderColor: theme.border,
+                      backgroundColor: theme.surface,
+                      flex: 1,
+                      marginBottom: 0,
+                    },
+                  ]}
+                >
                   <TouchableOpacity
-                    key={p}
                     style={[
-                      adminStyles.typeButton,
-                      {
-                        backgroundColor:
-                          form.porte === p ? theme.primary : theme.surface,
-                        borderColor: theme.border,
-                      },
+                      adminStyles.ageButton,
+                      { backgroundColor: theme.background },
                     ]}
-                    onPress={() => setForm({ ...form, porte: p as any })}
+                    onPress={() =>
+                      setForm((prev: any) => ({
+                        ...prev,
+                        idadeNum: Math.max(1, Number(prev.idadeNum) - 1),
+                      }))
+                    }
                   >
-                    <Text
-                      style={[
-                        adminStyles.typeButtonText,
-                        { color: form.porte === p ? "#000" : theme.text },
-                      ]}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    <Text style={[adminStyles.ageText, { color: theme.text }]}>
+                      -
                     </Text>
                   </TouchableOpacity>
-                ))}
+                  <Text style={[adminStyles.ageText, { color: theme.text }]}>
+                    {form.idadeNum}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      adminStyles.ageButton,
+                      { backgroundColor: theme.background },
+                    ]}
+                    onPress={() =>
+                      setForm((prev: any) => ({
+                        ...prev,
+                        idadeNum: Number(prev.idadeNum) + 1,
+                      }))
+                    }
+                  >
+                    <Text style={[adminStyles.ageText, { color: theme.text }]}>
+                      +
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View
+                  style={[
+                    adminStyles.typeSelector,
+                    { flex: 1, marginBottom: 0 },
+                  ]}
+                >
+                  {["anos", "meses"].map((u) => (
+                    <TouchableOpacity
+                      key={u}
+                      style={[
+                        adminStyles.typeButton,
+                        {
+                          backgroundColor:
+                            form.idadeUnidade === u
+                              ? theme.primary
+                              : theme.surface,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      onPress={() => setForm({ ...form, idadeUnidade: u })}
+                    >
+                      <Text
+                        style={{
+                          fontWeight: "700",
+                          color: form.idadeUnidade === u ? "#000" : theme.text,
+                        }}
+                      >
+                        {u.charAt(0).toUpperCase() + u.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               <Text style={[adminStyles.label, { color: theme.text }]}>
-                Sexo *
+                Sexo
               </Text>
               <View style={adminStyles.typeSelector}>
                 {["macho", "fêmea"].map((s) => (
@@ -799,7 +792,7 @@ export default function PetsAdocaoTab({
                         borderColor: theme.border,
                       },
                     ]}
-                    onPress={() => setForm({ ...form, sexo: s as any })}
+                    onPress={() => setForm({ ...form, sexo: s })}
                   >
                     <Text
                       style={[
@@ -814,41 +807,37 @@ export default function PetsAdocaoTab({
               </View>
 
               <Text style={[adminStyles.label, { color: theme.text }]}>
-                Idade
+                Porte do Animal
               </Text>
-              <View
-                style={[
-                  adminStyles.ageSelector,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                <TouchableOpacity
-                  style={[
-                    adminStyles.ageButton,
-                    { backgroundColor: theme.primary },
-                  ]}
-                  onPress={() =>
-                    setForm({ ...form, idade: Math.max(0, form.idade - 1) })
-                  }
-                >
-                  <Ionicons name="remove" size={20} color="#000" />
-                </TouchableOpacity>
-                <Text style={[adminStyles.ageText, { color: theme.text }]}>
-                  {form.idade}
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    adminStyles.ageButton,
-                    { backgroundColor: theme.primary },
-                  ]}
-                  onPress={() => setForm({ ...form, idade: form.idade + 1 })}
-                >
-                  <Ionicons name="add" size={20} color="#000" />
-                </TouchableOpacity>
+              <View style={adminStyles.typeSelector}>
+                {["pequeno", "médio", "grande"].map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={[
+                      adminStyles.typeButton,
+                      {
+                        backgroundColor:
+                          form.porte === p ? theme.primary : theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                    onPress={() => setForm({ ...form, porte: p })}
+                  >
+                    <Text
+                      style={[
+                        adminStyles.typeButtonText,
+                        { color: form.porte === p ? "#000" : theme.text },
+                      ]}
+                    >
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
+              {/* CAMPO DE TAGS RECUPERADO */}
               <Text style={[adminStyles.label, { color: theme.text }]}>
-                Tags
+                Tags / Características
               </Text>
               <TextInput
                 style={[
@@ -859,25 +848,22 @@ export default function PetsAdocaoTab({
                     borderColor: theme.border,
                   },
                 ]}
-                placeholder="Ex: vacinado, castrado, calmo"
-                placeholderTextColor={theme.textSecondary}
                 value={form.tags}
-                onChangeText={(text) => setForm({ ...form, tags: text })}
+                onChangeText={(t) => setForm({ ...form, tags: t })}
+                placeholder="Ex: Dócil, Vacinado, Castrado"
+                placeholderTextColor={theme.textSecondary}
               />
 
               <Text style={[adminStyles.label, { color: theme.text }]}>
-                Foto do Pet
+                Foto *
               </Text>
               <TouchableOpacity
                 style={[
                   adminStyles.imagePickerButton,
-                  {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.border,
-                  },
+                  { backgroundColor: theme.surface, borderColor: theme.border },
                 ]}
                 onPress={pickImage}
-                activeOpacity={0.7}
+                disabled={loadingSave}
               >
                 <Ionicons
                   name="image-outline"
@@ -885,56 +871,104 @@ export default function PetsAdocaoTab({
                   color={theme.primary}
                 />
                 <Text
-                  style={[
-                    adminStyles.imagePickerText,
-                    { color: theme.primary },
-                  ]}
+                  style={{
+                    color: theme.primary,
+                    fontWeight: "600",
+                    marginLeft: 8,
+                  }}
                 >
-                  {form.fotoUrl
-                    ? "Trocar foto"
-                    : "Selecionar foto do dispositivo"}
+                  {form.image ? "Trocar foto" : "Selecionar da galeria"}
                 </Text>
               </TouchableOpacity>
-
-              {form.fotoUrl && (
+              {form.image ? (
                 <View style={adminStyles.imagePreviewContainer}>
                   <Image
-                    source={{ uri: form.fotoUrl }}
+                    source={{ uri: form.image }}
                     style={adminStyles.imagePreview}
                     resizeMode="cover"
                   />
-                  <TouchableOpacity
-                    style={[
-                      adminStyles.removeImageButton,
-                      { backgroundColor: theme.error },
-                    ]}
-                    onPress={() =>
-                      setForm((prev) => ({ ...prev, fotoUrl: "" }))
-                    }
-                  >
-                    <Ionicons name="close" size={16} color="#FFF" />
-                  </TouchableOpacity>
                 </View>
-              )}
+              ) : null}
+
+              <Text style={[adminStyles.label, { color: theme.text }]}>
+                Descrição / História (Opcional)
+              </Text>
+              <TextInput
+                style={[
+                  adminStyles.input,
+                  {
+                    backgroundColor: theme.surface,
+                    color: theme.text,
+                    borderColor: theme.border,
+                    height: 80,
+                  },
+                ]}
+                multiline
+                value={form.descricao}
+                onChangeText={(t) => setForm({ ...form, descricao: t })}
+                placeholder="História do pet..."
+                placeholderTextColor={theme.textSecondary}
+              />
+
+              <View
+                style={[
+                  adminStyles.tipsBox,
+                  { borderColor: theme.border, backgroundColor: theme.surface },
+                ]}
+              >
+                <View style={adminStyles.tipsTitleRow}>
+                  <Ionicons
+                    name="bulb-outline"
+                    size={18}
+                    color={theme.primary}
+                  />
+                  <Text style={[adminStyles.tipsTitle, { color: theme.text }]}>
+                    Dica de Preenchimento
+                  </Text>
+                </View>
+                <Text
+                  style={[adminStyles.tipText, { color: theme.textSecondary }]}
+                >
+                  Mantenha os dados atualizados para facilitar o contato com os
+                  possíveis adotantes.
+                </Text>
+              </View>
 
               <TouchableOpacity
                 style={[
                   adminStyles.submitButton,
-                  { backgroundColor: theme.primary },
+                  {
+                    backgroundColor: theme.primary,
+                    opacity: loadingSave ? 0.6 : 1,
+                  },
                 ]}
-                onPress={handleSave}
+                onPress={handleSavePet}
+                disabled={loadingSave}
               >
-                <Text style={adminStyles.submitButtonText}>
-                  {editingPet ? "Atualizar" : "Salvar"} Pet
-                </Text>
+                {loadingSave ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <ActivityIndicator size="small" color="#000" />
+                    <Text style={adminStyles.submitButtonText}>
+                      A enviar foto...
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={adminStyles.submitButtonText}>Salvar Pet</Text>
+                )}
               </TouchableOpacity>
             </View>
           </ScrollView>
         </SafeAreaView>
       </Modal>
 
-      {/* Modal de Requisição de Adoção */}
-      <Modal visible={showRequisicaoModal} animationType="slide" transparent>
+      {/* MODAL: DETALHES DA REQUISIÇÃO */}
+      <Modal visible={showReqModal} animationType="slide" transparent>
         <SafeAreaView
           style={[adminStyles.modal, { backgroundColor: theme.background }]}
         >
@@ -945,459 +979,195 @@ export default function PetsAdocaoTab({
             ]}
           >
             <Text style={[adminStyles.modalTitle, { color: theme.text }]}>
-              Requisição de Adoção
+              Detalhes da Adoção
             </Text>
-            <TouchableOpacity onPress={() => setShowRequisicaoModal(false)}>
+            <TouchableOpacity onPress={() => setShowReqModal(false)}>
               <Ionicons name="close" size={24} color={theme.text} />
             </TouchableOpacity>
           </View>
-
           <ScrollView style={adminStyles.modalContent}>
-            {selectedRequisicao && (
+            {selectedReq && (
               <View style={adminStyles.modalForm}>
-                {/* Status Badge */}
-                <View
-                  style={{
-                    backgroundColor:
-                      getStatusColor(selectedRequisicao.status, theme) + "20",
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 6,
-                    marginBottom: 16,
-                    alignSelf: "flex-start",
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: getStatusColor(selectedRequisicao.status, theme),
-                      fontWeight: "600",
-                    }}
-                  >
-                    {getStatusLabel(selectedRequisicao.status)}
-                  </Text>
-                </View>
-
-                {/* Seção: Dados do Pet */}
-                <Text
-                  style={[adminStyles.sectionTitle, { color: theme.primary }]}
-                >
-                  Dados do Pet Solicitado
-                </Text>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Nome do Pet
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.petNome}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Raça
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.petRaca}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Porte
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.petPorte}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Sexo
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.petSexo}
-                  </Text>
-                </View>
-
-                {/* Seção: Dados do Adotante */}
                 <Text
                   style={[
                     adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 16 },
+                    { color: theme.primary, marginTop: 0 },
                   ]}
                 >
-                  Dados do Adotante
+                  Informações do Adotante
                 </Text>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Nome Completo
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.nomeCompleto}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Data de Nascimento
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {formatDate(selectedRequisicao.dataNascimento)}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    CPF
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.cpf}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Celular
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.celular}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Email
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.email}
-                  </Text>
-                </View>
 
-                {/* Seção: Endereço */}
+                <Text style={[adminStyles.label, { color: theme.text }]}>
+                  Nome Completo
+                </Text>
                 <Text
                   style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 16 },
+                    adminStyles.itemDetail,
+                    { color: theme.textSecondary, marginBottom: 12 },
                   ]}
                 >
-                  Endereço
+                  {selectedReq.usuarioNome || selectedReq.clienteNome}
                 </Text>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Endereço
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.endereco}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    CEP
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.cep}
-                  </Text>
-                </View>
 
-                {/* Seção: Informações sobre Residência */}
-                <Text
-                  style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 16 },
-                  ]}
-                >
-                  Informações sobre Residência
-                </Text>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Tipo de Residência
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.tipoResidencia}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Situação do Imóvel
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.situacaoImovel}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Permite Animais
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.permiteAnimais || "Não informado"}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Pessoas na Casa
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.pessoasNaCasa}
-                  </Text>
-                </View>
-
-                {/* Seção: Informações sobre Dependentes */}
-                <Text
-                  style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 16 },
-                  ]}
-                >
-                  Informações sobre Dependentes
-                </Text>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Tem Crianças
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.temCriancas}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Tem Idosos
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.temIdosos}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Tem Alergias
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.temAlergias}
-                  </Text>
-                </View>
-
-                {/* Seção: Experiência com Animais */}
-                <Text
-                  style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 16 },
-                  ]}
-                >
-                  Experiência com Animais
-                </Text>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Tem Animais Atualmente
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.temAnimaisAtuais}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Teve Animais Anteriormente
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.temAnimaisAnteriores}
-                  </Text>
-                </View>
-
-                {/* Seção: Consciência Financeira e Compromisso */}
-                <Text
-                  style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 16 },
-                  ]}
-                >
-                  Consciência Financeira e Compromisso
-                </Text>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Consciência Financeira
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.conscienciaFinanceira}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Mudanças na Rotina
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.mudancasRotina}
-                  </Text>
-                </View>
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Concorda com Acompanhamento
-                  </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {selectedRequisicao.concordaAcompanhamento}
-                  </Text>
-                </View>
-
-                {/* Observações */}
-                {selectedRequisicao.observacoes && (
-                  <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  <View style={{ flex: 1 }}>
                     <Text style={[adminStyles.label, { color: theme.text }]}>
-                      Observações
+                      Telefone
                     </Text>
                     <Text
                       style={[
                         adminStyles.itemDetail,
-                        { color: theme.textSecondary },
+                        { color: theme.textSecondary, marginBottom: 12 },
                       ]}
                     >
-                      {selectedRequisicao.observacoes}
+                      {selectedReq.telefone || "Não informado"}
                     </Text>
                   </View>
-                )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[adminStyles.label, { color: theme.text }]}>
+                      E-mail
+                    </Text>
+                    <Text
+                      style={[
+                        adminStyles.itemDetail,
+                        { color: theme.textSecondary, marginBottom: 12 },
+                      ]}
+                    >
+                      {selectedReq.email || "Não informado"}
+                    </Text>
+                  </View>
+                </View>
 
-                {/* Data de Criação */}
-                <View style={{ marginBottom: 24 }}>
-                  <Text style={[adminStyles.label, { color: theme.text }]}>
-                    Data de Submissão
+                <Text style={[adminStyles.label, { color: theme.text }]}>
+                  Endereço
+                </Text>
+                <Text
+                  style={[
+                    adminStyles.itemDetail,
+                    { color: theme.textSecondary, marginBottom: 20 },
+                  ]}
+                >
+                  {selectedReq.endereco ||
+                    selectedReq.cidade ||
+                    "Não informado"}
+                </Text>
+
+                <Text
+                  style={[adminStyles.sectionTitle, { color: theme.primary }]}
+                >
+                  Sobre o Pet
+                </Text>
+                <View
+                  style={[
+                    adminStyles.itemCard,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                      padding: 12,
+                    },
+                  ]}
+                >
+                  <Text style={[adminStyles.itemName, { color: theme.text }]}>
+                    {selectedReq.petNome}
                   </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
-                  >
-                    {formatDate(selectedRequisicao.criadoEm)}
+                  <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+                    ID do Pet: {selectedReq.petId}
                   </Text>
                 </View>
 
-                {/* Action Buttons */}
-                {selectedRequisicao.status === "pendente" && (
+                <Text
+                  style={[
+                    adminStyles.sectionTitle,
+                    { color: theme.primary, marginTop: 20 },
+                  ]}
+                >
+                  Formulário
+                </Text>
+                <Text style={[adminStyles.label, { color: theme.text }]}>
+                  Por que quer adotar?
+                </Text>
+                <Text
+                  style={[
+                    adminStyles.itemDetail,
+                    {
+                      color: theme.textSecondary,
+                      marginBottom: 16,
+                      fontStyle: "italic",
+                    },
+                  ]}
+                >
+                  "
+                  {selectedReq.motivo ||
+                    selectedReq.mensagem ||
+                    "Nenhuma mensagem enviada."}
+                  "
+                </Text>
+
+                {selectedReq.status === "pendente" ? (
                   <View
-                    style={{ flexDirection: "row", gap: 12, marginBottom: 20 }}
+                    style={{ flexDirection: "row", gap: 12, marginTop: 20 }}
                   >
                     <TouchableOpacity
                       style={[
                         adminStyles.submitButton,
-                        { backgroundColor: "#4CAF50", flex: 1 },
+                        { flex: 1, backgroundColor: "#10b981", marginTop: 0 },
                       ]}
-                      onPress={handleApproveRequisicao}
+                      onPress={() => handleUpdateRequisicao("aprovado")}
                     >
-                      <Text style={adminStyles.submitButtonText}>Aprovar</Text>
+                      <Text
+                        style={{
+                          color: "#FFF",
+                          fontWeight: "700",
+                          fontSize: 16,
+                        }}
+                      >
+                        Aprovar
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[
                         adminStyles.submitButton,
-                        { backgroundColor: "#F44336", flex: 1 },
+                        { flex: 1, backgroundColor: "#ef4444", marginTop: 0 },
                       ]}
-                      onPress={handleRejectRequisicao}
+                      onPress={() => handleUpdateRequisicao("rejeitado")}
                     >
-                      <Text style={adminStyles.submitButtonText}>Rejeitar</Text>
+                      <Text
+                        style={{
+                          color: "#FFF",
+                          fontWeight: "700",
+                          fontSize: 16,
+                        }}
+                      >
+                        Rejeitar
+                      </Text>
                     </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View
+                    style={{
+                      marginTop: 20,
+                      alignItems: "center",
+                      padding: 16,
+                      backgroundColor:
+                        selectedReq.status === "aprovado"
+                          ? "#10b98120"
+                          : "#ef444420",
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontWeight: "bold",
+                        fontSize: 16,
+                        color:
+                          selectedReq.status === "aprovado"
+                            ? "#10b981"
+                            : "#ef4444",
+                      }}
+                    >
+                      ESTA REQUISIÇÃO FOI{" "}
+                      {selectedReq.status?.toUpperCase() || "PENDENTE"}
+                    </Text>
                   </View>
                 )}
               </View>

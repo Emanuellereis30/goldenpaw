@@ -265,21 +265,30 @@ export const adminStyles = StyleSheet.create({
     justifyContent: "center",
   },
   // Dashboard specific styles
-  dashboardCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  dashboardCardTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
   dashboardGrid: {
     flexDirection: "row",
-    gap: 12,
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  dashboardCard: {
+    width: "48%",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
     marginBottom: 16,
+    alignItems: "flex-start",
+  },
+  dashboardCardValue: {
+    fontSize: 28,
+    fontWeight: "800",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  dashboardCardTitle: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   dashboardGridItem: {
     flex: 1,

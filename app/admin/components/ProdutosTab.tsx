@@ -1,9 +1,11 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   ScrollView,
   Text,
@@ -64,24 +66,37 @@ export default function ProdutosTab({
     return valor.replace(".", ",");
   };
 
-  const validarUrl = (url: string) => /^https?:\/\/.+\..+/.test(url.trim());
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permissão necessária",
+        "Precisamos de acesso à galeria para selecionar a foto.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1], // Produtos geralmente ficam melhores em 1:1 (quadrado)
+      quality: 0.8,
+      base64: false,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      setForm((prev) => ({ ...prev, image: result.assets[0].uri }));
+    }
+  };
 
   const handleSave = async () => {
     if (!form.nome || !form.preco || !form.image) {
-      Alert.alert("Erro", "Preencha nome, preço e link da imagem");
+      Alert.alert("Erro", "Preencha nome, preço e selecione uma imagem");
       return;
     }
 
     if (ehRacao && !form.kg) {
       Alert.alert("Erro", "Informe o KG da ração");
-      return;
-    }
-
-    if (!validarUrl(form.image)) {
-      Alert.alert(
-        "Erro",
-        "Link da imagem inválido (comece com http:// ou https://)",
-      );
       return;
     }
 
@@ -208,7 +223,21 @@ export default function ProdutosTab({
                   { backgroundColor: theme.surface, borderColor: theme.border },
                 ]}
               >
-                <View style={adminStyles.itemInfo}>
+                {/* Exibe a miniatura da foto do produto na listagem */}
+                {produto.image ? (
+                  <Image
+                    source={{ uri: produto.image }}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 8,
+                      marginRight: 12,
+                    }}
+                    resizeMode="cover"
+                  />
+                ) : null}
+
+                <View style={[adminStyles.itemInfo, { flex: 1 }]}>
                   <Text style={[adminStyles.itemName, { color: theme.text }]}>
                     {produto.nome}
                   </Text>
@@ -221,14 +250,63 @@ export default function ProdutosTab({
                     R$ {produto.preco}
                     {produto.kg ? ` • ${produto.kg}kg` : ""}
                   </Text>
-                  <Text
-                    style={[
-                      adminStyles.itemDetail,
-                      { color: theme.textSecondary },
-                    ]}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
                   >
-                    Estoque: {produto.estoque || 0} unidades
-                  </Text>
+                    <Text
+                      style={[
+                        adminStyles.itemDetail,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      Estoque: {produto.estoque || 0} unidades
+                    </Text>
+
+                    {/* Sistema de Alerta de Estoque */}
+                    {!produto.estoque || produto.estoque <= 0 ? (
+                      <View
+                        style={{
+                          backgroundColor: "#ef444420",
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "bold",
+                            color: "#ef4444",
+                          }}
+                        >
+                          ESGOTADO
+                        </Text>
+                      </View>
+                    ) : produto.estoque <= 5 ? (
+                      <View
+                        style={{
+                          backgroundColor: "#f59e0b20",
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "bold",
+                            color: "#f59e0b",
+                          }}
+                        >
+                          BAIXO ESTOQUE
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                   {produto.tag && (
                     <Text
                       style={[
@@ -391,27 +469,56 @@ export default function ProdutosTab({
                 </View>
               )}
 
+              {/* Novo Campo de Imagem (Substituindo o antigo URL) */}
               <Text style={[adminStyles.label, { color: theme.text }]}>
-                Link da Imagem (URL) *
+                Foto do Produto *
               </Text>
-              <TextInput
+              <TouchableOpacity
                 style={[
-                  adminStyles.input,
+                  adminStyles.imagePickerButton,
                   {
                     backgroundColor: theme.surface,
-                    color: theme.text,
                     borderColor: theme.border,
                   },
                 ]}
-                placeholder="https://exemplo.com/imagem.jpg"
-                placeholderTextColor={theme.textSecondary}
-                value={form.image}
-                autoCapitalize="none"
-                keyboardType="url"
-                onChangeText={(text) =>
-                  setForm({ ...form, image: text.trim() })
-                }
-              />
+                onPress={pickImage}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="image-outline"
+                  size={20}
+                  color={theme.primary}
+                />
+                <Text
+                  style={[
+                    adminStyles.imagePickerText,
+                    { color: theme.primary },
+                  ]}
+                >
+                  {form.image
+                    ? "Trocar foto"
+                    : "Selecionar foto do dispositivo"}
+                </Text>
+              </TouchableOpacity>
+
+              {form.image ? (
+                <View style={adminStyles.imagePreviewContainer}>
+                  <Image
+                    source={{ uri: form.image }}
+                    style={adminStyles.imagePreview}
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity
+                    style={[
+                      adminStyles.removeImageButton,
+                      { backgroundColor: theme.error },
+                    ]}
+                    onPress={() => setForm((prev) => ({ ...prev, image: "" }))}
+                  >
+                    <Ionicons name="close" size={16} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
 
               <Text style={[adminStyles.label, { color: theme.text }]}>
                 Tag (Opcional)

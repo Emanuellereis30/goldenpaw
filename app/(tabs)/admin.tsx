@@ -327,31 +327,5 @@ export default function AdminScreen() {
     );
   }
 
-  return (
-    <AdminDashboard
-      // Dados
-      funcionarios={funcionarios}
-      pets={pets}
-      produtos={produtos}
-      pedidos={pedidos}
-      usuarios={usuarios}
-      requisicoes={requisicoes}
-      // Funções de Funcionários
-      onAddFuncionario={handleAddFuncionario}
-      onEditFuncionario={handleEditFuncionario}
-      onDeleteFuncionario={handleDeleteFuncionario}
-      // Funções de Pets
-      onAddPet={handleAddPet}
-      onEditPet={handleEditPet}
-      onDeletePet={handleDeletePet}
-      onUpdateRequisicao={handleUpdateRequisicao}
-      // Funções de Produtos
-      onAddProduto={handleAddProduto}
-      onEditProduto={handleEditProduto}
-      onDeleteProduto={handleDeleteProduto}
-      // Funções de Pedidos
-      onUpdatePedidoStatus={handleUpdatePedidoStatus}
-      onDeletePedido={handleDeletePedido}
-    />
-  );
+  return <AdminDashboard />;
 }

@@ -1,6 +1,7 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { collection, onSnapshot } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -11,19 +12,33 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { db } from "../../../firebaseConfig";
 import { adminStyles } from "../styles/adminStyles";
 import { Usuario } from "../types/admin.types";
 
-interface UsuariosTabProps {
-  usuarios: Usuario[];
-  loading: boolean;
-}
-
-export default function UsuariosTab({ usuarios, loading }: UsuariosTabProps) {
+export default function UsuariosTab() {
   const { theme } = useAppTheme();
+
+  // Estados do Firebase
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Estados da Interface
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "usuarios"), (snapshot) => {
+      const docs = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as Usuario[];
+      setUsuarios(docs);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
   const filteredUsuarios = usuarios.filter(
     (u) =>
@@ -107,47 +122,39 @@ export default function UsuariosTab({ usuarios, loading }: UsuariosTabProps) {
                   </Text>
                   <View style={{ flexDirection: "row", gap: 12, marginTop: 8 }}>
                     <View
-                      style={[
-                        {
-                          backgroundColor: theme.primary + "20",
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 4,
-                        },
-                      ]}
+                      style={{
+                        backgroundColor: theme.primary + "20",
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                      }}
                     >
                       <Text
-                        style={[
-                          {
-                            fontSize: 12,
-                            color: theme.primary,
-                            fontWeight: "600",
-                          },
-                        ]}
+                        style={{
+                          fontSize: 12,
+                          color: theme.primary,
+                          fontWeight: "600",
+                        }}
                       >
-                        {usuario.pets.length} pets
+                        {usuario.pets?.length || 0} pets
                       </Text>
                     </View>
                     <View
-                      style={[
-                        {
-                          backgroundColor: theme.primary + "20",
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 4,
-                        },
-                      ]}
+                      style={{
+                        backgroundColor: theme.primary + "20",
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                      }}
                     >
                       <Text
-                        style={[
-                          {
-                            fontSize: 12,
-                            color: theme.primary,
-                            fontWeight: "600",
-                          },
-                        ]}
+                        style={{
+                          fontSize: 12,
+                          color: theme.primary,
+                          fontWeight: "600",
+                        }}
                       >
-                        {usuario.historicoCompras.length} compras
+                        {usuario.historicoCompras?.length || 0} compras
                       </Text>
                     </View>
                   </View>
@@ -191,7 +198,6 @@ export default function UsuariosTab({ usuarios, loading }: UsuariosTabProps) {
           <ScrollView style={adminStyles.modalContent}>
             {selectedUsuario && (
               <View style={adminStyles.modalForm}>
-                {/* Informações Pessoais */}
                 <Text
                   style={[adminStyles.sectionTitle, { color: theme.primary }]}
                 >
@@ -259,10 +265,9 @@ export default function UsuariosTab({ usuarios, loading }: UsuariosTabProps) {
                     { color: theme.textSecondary, marginBottom: 16 },
                   ]}
                 >
-                  {selectedUsuario.dataCadastro}
+                  {selectedUsuario.dataCadastro || "N/A"}
                 </Text>
 
-                {/* Endereço */}
                 <Text
                   style={[
                     adminStyles.sectionTitle,
@@ -325,8 +330,7 @@ export default function UsuariosTab({ usuarios, loading }: UsuariosTabProps) {
                   {selectedUsuario.cep}
                 </Text>
 
-                {/* Pets do Usuário */}
-                {selectedUsuario.pets.length > 0 && (
+                {selectedUsuario.pets && selectedUsuario.pets.length > 0 && (
                   <>
                     <Text
                       style={[
@@ -368,87 +372,87 @@ export default function UsuariosTab({ usuarios, loading }: UsuariosTabProps) {
                   </>
                 )}
 
-                {/* Histórico de Compras */}
-                {selectedUsuario.historicoCompras.length > 0 && (
-                  <>
-                    <Text
-                      style={[
-                        adminStyles.sectionTitle,
-                        { color: theme.primary, marginTop: 20 },
-                      ]}
-                    >
-                      Histórico de Compras (
-                      {selectedUsuario.historicoCompras.length})
-                    </Text>
-                    {selectedUsuario.historicoCompras.map((compra, index) => (
-                      <View
-                        key={index}
+                {selectedUsuario.historicoCompras &&
+                  selectedUsuario.historicoCompras.length > 0 && (
+                    <>
+                      <Text
                         style={[
-                          adminStyles.listItem,
-                          {
-                            borderBottomColor: theme.border,
-                            paddingVertical: 12,
-                          },
+                          adminStyles.sectionTitle,
+                          { color: theme.primary, marginTop: 20 },
                         ]}
                       >
+                        Histórico de Compras (
+                        {selectedUsuario.historicoCompras.length})
+                      </Text>
+                      {selectedUsuario.historicoCompras.map((compra, index) => (
                         <View
-                          style={{
-                            flexDirection: "row",
-                            justifyContent: "space-between",
-                          }}
+                          key={index}
+                          style={[
+                            adminStyles.listItem,
+                            {
+                              borderBottomColor: theme.border,
+                              paddingVertical: 12,
+                            },
+                          ]}
                         >
-                          <Text
-                            style={[
-                              adminStyles.listItemTitle,
-                              { color: theme.text },
-                            ]}
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                            }}
                           >
-                            Pedido #{compra.pedidoId}
-                          </Text>
-                          <Text
-                            style={[
-                              { fontWeight: "700", color: theme.primary },
-                            ]}
+                            <Text
+                              style={[
+                                adminStyles.listItemTitle,
+                                { color: theme.text },
+                              ]}
+                            >
+                              Pedido #{compra.pedidoId}
+                            </Text>
+                            <Text
+                              style={[
+                                { fontWeight: "700", color: theme.primary },
+                              ]}
+                            >
+                              R$ {compra.total}
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                            }}
                           >
-                            R$ {compra.total}
-                          </Text>
+                            <Text
+                              style={[
+                                adminStyles.listItemSubtitle,
+                                { color: theme.textSecondary },
+                              ]}
+                            >
+                              {compra.data}
+                            </Text>
+                            <Text
+                              style={[
+                                {
+                                  fontSize: 12,
+                                  fontWeight: "600",
+                                  color:
+                                    compra.status === "entregue"
+                                      ? "#10b981"
+                                      : compra.status === "cancelado"
+                                        ? "#ef4444"
+                                        : theme.primary,
+                                },
+                              ]}
+                            >
+                              {compra.status.toUpperCase()}
+                            </Text>
+                          </View>
                         </View>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <Text
-                            style={[
-                              adminStyles.listItemSubtitle,
-                              { color: theme.textSecondary },
-                            ]}
-                          >
-                            {compra.data}
-                          </Text>
-                          <Text
-                            style={[
-                              { fontSize: 12, fontWeight: "600" },
-                              {
-                                color:
-                                  compra.status === "entregue"
-                                    ? "#10b981"
-                                    : compra.status === "cancelado"
-                                      ? "#ef4444"
-                                      : theme.primary,
-                              },
-                            ]}
-                          >
-                            {compra.status.toUpperCase()}
-                          </Text>
-                        </View>
-                      </View>
-                    ))}
-                  </>
-                )}
+                      ))}
+                    </>
+                  )}
 
-                {/* Total Gasto */}
                 <View
                   style={[
                     adminStyles.dashboardCard,
@@ -472,7 +476,7 @@ export default function UsuariosTab({ usuarios, loading }: UsuariosTabProps) {
                       { fontSize: 24, fontWeight: "700", color: theme.primary },
                     ]}
                   >
-                    R$ {selectedUsuario.totalGasto}
+                    R$ {selectedUsuario.totalGasto || 0}
                   </Text>
                 </View>
               </View>

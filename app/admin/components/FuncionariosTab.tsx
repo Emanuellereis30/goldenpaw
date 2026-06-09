@@ -1,6 +1,14 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  updateDoc,
+} from "firebase/firestore";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,32 +20,23 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { db } from "../../../firebaseConfig";
 import { adminStyles } from "../styles/adminStyles";
 import { Funcionario } from "../types/admin.types";
 
-interface FuncionariosTabProps {
-  funcionarios: Funcionario[];
-  loading: boolean;
-  onAddFuncionario: (funcionario: Omit<Funcionario, "id">) => Promise<void>;
-  onEditFuncionario: (
-    id: string,
-    funcionario: Omit<Funcionario, "id">,
-  ) => Promise<void>;
-  onDeleteFuncionario: (id: string) => Promise<void>;
-}
-
-export default function FuncionariosTab({
-  funcionarios,
-  loading,
-  onAddFuncionario,
-  onEditFuncionario,
-  onDeleteFuncionario,
-}: FuncionariosTabProps) {
+export default function FuncionariosTab() {
   const { theme } = useAppTheme();
+
+  // Estados do Firebase
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Estados da Interface
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingFuncionario, setEditingFuncionario] =
     useState<Funcionario | null>(null);
+
   const [form, setForm] = useState<{
     nome: string;
     email: string;
@@ -57,6 +56,33 @@ export default function FuncionariosTab({
     status: "ativo",
     endereco: "",
   });
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "funcionarios"), (snapshot) => {
+      const docs = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as Funcionario[];
+      setFuncionarios(docs);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const onAddFuncionario = async (funcionario: Omit<Funcionario, "id">) => {
+    await addDoc(collection(db, "funcionarios"), funcionario);
+  };
+
+  const onEditFuncionario = async (
+    id: string,
+    funcionario: Omit<Funcionario, "id">,
+  ) => {
+    await updateDoc(doc(db, "funcionarios", id), funcionario);
+  };
+
+  const onDeleteFuncionario = async (id: string) => {
+    await deleteDoc(doc(db, "funcionarios", id));
+  };
 
   const filteredFuncionarios = funcionarios.filter(
     (f) =>
@@ -220,22 +246,21 @@ export default function FuncionariosTab({
                       {funcionario.nome}
                     </Text>
                     <View
-                      style={[
-                        {
-                          backgroundColor:
-                            funcionario.status === "ativo"
-                              ? "#10b98120"
-                              : "#ef444420",
-                          paddingHorizontal: 8,
-                          paddingVertical: 2,
-                          borderRadius: 4,
-                        },
-                      ]}
+                      style={{
+                        backgroundColor:
+                          funcionario.status === "ativo"
+                            ? "#10b98120"
+                            : "#ef444420",
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      }}
                     >
                       <Text
                         style={[
-                          { fontSize: 10, fontWeight: "bold" },
                           {
+                            fontSize: 10,
+                            fontWeight: "bold",
                             color:
                               funcionario.status === "ativo"
                                 ? "#10b981"

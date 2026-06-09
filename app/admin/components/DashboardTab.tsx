@@ -1,35 +1,52 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  Text,
-  View
-} from "react-native";
+import { collection, onSnapshot } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { db } from "../../../firebaseConfig";
 import { adminStyles } from "../styles/adminStyles";
-import {
-  DashboardStats
-} from "../types/admin.types";
 
-interface DashboardTabProps {
-  stats?: DashboardStats | null;
-  loading?: boolean;
-  produtos?: any[];
-  pedidos?: any[];
-  usuarios?: any[];
-  pets?: any[];
-}
-
-export default function DashboardTab({
-  stats,
-  loading = false,
-  produtos = [],
-  pedidos = [],
-  usuarios = [],
-  pets = [],
-}: DashboardTabProps) {
+export default function DashboardTab() {
   const { theme } = useAppTheme();
+
+  const [produtos, setProdutos] = useState<any[]>([]);
+  const [pets, setPets] = useState<any[]>([]);
+  const [pedidos, setPedidos] = useState<any[]>([]);
+  const [requisicoes, setRequisicoes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Busca Produtos
+    const unsubProdutos = onSnapshot(collection(db, "produtos"), (snapshot) => {
+      setProdutos(snapshot.docs.map((doc) => doc.data()));
+    });
+
+    // Busca Pets
+    const unsubPets = onSnapshot(collection(db, "pets"), (snapshot) => {
+      setPets(snapshot.docs.map((doc) => doc.data()));
+    });
+
+    // Busca Pedidos
+    const unsubPedidos = onSnapshot(collection(db, "pedidos"), (snapshot) => {
+      setPedidos(snapshot.docs.map((doc) => doc.data()));
+    });
+
+    // Busca Requisições de Adoção
+    const unsubRequisicoes = onSnapshot(
+      collection(db, "requisicoes_adocao"),
+      (snapshot) => {
+        setRequisicoes(snapshot.docs.map((doc) => doc.data()));
+        setLoading(false);
+      },
+    );
+
+    return () => {
+      unsubProdutos();
+      unsubPets();
+      unsubPedidos();
+      unsubRequisicoes();
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -44,372 +61,263 @@ export default function DashboardTab({
     );
   }
 
-  if (!stats) {
-    return (
-      <View
-        style={[
-          adminStyles.centerContainer,
-          { backgroundColor: theme.background },
-        ]}
-      >
-        <Text style={{ color: theme.text }}>Nenhum dado disponível</Text>
-      </View>
+  // Cálculos de Estatísticas
+  const baixoEstoque = produtos.filter((p) => (p.estoque || 0) <= 5).length;
+  const requisicoesPendentes = requisicoes.filter(
+    (r) => r.status === "pendente",
+  ).length;
+  const pedidosPendentes = pedidos.filter(
+    (p) => p.status === "pendente",
+  ).length;
+
+  const totalGeralGanho = pedidos.reduce((acc, pedido) => {
+    const valor = parseFloat(
+      (pedido.total || "0")
+        .replace("R$ ", "")
+        .replace(".", "")
+        .replace(",", "."),
     );
-  }
+    return acc + (isNaN(valor) ? 0 : valor);
+  }, 0);
 
   return (
-    <ScrollView
+    <View
       style={[
         adminStyles.contentContainer,
         { backgroundColor: theme.background },
       ]}
-      showsVerticalScrollIndicator={false}
     >
-      {/* Cartões de Resumo */}
-      <View style={adminStyles.dashboardGrid}>
-        <View
-          style={[
-            adminStyles.dashboardGridItem,
-            { backgroundColor: theme.surface, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="cart" size={24} color={theme.primary} />
-          <Text style={[adminStyles.dashboardGridValue, { color: theme.text }]}>
-            {stats.totalPedidos}
-          </Text>
-          <Text
-            style={[
-              adminStyles.dashboardGridLabel,
-              { color: theme.textSecondary },
-            ]}
-          >
-            Pedidos
-          </Text>
-        </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Bloco de Avisos / Alertas */}
+        {(baixoEstoque > 0 ||
+          requisicoesPendentes > 0 ||
+          pedidosPendentes > 0) && (
+          <View style={{ marginBottom: 20 }}>
+            <Text style={[adminStyles.sectionTitle, { color: theme.primary }]}>
+              Alertas Pendentes
+            </Text>
 
-        <View
-          style={[
-            adminStyles.dashboardGridItem,
-            { backgroundColor: theme.surface, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="people" size={24} color={theme.primary} />
-          <Text style={[adminStyles.dashboardGridValue, { color: theme.text }]}>
-            {stats.totalUsuarios}
-          </Text>
-          <Text
-            style={[
-              adminStyles.dashboardGridLabel,
-              { color: theme.textSecondary },
-            ]}
-          >
-            Usuários
-          </Text>
-        </View>
+            {baixoEstoque > 0 && (
+              <View
+                style={[
+                  adminStyles.itemCard,
+                  { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
+                ]}
+              >
+                <Ionicons name="warning" size={24} color="#ef4444" />
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={{ fontWeight: "700", color: "#b91c1c" }}>
+                    Estoque Baixo
+                  </Text>
+                  <Text style={{ color: "#7f1d1d" }}>
+                    Você tem {baixoEstoque} produto(s) com 5 ou menos unidades
+                    em estoque.
+                  </Text>
+                </View>
+              </View>
+            )}
 
-        <View
-          style={[
-            adminStyles.dashboardGridItem,
-            { backgroundColor: theme.surface, borderColor: theme.border },
-          ]}
-        >
-          <Ionicons name="paw" size={24} color={theme.primary} />
-          <Text style={[adminStyles.dashboardGridValue, { color: theme.text }]}>
-            {stats.totalPets}
-          </Text>
-          <Text
-            style={[
-              adminStyles.dashboardGridLabel,
-              { color: theme.textSecondary },
-            ]}
-          >
-            Pets
-          </Text>
-        </View>
-      </View>
+            {requisicoesPendentes > 0 && (
+              <View
+                style={[
+                  adminStyles.itemCard,
+                  {
+                    backgroundColor: "#fffbeb",
+                    borderColor: "#fcd34d",
+                    marginTop: 10,
+                  },
+                ]}
+              >
+                <Ionicons name="paw" size={24} color="#f59e0b" />
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={{ fontWeight: "700", color: "#b45309" }}>
+                    Adoções Pendentes
+                  </Text>
+                  <Text style={{ color: "#78350f" }}>
+                    Existem {requisicoesPendentes} solicitação(ões) de adoção
+                    aguardando análise.
+                  </Text>
+                </View>
+              </View>
+            )}
 
-      {/* Total de Vendas */}
-      <View
-        style={[
-          adminStyles.dashboardCard,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Ionicons name="trending-up" size={20} color={theme.primary} />
-          <Text style={[adminStyles.dashboardCardTitle, { color: theme.text }]}>
-            Total de Vendas
-          </Text>
-        </View>
-        <Text
-          style={[{ fontSize: 24, fontWeight: "700", color: theme.primary }]}
-        >
-          R$ {stats.totalVendas}
+            {pedidosPendentes > 0 && (
+              <View
+                style={[
+                  adminStyles.itemCard,
+                  {
+                    backgroundColor: "#eff6ff",
+                    borderColor: "#bfdbfe",
+                    marginTop: 10,
+                  },
+                ]}
+              >
+                <Ionicons name="cart" size={24} color="#3b82f6" />
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={{ fontWeight: "700", color: "#1d4ed8" }}>
+                    Pedidos Pendentes
+                  </Text>
+                  <Text style={{ color: "#1e3a8a" }}>
+                    Você tem {pedidosPendentes} novo(s) pedido(s) na loja para
+                    confirmar e enviar.
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        <Text style={[adminStyles.sectionTitle, { color: theme.primary }]}>
+          Visão Geral
         </Text>
-      </View>
 
-      {/* Produtos Mais Vendidos */}
-      <View
-        style={[
-          adminStyles.dashboardCard,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Ionicons name="star" size={20} color={theme.primary} />
-          <Text style={[adminStyles.dashboardCardTitle, { color: theme.text }]}>
-            Produtos Mais Vendidos
-          </Text>
-        </View>
-        {stats.produtosMaisVendidos.length > 0 ? (
-          stats.produtosMaisVendidos.slice(0, 5).map((produto, index) => (
-            <View
-              key={index}
+        <View style={adminStyles.dashboardGrid}>
+          {/* Card Produtos */}
+          <View
+            style={[
+              adminStyles.dashboardCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="cube" size={32} color={theme.primary} />
+            <Text
+              style={[adminStyles.dashboardCardValue, { color: theme.text }]}
+            >
+              {produtos.length}
+            </Text>
+            <Text
               style={[
-                adminStyles.listItem,
-                { borderBottomColor: theme.border },
+                adminStyles.dashboardCardTitle,
+                { color: theme.textSecondary },
               ]}
             >
+              Produtos
+            </Text>
+          </View>
+
+          {/* Card Pets */}
+          <View
+            style={[
+              adminStyles.dashboardCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="paw" size={32} color={theme.primary} />
+            <Text
+              style={[adminStyles.dashboardCardValue, { color: theme.text }]}
+            >
+              {pets.length}
+            </Text>
+            <Text
+              style={[
+                adminStyles.dashboardCardTitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Pets para Adoção
+            </Text>
+          </View>
+
+          {/* Card Pedidos Total */}
+          <View
+            style={[
+              adminStyles.dashboardCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="bag-check" size={32} color={theme.primary} />
+            <Text
+              style={[adminStyles.dashboardCardValue, { color: theme.text }]}
+            >
+              {pedidos.length}
+            </Text>
+            <Text
+              style={[
+                adminStyles.dashboardCardTitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Pedidos Realizados
+            </Text>
+          </View>
+
+          {/* Card Adoções (Revisadas e Concluídas) */}
+          <View
+            style={[
+              adminStyles.dashboardCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name="heart" size={32} color={theme.primary} />
+            <Text
+              style={[adminStyles.dashboardCardValue, { color: theme.text }]}
+            >
+              {requisicoes.filter((r) => r.status === "aprovado").length}
+            </Text>
+            <Text
+              style={[
+                adminStyles.dashboardCardTitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Adoções Aprovadas
+            </Text>
+          </View>
+        </View>
+
+        {/* Resumo Financeiro Simples */}
+        <View style={{ marginTop: 24, marginBottom: 40 }}>
+          <Text style={[adminStyles.sectionTitle, { color: theme.primary }]}>
+            Financeiro da Loja
+          </Text>
+          <View
+            style={[
+              adminStyles.itemCard,
+              {
+                backgroundColor: theme.surface,
+                borderColor: theme.border,
+                padding: 20,
+              },
+            ]}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
               <View
                 style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
+                  backgroundColor: "#10b98120",
+                  padding: 12,
+                  borderRadius: 12,
                 }}
               >
-                <Text
-                  style={[adminStyles.listItemTitle, { color: theme.text }]}
-                >
-                  {index + 1}. {produto.produtoNome}
-                </Text>
-                <Text style={[{ fontWeight: "700", color: theme.primary }]}>
-                  {produto.quantidade}x
-                </Text>
+                <Ionicons name="cash" size={28} color="#10b981" />
               </View>
-              <Text
-                style={[
-                  adminStyles.listItemSubtitle,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                Total: R$ {produto.total}
-              </Text>
-            </View>
-          ))
-        ) : (
-          <Text style={[adminStyles.emptyText, { color: theme.textSecondary }]}>
-            Nenhum produto vendido ainda
-          </Text>
-        )}
-      </View>
-
-      {/* Usuários que Mais Compram */}
-      <View
-        style={[
-          adminStyles.dashboardCard,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Ionicons name="person-circle" size={20} color={theme.primary} />
-          <Text style={[adminStyles.dashboardCardTitle, { color: theme.text }]}>
-            Clientes Top
-          </Text>
-        </View>
-        {stats.usuariosMaisCompram.length > 0 ? (
-          stats.usuariosMaisCompram.slice(0, 5).map((usuario, index) => (
-            <View
-              key={index}
-              style={[
-                adminStyles.listItem,
-                { borderBottomColor: theme.border },
-              ]}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
+              <View style={{ marginLeft: 16 }}>
                 <Text
-                  style={[adminStyles.listItemTitle, { color: theme.text }]}
+                  style={{
+                    color: theme.textSecondary,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
                 >
-                  {index + 1}. {usuario.usuarioNome}
+                  Faturamento Total Bruto
                 </Text>
-                <Text style={[{ fontWeight: "700", color: theme.primary }]}>
-                  {usuario.quantidadePedidos} pedidos
-                </Text>
-              </View>
-              <Text
-                style={[
-                  adminStyles.listItemSubtitle,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                Gasto: R$ {usuario.totalGasto}
-              </Text>
-            </View>
-          ))
-        ) : (
-          <Text style={[adminStyles.emptyText, { color: theme.textSecondary }]}>
-            Nenhuma compra registrada
-          </Text>
-        )}
-      </View>
-
-      {/* Pets com Mais Interesse */}
-      <View
-        style={[
-          adminStyles.dashboardCard,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Ionicons name="heart" size={20} color={theme.primary} />
-          <Text style={[adminStyles.dashboardCardTitle, { color: theme.text }]}>
-            Pets com Mais Interesse
-          </Text>
-        </View>
-        {stats.petsInteresse.length > 0 ? (
-          stats.petsInteresse.slice(0, 5).map((pet, index) => (
-            <View
-              key={index}
-              style={[
-                adminStyles.listItem,
-                { borderBottomColor: theme.border },
-              ]}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
                 <Text
-                  style={[adminStyles.listItemTitle, { color: theme.text }]}
+                  style={{
+                    color: theme.text,
+                    fontSize: 24,
+                    fontWeight: "800",
+                    marginTop: 4,
+                  }}
                 >
-                  {index + 1}. {pet.petNome}
-                </Text>
-                <Text style={[{ fontWeight: "700", color: theme.primary }]}>
-                  {pet.quantidadeInteresse} interessados
+                  R${" "}
+                  {totalGeralGanho.toLocaleString("pt-BR", {
+                    minimumFractionDigits: 2,
+                  })}
                 </Text>
               </View>
             </View>
-          ))
-        ) : (
-          <Text style={[adminStyles.emptyText, { color: theme.textSecondary }]}>
-            Nenhum pet com interesse registrado
-          </Text>
-        )}
-      </View>
-
-      {/* Pedidos Recentes */}
-      <View
-        style={[
-          adminStyles.dashboardCard,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
-          <Ionicons name="time" size={20} color={theme.primary} />
-          <Text style={[adminStyles.dashboardCardTitle, { color: theme.text }]}>
-            Pedidos Recentes
-          </Text>
+          </View>
         </View>
-        {stats.pedidosRecentes.length > 0 ? (
-          stats.pedidosRecentes.slice(0, 5).map((pedido, index) => (
-            <View
-              key={index}
-              style={[
-                adminStyles.listItem,
-                { borderBottomColor: theme.border },
-              ]}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text
-                  style={[adminStyles.listItemTitle, { color: theme.text }]}
-                >
-                  {pedido.clienteNome}
-                </Text>
-                <Text
-                  style={[
-                    { fontWeight: "700", fontSize: 12 },
-                    {
-                      color:
-                        pedido.status === "entregue"
-                          ? "#10b981"
-                          : pedido.status === "cancelado"
-                            ? "#ef4444"
-                            : theme.primary,
-                    },
-                  ]}
-                >
-                  {pedido.status.toUpperCase()}
-                </Text>
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text
-                  style={[
-                    adminStyles.listItemSubtitle,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  {pedido.data} às {pedido.horario}
-                </Text>
-                <Text
-                  style={[
-                    adminStyles.listItemSubtitle,
-                    { color: theme.primary, fontWeight: "600" },
-                  ]}
-                >
-                  R$ {pedido.total}
-                </Text>
-              </View>
-            </View>
-          ))
-        ) : (
-          <Text style={[adminStyles.emptyText, { color: theme.textSecondary }]}>
-            Nenhum pedido registrado
-          </Text>
-        )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

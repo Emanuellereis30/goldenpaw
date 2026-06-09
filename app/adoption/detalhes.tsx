@@ -5,7 +5,7 @@ import { Alert } from "react-native";
 import { db } from "../../firebaseConfig"; // Ajuste o caminho se necessário
 import AdocaoFormulario from "./AdocaoFormulario";
 
-// Tipo Pet definido localmente (copie de adocao.tsx se necessário)
+// Tipo Pet definido localmente
 interface Pet {
   id: string;
   nome: string;
@@ -56,25 +56,22 @@ export default function DetalhesAdocaoScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  // Recupere os dados do pet passados como parâmetro
   const petId = params.petId as string;
   const petJson = params.pet as string;
 
-  // Parse do JSON do pet
   let pet: Pet;
   try {
     pet = JSON.parse(petJson);
   } catch (error) {
     console.error("Erro ao fazer parse do pet:", error);
-    // Fallback - retorne para a página anterior
     router.back();
     return null;
   }
 
   const handleSubmit = async (formData: FormData) => {
     try {
-      // Salve o formulário no Firebase
-      const docRef = await addDoc(collection(db, "formularios_adocao"), {
+      // Salva na coleção correta que o Admin está lendo
+      const docRef = await addDoc(collection(db, "requisicoes_adocao"), {
         // Dados do pet
         petId: pet.id,
         petNome: pet.nome,
@@ -82,12 +79,23 @@ export default function DetalhesAdocaoScreen() {
         petPorte: pet.porte,
         petSexo: pet.sexo,
 
-        // Dados do formulário
+        // Dados brutos do form (aqui já inclui email, endereco, etc)
         ...formData,
 
+        // Campos específicos formatados para o Admin (sobrescrevemos apenas o que precisamos)
+        clienteNome: formData.nomeCompleto,
+        usuarioNome: formData.nomeCompleto,
+        telefone: formData.celular,
+        // O email e endereco já vieram no ...formData acima, então não precisamos repetir!
+
+        motivo: formData.observacoes
+          ? formData.observacoes
+          : "Sem observações adicionais.",
+
         // Metadados
+        data: new Date().toLocaleDateString("pt-BR"),
         criadoEm: new Date().toISOString(),
-        status: "pendente", // pendente, aprovado, rejeitado
+        status: "pendente",
         visualizado: false,
       });
 
@@ -95,12 +103,13 @@ export default function DetalhesAdocaoScreen() {
 
       Alert.alert(
         "Sucesso! 🎉",
-        `Seu formulário para adotar ${pet.nome} foi enviado! Entraremos em contato em breve.`,
+        "Seu formulário para adotar " +
+          pet.nome +
+          " foi enviado! Entraremos em contato em breve.",
         [
           {
             text: "OK",
             onPress: () => {
-              // Volte para a página de adoção
               router.back();
             },
           },
@@ -112,7 +121,6 @@ export default function DetalhesAdocaoScreen() {
         "Erro",
         "Não foi possível enviar o formulário. Tente novamente.",
       );
-      throw error;
     }
   };
 
