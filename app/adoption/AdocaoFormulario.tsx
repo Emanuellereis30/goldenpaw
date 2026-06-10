@@ -1,22 +1,23 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useAppTheme } from "../../hooks/use-app-theme";
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+// ── Props & Interfaces ────────────────────────────────────────────────────────
 
 interface Pet {
   id: string;
@@ -31,14 +32,11 @@ interface Pet {
 }
 
 interface FormData {
-  // Etapa 1: Dados Pessoais
   nomeCompleto: string;
   dataNascimento: string;
   cpf: string;
   celular: string;
   email: string;
-
-  // Etapa 2: Informações de Moradia
   endereco: string;
   cep: string;
   bairro: string;
@@ -49,8 +47,6 @@ interface FormData {
   quintalFechado: boolean | null;
   rotasFuga: boolean | null;
   telasProtecao: boolean | null;
-
-  // Etapa 3: Dinâmica Familiar
   quantidadePessoas: string;
   temCriancas: boolean | null;
   temIdosos: boolean | null;
@@ -58,14 +54,10 @@ interface FormData {
   temAlergias: boolean | null;
   temAlergiasQuem: string;
   tempoSozinho: string;
-
-  // Etapa 4: Histórico com Animais
   possuiOutrosAnimais: boolean | null;
   outrosAnimaisDescricao: string;
   jaTeveAnimais: boolean | null;
   jaTeveAnimaisDescricao: string;
-
-  // Etapa 5: Termo de Responsabilidade
   cienteFinanceiro: boolean | null;
   planosViagem: string;
   concordaAcompanhamento: boolean | null;
@@ -83,7 +75,6 @@ interface Props {
 const aplicarMascara = (texto: string, mascara: string): string => {
   let resultado = "";
   let textoIndex = 0;
-
   for (let i = 0; i < mascara.length && textoIndex < texto.length; i++) {
     if (mascara[i] === "X") {
       resultado += texto[textoIndex];
@@ -92,7 +83,6 @@ const aplicarMascara = (texto: string, mascara: string): string => {
       resultado += mascara[i];
     }
   }
-
   return resultado;
 };
 
@@ -105,14 +95,12 @@ const calcularIdade = (data: string): number => {
   const [dia, mes, ano] = data.split("/").map(Number);
   const hoje = new Date();
   let idade = hoje.getFullYear() - ano;
-
   if (
     hoje.getMonth() < mes - 1 ||
     (hoje.getMonth() === mes - 1 && hoje.getDate() < dia)
   ) {
     idade--;
   }
-
   return idade;
 };
 
@@ -124,6 +112,8 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
 
   const [etapaAtual, setEtapaAtual] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
   const [form, setForm] = useState<FormData>({
     nomeCompleto: "",
     dataNascimento: "",
@@ -157,115 +147,115 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
     observacoes: "",
   });
 
-  // ── Validações ────────────────────────────────────────────────────────────
+  // ── Handlers ────────────────────────────────────────────────────────────
+
+  const handleCepChange = async (text: string) => {
+    const cleanCep = text.replace(/\D/g, "");
+    const mascarado = aplicarMascara(cleanCep, "XXXXX-XXX");
+
+    setForm((prev) => ({ ...prev, cep: mascarado }));
+
+    if (cleanCep.length === 8) {
+      try {
+        const response = await fetch(
+          `https://viacep.com.br/ws/${cleanCep}/json/`,
+        );
+        const data = await response.json();
+
+        if (!data.erro) {
+          setForm((prev) => ({
+            ...prev,
+            endereco: data.logradouro || prev.endereco,
+            bairro: data.bairro || prev.bairro,
+            cidade: data.localidade || prev.cidade,
+          }));
+          setErrors((prevErrors) => ({ ...prevErrors, cep: undefined }));
+        }
+      } catch (e) {
+        console.error("Erro ao procurar o CEP", e);
+      }
+    }
+  };
 
   const validarEtapa1 = (): boolean => {
-    if (form.nomeCompleto.length < 15) {
-      Alert.alert("Erro", "Nome completo deve ter no mínimo 15 caracteres");
-      return false;
-    }
+    let newErrors: Record<string, string> = {};
+    if (form.nomeCompleto.trim().length < 15)
+      newErrors.nomeCompleto = "Mínimo 15 letras.";
     if (!form.dataNascimento || form.dataNascimento.length < 10) {
-      Alert.alert("Erro", "Data de nascimento inválida");
-      return false;
+      newErrors.dataNascimento = "Data inválida.";
+    } else if (calcularIdade(form.dataNascimento) < 18) {
+      newErrors.dataNascimento = "Apenas maiores de 18 anos.";
     }
-    if (calcularIdade(form.dataNascimento) < 18) {
-      Alert.alert("Erro", "Você deve ter no mínimo 18 anos para adotar");
-      return false;
-    }
-    if (form.cpf.replace(/\D/g, "").length !== 11) {
-      Alert.alert("Erro", "CPF deve ter 11 dígitos");
-      return false;
-    }
-    if (form.celular.replace(/\D/g, "").length !== 11) {
-      Alert.alert("Erro", "Celular deve ter 11 dígitos");
-      return false;
-    }
-    if (!validarEmail(form.email)) {
-      Alert.alert("Erro", "Email inválido");
-      return false;
-    }
-    return true;
+    if (form.cpf.replace(/\D/g, "").length !== 11)
+      newErrors.cpf = "CPF deve ter 11 dígitos.";
+    if (form.celular.replace(/\D/g, "").length !== 11)
+      newErrors.celular = "Celular inválido.";
+    if (!validarEmail(form.email)) newErrors.email = "E-mail inválido.";
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validarEtapa2 = (): boolean => {
-    if (!form.endereco.trim()) {
-      Alert.alert("Erro", "Endereço é obrigatório");
-      return false;
-    }
-    if (form.cep.replace(/\D/g, "").length !== 8) {
-      Alert.alert("Erro", "CEP deve ter 8 dígitos");
-      return false;
-    }
-    if (!form.bairro.trim() || !form.cidade.trim()) {
-      Alert.alert("Erro", "Bairro e cidade são obrigatórios");
-      return false;
-    }
-    if (!form.tipoResidencia) {
-      Alert.alert("Erro", "Tipo de residência é obrigatório");
-      return false;
-    }
-    if (!form.situacaoImovel) {
-      Alert.alert("Erro", "Situação do imóvel é obrigatória");
-      return false;
-    }
+    let newErrors: Record<string, string> = {};
+    if (form.cep.replace(/\D/g, "").length !== 8)
+      newErrors.cep = "CEP inválido.";
+    if (!form.endereco.trim()) newErrors.endereco = "Obrigatório.";
+    if (!form.bairro.trim()) newErrors.bairro = "Obrigatório.";
+    if (!form.cidade.trim()) newErrors.cidade = "Obrigatória.";
+    if (!form.tipoResidencia) newErrors.tipoResidencia = "Selecione o tipo.";
+    if (!form.situacaoImovel)
+      newErrors.situacaoImovel = "Selecione a situação.";
     if (
       form.situacaoImovel === "alugado" &&
       form.proprietarioPermiteAnimais === null
     ) {
-      Alert.alert("Erro", "Responda se o proprietário permite animais");
-      return false;
+      newErrors.proprietarioPermiteAnimais = "Responda esta pergunta.";
     }
-    return true;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validarEtapa3 = (): boolean => {
-    if (!form.quantidadePessoas.trim()) {
-      Alert.alert("Erro", "Quantidade de pessoas é obrigatória");
-      return false;
-    }
-    if (
-      form.temCriancas === null ||
-      form.temIdosos === null ||
-      form.todosAcordam === null
-    ) {
-      Alert.alert(
-        "Erro",
-        "Responda todas as perguntas sobre dinâmica familiar",
-      );
-      return false;
-    }
-    if (form.temAlergias === null) {
-      Alert.alert("Erro", "Responda sobre alergias");
-      return false;
-    }
-    if (!form.tempoSozinho.trim()) {
-      Alert.alert("Erro", "Tempo sozinho é obrigatório");
-      return false;
-    }
-    return true;
+    let newErrors: Record<string, string> = {};
+    if (!form.quantidadePessoas.trim())
+      newErrors.quantidadePessoas = "Obrigatório.";
+    if (form.temCriancas === null) newErrors.temCriancas = "Obrigatório.";
+    if (form.temIdosos === null) newErrors.temIdosos = "Obrigatório.";
+    if (form.todosAcordam === null) newErrors.todosAcordam = "Obrigatório.";
+    if (form.temAlergias === null) newErrors.temAlergias = "Obrigatório.";
+    if (form.temAlergias && !form.temAlergiasQuem.trim())
+      newErrors.temAlergiasQuem = "Descreva.";
+    if (!form.tempoSozinho.trim()) newErrors.tempoSozinho = "Obrigatório.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validarEtapa4 = (): boolean => {
-    if (form.possuiOutrosAnimais === null || form.jaTeveAnimais === null) {
-      Alert.alert("Erro", "Responda sobre histórico com animais");
-      return false;
+    let newErrors: Record<string, string> = {};
+    if (form.possuiOutrosAnimais === null)
+      newErrors.possuiOutrosAnimais = "Obrigatório.";
+    if (form.possuiOutrosAnimais && !form.outrosAnimaisDescricao.trim()) {
+      newErrors.outrosAnimaisDescricao = "Descreva os animais.";
     }
-    return true;
+    if (form.jaTeveAnimais === null) newErrors.jaTeveAnimais = "Obrigatório.";
+    if (form.jaTeveAnimais && !form.jaTeveAnimaisDescricao.trim()) {
+      newErrors.jaTeveAnimaisDescricao = "Descreva os anteriores.";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validarEtapa5 = (): boolean => {
-    if (
-      form.cienteFinanceiro === null ||
-      form.concordaAcompanhamento === null
-    ) {
-      Alert.alert("Erro", "Responda todas as perguntas");
-      return false;
-    }
-    if (!form.planosViagem.trim()) {
-      Alert.alert("Erro", "Descreva seus planos para viagens/mudanças");
-      return false;
-    }
-    return true;
+    let newErrors: Record<string, string> = {};
+    if (form.cienteFinanceiro === null)
+      newErrors.cienteFinanceiro = "Obrigatório.";
+    if (!form.planosViagem.trim())
+      newErrors.planosViagem = "Descreva seus planos.";
+    if (form.concordaAcompanhamento === null)
+      newErrors.concordaAcompanhamento = "Obrigatório.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validarEtapaAtual = (): boolean => {
@@ -285,21 +275,20 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
     }
   };
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-
   const handleProxima = () => {
     if (validarEtapaAtual()) {
+      setErrors({});
       setEtapaAtual(etapaAtual + 1);
     }
   };
 
   const handleAnterior = () => {
+    setErrors({});
     setEtapaAtual(etapaAtual - 1);
   };
 
   const handleEnviar = async () => {
     if (!validarEtapaAtual()) return;
-
     try {
       setLoading(true);
       await onSubmit(form);
@@ -314,224 +303,119 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
 
   const renderEtapa1 = () => (
     <View>
-      <Text style={[styles.etapaTitle, { color: theme.text }]}>
-        Dados Pessoais
-      </Text>
+      <Text style={[styles.title, { color: theme.text }]}>Dados Pessoais</Text>
 
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>
-          Nome Completo *
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="Seu nome completo"
-          placeholderTextColor={theme.textSecondary}
-          value={form.nomeCompleto}
-          onChangeText={(text) => setForm({ ...form, nomeCompleto: text })}
-        />
-      </View>
-
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>
-          Data de Nascimento (DD/MM/AAAA) *
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="01/01/1990"
-          placeholderTextColor={theme.textSecondary}
-          value={form.dataNascimento}
-          onChangeText={(text) => {
-            const mascarado = aplicarMascara(
-              text.replace(/\D/g, ""),
-              "XX/XX/XXXX",
-            );
-            setForm({ ...form, dataNascimento: mascarado });
-          }}
-          keyboardType="numeric"
-          maxLength={10}
-        />
-      </View>
-
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>
-          CPF (XXX.XXX.XXX-XX) *
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="123.456.789-00"
-          placeholderTextColor={theme.textSecondary}
-          value={form.cpf}
-          onChangeText={(text) => {
-            const mascarado = aplicarMascara(
-              text.replace(/\D/g, ""),
-              "XXX.XXX.XXX-XX",
-            );
-            setForm({ ...form, cpf: mascarado });
-          }}
-          keyboardType="numeric"
-          maxLength={14}
-        />
-      </View>
-
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>
-          Celular ((XX)XXXXX-XXXX) *
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="(11)98765-4321"
-          placeholderTextColor={theme.textSecondary}
-          value={form.celular}
-          onChangeText={(text) => {
-            const mascarado = aplicarMascara(
-              text.replace(/\D/g, ""),
-              "(XX)XXXXX-XXXX",
-            );
-            setForm({ ...form, celular: mascarado });
-          }}
-          keyboardType="numeric"
-          maxLength={14}
-        />
-      </View>
-
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>Email *</Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="seu@email.com"
-          placeholderTextColor={theme.textSecondary}
-          value={form.email}
-          onChangeText={(text) => setForm({ ...form, email: text })}
-          keyboardType="email-address"
-        />
-      </View>
+      <CustomInput
+        theme={theme}
+        label="Nome Completo *"
+        placeholder="O seu nome completo"
+        value={form.nomeCompleto}
+        onChange={(t: string) => setForm({ ...form, nomeCompleto: t })}
+        autoCapitalize="words"
+        errorMessage={errors.nomeCompleto}
+      />
+      <CustomInput
+        theme={theme}
+        label="Data de Nascimento *"
+        placeholder="DD/MM/AAAA"
+        value={form.dataNascimento}
+        onChange={(t: string) => {
+          const m = aplicarMascara(t.replace(/\D/g, ""), "XX/XX/XXXX");
+          setForm({ ...form, dataNascimento: m });
+        }}
+        keyboard="numeric"
+        maxLength={10}
+        errorMessage={errors.dataNascimento}
+      />
+      <CustomInput
+        theme={theme}
+        label="CPF *"
+        placeholder="XXX.XXX.XXX-XX"
+        value={form.cpf}
+        onChange={(t: string) => {
+          const m = aplicarMascara(t.replace(/\D/g, ""), "XXX.XXX.XXX-XX");
+          setForm({ ...form, cpf: m });
+        }}
+        keyboard="numeric"
+        maxLength={14}
+        errorMessage={errors.cpf}
+      />
+      <CustomInput
+        theme={theme}
+        label="Celular *"
+        placeholder="(XX) XXXXX-XXXX"
+        value={form.celular}
+        onChange={(t: string) => {
+          const m = aplicarMascara(t.replace(/\D/g, ""), "(XX)XXXXX-XXXX");
+          setForm({ ...form, celular: m });
+        }}
+        keyboard="numeric"
+        maxLength={14}
+        errorMessage={errors.celular}
+      />
+      <CustomInput
+        theme={theme}
+        label="E-mail *"
+        placeholder="seu@email.com"
+        value={form.email}
+        onChange={(t: string) => setForm({ ...form, email: t })}
+        keyboard="email-address"
+        autoCapitalize="none"
+        errorMessage={errors.email}
+      />
     </View>
   );
 
   const renderEtapa2 = () => (
     <View>
-      <Text style={[styles.etapaTitle, { color: theme.text }]}>
-        Informações de Moradia
-      </Text>
+      <Text style={[styles.title, { color: theme.text }]}>Moradia</Text>
 
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>
-          CEP (XXXXX-XXX) *
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="01234-567"
-          placeholderTextColor={theme.textSecondary}
-          value={form.cep}
-          onChangeText={(text) => {
-            const mascarado = aplicarMascara(
-              text.replace(/\D/g, ""),
-              "XXXXX-XXX",
-            );
-            setForm({ ...form, cep: mascarado });
-          }}
-          keyboardType="numeric"
-          maxLength={9}
-        />
+      <CustomInput
+        theme={theme}
+        label="CEP *"
+        placeholder="XXXXX-XXX"
+        value={form.cep}
+        onChange={handleCepChange}
+        keyboard="numeric"
+        maxLength={9}
+        errorMessage={errors.cep}
+      />
+      <CustomInput
+        theme={theme}
+        label="Endereço *"
+        placeholder="Ex: Rua das Flores, 123"
+        value={form.endereco}
+        onChange={(t: string) => setForm({ ...form, endereco: t })}
+        autoCapitalize="words"
+        errorMessage={errors.endereco}
+      />
+
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <CustomInput
+            theme={theme}
+            label="Bairro *"
+            placeholder="Centro"
+            value={form.bairro}
+            onChange={(t: string) => setForm({ ...form, bairro: t })}
+            autoCapitalize="words"
+            errorMessage={errors.bairro}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <CustomInput
+            theme={theme}
+            label="Cidade *"
+            placeholder="São Paulo"
+            value={form.cidade}
+            onChange={(t: string) => setForm({ ...form, cidade: t })}
+            autoCapitalize="words"
+            errorMessage={errors.cidade}
+          />
+        </View>
       </View>
 
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>Endereço *</Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="Rua das Flores, 123"
-          placeholderTextColor={theme.textSecondary}
-          value={form.endereco}
-          onChangeText={(text) => setForm({ ...form, endereco: text })}
-        />
-      </View>
-
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>Bairro *</Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="Centro"
-          placeholderTextColor={theme.textSecondary}
-          value={form.bairro}
-          onChangeText={(text) => setForm({ ...form, bairro: text })}
-        />
-      </View>
-
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>Cidade *</Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="São Paulo"
-          placeholderTextColor={theme.textSecondary}
-          value={form.cidade}
-          onChangeText={(text) => setForm({ ...form, cidade: text })}
-        />
-      </View>
-
-      <View style={styles.fieldContainer}>
+      <View style={styles.inputWrapper}>
         <Text style={[styles.label, { color: theme.text }]}>
           Tipo de Residência *
         </Text>
@@ -546,7 +430,7 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
                     form.tipoResidencia === tipo
                       ? theme.primary
                       : theme.surface,
-                  borderColor: theme.border,
+                  borderColor: errors.tipoResidencia ? "#FF4D4D" : theme.border,
                 },
               ]}
               onPress={() => setForm({ ...form, tipoResidencia: tipo })}
@@ -554,9 +438,7 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
               <Text
                 style={[
                   styles.selectOptionText,
-                  {
-                    color: form.tipoResidencia === tipo ? "#fff" : theme.text,
-                  },
+                  { color: form.tipoResidencia === tipo ? "#fff" : theme.text },
                 ]}
               >
                 {tipo}
@@ -564,76 +446,37 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
             </TouchableOpacity>
           ))}
         </View>
+        {errors.tipoResidencia ? (
+          <Text style={styles.errorText}>{errors.tipoResidencia}</Text>
+        ) : null}
       </View>
 
-      <View style={styles.fieldContainer}>
+      <View style={styles.inputWrapper}>
         <Text style={[styles.label, { color: theme.text }]}>
           Situação do Imóvel *
         </Text>
         <View style={styles.selectContainer}>
-          {["Próprio", "Alugado"].map((situacao) => (
-            <TouchableOpacity
-              key={situacao}
-              style={[
-                styles.selectOption,
-                {
-                  backgroundColor:
-                    form.situacaoImovel === situacao.toLowerCase()
-                      ? theme.primary
-                      : theme.surface,
-                  borderColor: theme.border,
-                },
-              ]}
-              onPress={() =>
-                setForm({
-                  ...form,
-                  situacaoImovel: situacao.toLowerCase() as
-                    | "proprio"
-                    | "alugado",
-                })
-              }
-            >
-              <Text
-                style={[
-                  styles.selectOptionText,
-                  {
-                    color:
-                      form.situacaoImovel === situacao.toLowerCase()
-                        ? "#fff"
-                        : theme.text,
-                  },
-                ]}
-              >
-                {situacao}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {form.situacaoImovel === "alugado" && (
-        <View style={styles.fieldContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>
-            O proprietário permite animais? *
-          </Text>
-          <View style={styles.selectContainer}>
-            {["Sim", "Não"].map((resp) => (
+          {["Próprio", "Alugado"].map((situacao) => {
+            const value = situacao === "Próprio" ? "proprio" : "alugado";
+            return (
               <TouchableOpacity
-                key={resp}
+                key={situacao}
                 style={[
                   styles.selectOption,
                   {
                     backgroundColor:
-                      form.proprietarioPermiteAnimais === (resp === "Sim")
+                      form.situacaoImovel === value
                         ? theme.primary
                         : theme.surface,
-                    borderColor: theme.border,
+                    borderColor: errors.situacaoImovel
+                      ? "#FF4D4D"
+                      : theme.border,
                   },
                 ]}
                 onPress={() =>
                   setForm({
                     ...form,
-                    proprietarioPermiteAnimais: resp === "Sim",
+                    situacaoImovel: value as "proprio" | "alugado",
                   })
                 }
               >
@@ -642,21 +485,34 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
                     styles.selectOptionText,
                     {
                       color:
-                        form.proprietarioPermiteAnimais === (resp === "Sim")
-                          ? "#fff"
-                          : theme.text,
+                        form.situacaoImovel === value ? "#fff" : theme.text,
                     },
                   ]}
                 >
-                  {resp}
+                  {situacao}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            );
+          })}
         </View>
+        {errors.situacaoImovel ? (
+          <Text style={styles.errorText}>{errors.situacaoImovel}</Text>
+        ) : null}
+      </View>
+
+      {form.situacaoImovel === "alugado" && (
+        <BooleanQuestion
+          label="O proprietário permite animais? *"
+          value={form.proprietarioPermiteAnimais}
+          onChange={(val) =>
+            setForm({ ...form, proprietarioPermiteAnimais: val })
+          }
+          errorMessage={errors.proprietarioPermiteAnimais}
+        />
       )}
 
-      <Text style={[styles.label, { color: theme.text, marginTop: 16 }]}>
+      <View style={styles.divider} />
+      <Text style={[styles.title, { color: theme.text, fontSize: 18 }]}>
         Segurança Estrutural
       </Text>
 
@@ -665,13 +521,11 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
         value={form.quintalFechado}
         onChange={(val) => setForm({ ...form, quintalFechado: val })}
       />
-
       <BooleanQuestion
         label="Existem rotas de fuga?"
         value={form.rotasFuga}
         onChange={(val) => setForm({ ...form, rotasFuga: val })}
       />
-
       <BooleanQuestion
         label="Possui telas de proteção nas janelas?"
         value={form.telasProtecao}
@@ -682,102 +536,73 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
 
   const renderEtapa3 = () => (
     <View>
-      <Text style={[styles.etapaTitle, { color: theme.text }]}>
+      <Text style={[styles.title, { color: theme.text }]}>
         Dinâmica Familiar
       </Text>
 
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>
-          Quantas pessoas moram na residência? *
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="Ex: 4"
-          placeholderTextColor={theme.textSecondary}
-          value={form.quantidadePessoas}
-          onChangeText={(text) =>
-            setForm({ ...form, quantidadePessoas: text.replace(/\D/g, "") })
-          }
-          keyboardType="numeric"
-        />
-      </View>
+      <CustomInput
+        theme={theme}
+        label="Quantas pessoas moram na residência? *"
+        placeholder="Ex: 4"
+        value={form.quantidadePessoas}
+        onChange={(t: string) =>
+          setForm({ ...form, quantidadePessoas: t.replace(/\D/g, "") })
+        }
+        keyboard="numeric"
+        errorMessage={errors.quantidadePessoas}
+      />
 
       <BooleanQuestion
         label="Há crianças na casa?"
         value={form.temCriancas}
         onChange={(val) => setForm({ ...form, temCriancas: val })}
+        errorMessage={errors.temCriancas}
       />
-
       <BooleanQuestion
         label="Há idosos na casa?"
         value={form.temIdosos}
         onChange={(val) => setForm({ ...form, temIdosos: val })}
+        errorMessage={errors.temIdosos}
       />
-
       <BooleanQuestion
         label="Todos os moradores concordam com a adoção?"
         value={form.todosAcordam}
         onChange={(val) => setForm({ ...form, todosAcordam: val })}
+        errorMessage={errors.todosAcordam}
       />
-
       <BooleanQuestion
         label="Alguém na casa tem alergia a pelos?"
         value={form.temAlergias}
         onChange={(val) => setForm({ ...form, temAlergias: val })}
+        errorMessage={errors.temAlergias}
       />
 
       {form.temAlergias && (
-        <View style={styles.fieldContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>Quem? *</Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                borderColor: theme.border,
-                color: theme.text,
-                backgroundColor: theme.surface,
-              },
-            ]}
-            placeholder="Descreva quem tem alergia"
-            placeholderTextColor={theme.textSecondary}
-            value={form.temAlergiasQuem}
-            onChangeText={(text) => setForm({ ...form, temAlergiasQuem: text })}
-          />
-        </View>
+        <CustomInput
+          theme={theme}
+          label="Quem possui alergia? *"
+          placeholder="Descreva quem tem alergia"
+          value={form.temAlergiasQuem}
+          onChange={(t: string) => setForm({ ...form, temAlergiasQuem: t })}
+          autoCapitalize="words"
+          errorMessage={errors.temAlergiasQuem}
+        />
       )}
 
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>
-          Quantas horas por dia o animal ficará sozinho? *
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="Ex: 4 horas"
-          placeholderTextColor={theme.textSecondary}
-          value={form.tempoSozinho}
-          onChangeText={(text) => setForm({ ...form, tempoSozinho: text })}
-        />
-      </View>
+      <CustomInput
+        theme={theme}
+        label="Quantas horas por dia o animal ficará sozinho? *"
+        placeholder="Ex: 4 horas"
+        value={form.tempoSozinho}
+        onChange={(t: string) => setForm({ ...form, tempoSozinho: t })}
+        errorMessage={errors.tempoSozinho}
+      />
     </View>
   );
 
   const renderEtapa4 = () => (
     <View>
-      <Text style={[styles.etapaTitle, { color: theme.text }]}>
+      <Text style={[styles.title, { color: theme.text }]}>
         Histórico com Animais
       </Text>
 
@@ -785,123 +610,88 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
         label="Possui outros animais?"
         value={form.possuiOutrosAnimais}
         onChange={(val) => setForm({ ...form, possuiOutrosAnimais: val })}
+        errorMessage={errors.possuiOutrosAnimais}
       />
 
       {form.possuiOutrosAnimais && (
-        <View style={styles.fieldContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>
-            Descreva os animais *
-          </Text>
-          <TextInput
-            style={[
-              styles.textArea,
-              {
-                borderColor: theme.border,
-                color: theme.text,
-                backgroundColor: theme.surface,
-              },
-            ]}
-            placeholder="Espécie, idade, temperamento, vacinação..."
-            placeholderTextColor={theme.textSecondary}
-            value={form.outrosAnimaisDescricao}
-            onChangeText={(text) =>
-              setForm({ ...form, outrosAnimaisDescricao: text })
-            }
-            multiline
-          />
-        </View>
+        <CustomInput
+          theme={theme}
+          label="Descreva os animais *"
+          placeholder="Espécie, idade, temperamento..."
+          value={form.outrosAnimaisDescricao}
+          onChange={(t: string) =>
+            setForm({ ...form, outrosAnimaisDescricao: t })
+          }
+          multiline={true}
+          autoCapitalize="sentences"
+          errorMessage={errors.outrosAnimaisDescricao}
+        />
       )}
 
       <BooleanQuestion
         label="Já teve animais antes?"
         value={form.jaTeveAnimais}
         onChange={(val) => setForm({ ...form, jaTeveAnimais: val })}
+        errorMessage={errors.jaTeveAnimais}
       />
 
       {form.jaTeveAnimais && (
-        <View style={styles.fieldContainer}>
-          <Text style={[styles.label, { color: theme.text }]}>
-            Descreva os animais anteriores *
-          </Text>
-          <TextInput
-            style={[
-              styles.textArea,
-              {
-                borderColor: theme.border,
-                color: theme.text,
-                backgroundColor: theme.surface,
-              },
-            ]}
-            placeholder="O que aconteceu com eles..."
-            placeholderTextColor={theme.textSecondary}
-            value={form.jaTeveAnimaisDescricao}
-            onChangeText={(text) =>
-              setForm({ ...form, jaTeveAnimaisDescricao: text })
-            }
-            multiline
-          />
-        </View>
+        <CustomInput
+          theme={theme}
+          label="Descreva os animais anteriores *"
+          placeholder="O que aconteceu com eles..."
+          value={form.jaTeveAnimaisDescricao}
+          onChange={(t: string) =>
+            setForm({ ...form, jaTeveAnimaisDescricao: t })
+          }
+          multiline={true}
+          autoCapitalize="sentences"
+          errorMessage={errors.jaTeveAnimaisDescricao}
+        />
       )}
     </View>
   );
 
   const renderEtapa5 = () => (
     <View>
-      <Text style={[styles.etapaTitle, { color: theme.text }]}>
+      <Text style={[styles.title, { color: theme.text }]}>
         Termo de Responsabilidade
       </Text>
 
       <BooleanQuestion
-        label="Está ciente dos custos com alimentação, vacinas e emergências?"
+        label="Ciente dos custos (alimentação, vacinas, emergências)?"
         value={form.cienteFinanceiro}
         onChange={(val) => setForm({ ...form, cienteFinanceiro: val })}
+        errorMessage={errors.cienteFinanceiro}
       />
 
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>
-          O que planeja fazer com o animal em caso de viagens ou mudanças? *
-        </Text>
-        <TextInput
-          style={[
-            styles.textArea,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="Descreva seus planos..."
-          placeholderTextColor={theme.textSecondary}
-          value={form.planosViagem}
-          onChangeText={(text) => setForm({ ...form, planosViagem: text })}
-          multiline
-        />
-      </View>
+      <CustomInput
+        theme={theme}
+        label="Planos em caso de viagens ou mudanças *"
+        placeholder="Descreva os seus planos..."
+        value={form.planosViagem}
+        onChange={(t: string) => setForm({ ...form, planosViagem: t })}
+        multiline={true}
+        autoCapitalize="sentences"
+        errorMessage={errors.planosViagem}
+      />
 
       <BooleanQuestion
         label="Concorda em enviar fotos e receber visitas de acompanhamento?"
         value={form.concordaAcompanhamento}
         onChange={(val) => setForm({ ...form, concordaAcompanhamento: val })}
+        errorMessage={errors.concordaAcompanhamento}
       />
 
-      <View style={styles.fieldContainer}>
-        <Text style={[styles.label, { color: theme.text }]}>Observações</Text>
-        <TextInput
-          style={[
-            styles.textArea,
-            {
-              borderColor: theme.border,
-              color: theme.text,
-              backgroundColor: theme.surface,
-            },
-          ]}
-          placeholder="Adicione qualquer informação relevante..."
-          placeholderTextColor={theme.textSecondary}
-          value={form.observacoes}
-          onChangeText={(text) => setForm({ ...form, observacoes: text })}
-          multiline
-        />
-      </View>
+      <CustomInput
+        theme={theme}
+        label="Observações"
+        placeholder="Adicione qualquer informação relevante..."
+        value={form.observacoes}
+        onChange={(t: string) => setForm({ ...form, observacoes: t })}
+        multiline={true}
+        autoCapitalize="sentences"
+      />
     </View>
   );
 
@@ -924,117 +714,203 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingBottom: insets.bottom + 30 },
-        ]}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={onCancel}>
-            <Ionicons name="close" size={24} color={theme.text} />
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + 20, paddingBottom: 100 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableOpacity
+            style={[
+              styles.closeButton,
+              {
+                top: insets.top + 10,
+                backgroundColor: theme.buttonBackground ?? theme.surface,
+                borderColor: theme.primary + "40",
+              },
+            ]}
+            onPress={onCancel}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={24} color={theme.primary} />
           </TouchableOpacity>
+
           <Text style={[styles.headerTitle, { color: theme.text }]}>
             Adotar {pet.nome}
           </Text>
-          <View style={{ width: 24 }} />
-        </View>
 
-        {/* Barra de Progresso */}
-        <View style={styles.progressContainer}>
-          <View
-            style={[
-              styles.progressBar,
-              {
-                backgroundColor: theme.primary,
-                width: `${(etapaAtual / 5) * 100}%`,
-              },
-            ]}
-          />
-        </View>
+          <View style={styles.progressWrapper}>
+            <View style={styles.progressContainer}>
+              <View
+                style={[
+                  styles.progressBar,
+                  {
+                    backgroundColor: theme.primary,
+                    width: `${(etapaAtual / 5) * 100}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.stepCounter, { color: theme.textSecondary }]}>
+              Etapa {etapaAtual} de 5
+            </Text>
+          </View>
 
-        <Text style={[styles.stepCounter, { color: theme.textSecondary }]}>
-          Etapa {etapaAtual} de 5
-        </Text>
+          <View style={styles.content}>{renderContent()}</View>
 
-        {/* Conteúdo */}
-        <View style={styles.content}>{renderContent()}</View>
-
-        {/* Botões */}
-        <View style={styles.buttonsContainer}>
-          {etapaAtual > 1 && (
-            <TouchableOpacity
-              style={[
-                styles.button,
-                {
-                  backgroundColor: theme.surface,
-                  borderWidth: 1,
-                  borderColor: theme.border,
-                },
-              ]}
-              onPress={handleAnterior}
-              disabled={loading}
-            >
-              <Text style={[styles.buttonText, { color: theme.text }]}>
-                Anterior
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {etapaAtual < 5 ? (
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: theme.primary }]}
-              onPress={handleProxima}
-              disabled={loading}
-            >
-              <Text style={[styles.buttonText, { color: "#fff" }]}>
-                Próxima
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.button,
-                {
-                  backgroundColor: loading
-                    ? theme.textSecondary
-                    : theme.primary,
-                },
-              ]}
-              onPress={handleEnviar}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={[styles.buttonText, { color: "#fff" }]}>
-                  Enviar Formulário
+          <View style={styles.buttonsContainer}>
+            {etapaAtual > 1 && (
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  {
+                    backgroundColor: theme.surface,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  },
+                ]}
+                onPress={handleAnterior}
+                disabled={loading}
+              >
+                <Text style={[styles.btnText, { color: theme.text }]}>
+                  Anterior
                 </Text>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
+              </TouchableOpacity>
+            )}
+
+            {etapaAtual < 5 ? (
+              <TouchableOpacity
+                style={[styles.btn, { backgroundColor: theme.primary }]}
+                onPress={handleProxima}
+                disabled={loading}
+              >
+                <Text style={[styles.btnText, { color: "#fff" }]}>Próxima</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[
+                  styles.btn,
+                  {
+                    backgroundColor: loading
+                      ? theme.textSecondary
+                      : theme.primary,
+                  },
+                ]}
+                onPress={handleEnviar}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={[styles.btnText, { color: "#fff" }]}>
+                    Enviar Formulário
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-// ── Componente Auxiliar ───────────────────────────────────────────────────────
+// ── Componentes Internos ──────────────────────────────────────────────────────
+
+interface CustomInputProps {
+  theme: any;
+  label?: string;
+  placeholder?: string;
+  value: string;
+  onChange: (text: string) => void;
+  maxLength?: number;
+  keyboard?:
+    | "default"
+    | "email-address"
+    | "numeric"
+    | "phone-pad"
+    | "number-pad";
+  errorMessage?: string;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  multiline?: boolean;
+}
+
+function CustomInput({
+  theme,
+  label,
+  placeholder,
+  value,
+  onChange,
+  maxLength,
+  keyboard,
+  errorMessage,
+  autoCapitalize = "none",
+  multiline = false,
+}: CustomInputProps) {
+  return (
+    <View style={styles.inputWrapper}>
+      {label ? (
+        <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
+      ) : null}
+      <View
+        style={[
+          styles.inputContainer,
+          multiline
+            ? { height: 100, alignItems: "flex-start", paddingTop: 15 }
+            : {},
+          {
+            backgroundColor: theme.surface,
+            borderColor: errorMessage ? "#FF4D4D" : theme.border,
+          },
+        ]}
+      >
+        <TextInput
+          style={[
+            styles.input,
+            { color: theme.text },
+            multiline ? { textAlignVertical: "top" } : {},
+          ]}
+          placeholder={placeholder}
+          placeholderTextColor={theme.textSecondary}
+          value={value}
+          onChangeText={onChange}
+          maxLength={maxLength}
+          keyboardType={keyboard}
+          autoCapitalize={autoCapitalize}
+          multiline={multiline}
+        />
+      </View>
+      {errorMessage ? (
+        <Text style={styles.errorText}>{errorMessage}</Text>
+      ) : null}
+    </View>
+  );
+}
 
 interface BooleanQuestionProps {
   label: string;
   value: boolean | null;
   onChange: (value: boolean) => void;
+  errorMessage?: string;
 }
 
-function BooleanQuestion({ label, value, onChange }: BooleanQuestionProps) {
+function BooleanQuestion({
+  label,
+  value,
+  onChange,
+  errorMessage,
+}: BooleanQuestionProps) {
   const { theme } = useAppTheme();
 
   return (
-    <View style={styles.questionContainer}>
-      <Text style={[styles.questionLabel, { color: theme.text }]}>{label}</Text>
+    <View style={styles.inputWrapper}>
+      <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
       <View style={styles.selectContainer}>
         {["Sim", "Não"].map((opcao) => (
           <TouchableOpacity
@@ -1044,7 +920,7 @@ function BooleanQuestion({ label, value, onChange }: BooleanQuestionProps) {
               {
                 backgroundColor:
                   value === (opcao === "Sim") ? theme.primary : theme.surface,
-                borderColor: theme.border,
+                borderColor: errorMessage ? "#FF4D4D" : theme.border,
               },
             ]}
             onPress={() => onChange(opcao === "Sim")}
@@ -1052,9 +928,7 @@ function BooleanQuestion({ label, value, onChange }: BooleanQuestionProps) {
             <Text
               style={[
                 styles.selectOptionText,
-                {
-                  color: value === (opcao === "Sim") ? "#fff" : theme.text,
-                },
+                { color: value === (opcao === "Sim") ? "#fff" : theme.text },
               ]}
             >
               {opcao}
@@ -1062,6 +936,9 @@ function BooleanQuestion({ label, value, onChange }: BooleanQuestionProps) {
           </TouchableOpacity>
         ))}
       </View>
+      {errorMessage ? (
+        <Text style={styles.errorText}>{errorMessage}</Text>
+      ) : null}
     </View>
   );
 }
@@ -1069,107 +946,85 @@ function BooleanQuestion({ label, value, onChange }: BooleanQuestionProps) {
 // ── Estilos ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-  },
-  scroll: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  safe: { flex: 1 },
+  scroll: { paddingHorizontal: 20 },
+  closeButton: {
+    position: "absolute",
+    left: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
     alignItems: "center",
-    marginBottom: 20,
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 22,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginTop: 40,
+    marginBottom: 20,
   },
+  progressWrapper: { marginBottom: 20 },
   progressContainer: {
     height: 8,
     borderRadius: 4,
     overflow: "hidden",
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  progressBar: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  stepCounter: {
-    fontSize: 12,
-    marginBottom: 20,
-  },
-  content: {
-    marginBottom: 20,
-  },
-  etapaTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 16,
-  },
-  fieldContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
     marginBottom: 8,
-  },
-  input: {
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderColor: "#eee",
   },
-  textArea: {
+  progressBar: { height: "100%", borderRadius: 4 },
+  stepCounter: { fontSize: 13, textAlign: "right" },
+  content: { width: "100%" },
+  title: { fontSize: 20, fontWeight: "bold", marginBottom: 20 },
+  label: { fontSize: 14, fontWeight: "500", marginBottom: 6, marginLeft: 2 },
+
+  inputWrapper: { width: "100%", marginBottom: 16 },
+  inputContainer: {
+    width: "100%",
+    height: 55,
+    borderRadius: 12,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    minHeight: 100,
-    textAlignVertical: "top",
-  },
-  questionContainer: {
-    marginBottom: 16,
-  },
-  questionLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  selectContainer: {
+    paddingHorizontal: 15,
     flexDirection: "row",
-    gap: 8,
+    alignItems: "center",
   },
+  input: { flex: 1, fontSize: 16 },
+
+  selectContainer: { flexDirection: "row", gap: 10 },
   selectOption: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  selectOptionText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  buttonsContainer: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 20,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    height: 55,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: "600",
+  selectOptionText: { fontSize: 16, fontWeight: "500" },
+
+  row: { flexDirection: "row", gap: 10, width: "100%" },
+  divider: {
+    height: 1,
+    width: "100%",
+    backgroundColor: "#eee",
+    marginVertical: 15,
   },
+  buttonsContainer: { flexDirection: "row", gap: 10, marginTop: 10 },
+
+  btn: {
+    flex: 1,
+    height: 55,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  btnText: { fontSize: 16, fontWeight: "bold" },
+  errorText: { color: "#FF4D4D", fontSize: 12, marginTop: 4, marginLeft: 5 },
 });
