@@ -1,6 +1,8 @@
+import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,17 +19,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import { useAppTheme } from "@/hooks/use-app-theme";
-import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebaseConfig";
 
 const IMAGES = {
   logo: require("../assets/img/logo.png"),
 };
-
-const ADMIN_EMAIL = "admin@goldenpaw.com";
-const ADMIN_PASSWORD = "admin123";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -43,7 +39,7 @@ export default function LoginScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as any);
     }
   };
 
@@ -53,19 +49,21 @@ export default function LoginScreen() {
       return;
     }
 
-    const isAdminCredentials =
-      email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase() &&
-      password === ADMIN_PASSWORD;
-
     setLoading(true);
     try {
-      if (isAdminCredentials) {
-        router.push("/(tabs)/admin");
-        return;
-      }
+      // Faz o login nativo no Firebase para persistir a sessão como usuário comum
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email.trim().toLowerCase(),
+        password,
+      );
+      const user = userCredential.user;
 
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/(tabs)");
+      if (user.email?.toLowerCase() === "admin@goldenpaw.com") {
+        router.replace("/admin/AdminDashboard" as any);
+      } else {
+        router.replace("/(tabs)" as any);
+      }
     } catch (error: any) {
       console.error(error);
       let message = "E-mail ou senha incorretos.";
@@ -91,7 +89,7 @@ export default function LoginScreen() {
           styles.backButton,
           {
             top: insets.top + 10,
-            backgroundColor: theme.buttonBackground,
+            backgroundColor: theme.surface,
             borderColor: theme.primary + "40",
           },
         ]}
@@ -203,7 +201,7 @@ export default function LoginScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.push("/register")}>
+            <TouchableOpacity onPress={() => router.push("/register" as any)}>
               <Text style={[styles.linkText, { color: theme.primary }]}>
                 Não tem uma conta? Cadastre-se
               </Text>
@@ -216,9 +214,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   backButton: {
     zIndex: 10,
     width: 44,
@@ -227,11 +223,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    position: "absolute",
+    left: 20,
   },
   scrollContent: {
     flexGrow: 1,
@@ -249,18 +242,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 12,
   },
-  passwordContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  passwordInput: {
-    flex: 1,
-    paddingVertical: 12,
-  },
-  eyeButton: {
-    paddingHorizontal: 4,
-    paddingVertical: 8,
-  },
+  passwordContainer: { flexDirection: "row", alignItems: "center" },
+  passwordInput: { flex: 1, paddingVertical: 12 },
+  eyeButton: { paddingHorizontal: 4, paddingVertical: 8 },
   input: { fontSize: 16 },
   loginButton: {
     width: "100%",
@@ -281,10 +265,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
 });

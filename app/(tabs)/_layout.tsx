@@ -120,16 +120,19 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* Mantém a rota ativa internamente, mas 100% oculta da barra de navegação */}
       <Tabs.Screen
         name="admin"
         options={{
-          href: null, // Oculta completamente o botão da barra de navegação
+          href: null,
         }}
       />
+
       <Tabs.Screen
         name="explore"
         options={{
-          href: null, // Oculta completamente o botão da barra de navegação
+          href: null,
         }}
       />
     </Tabs>
@@ -156,9 +159,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 2,
   },
-  cartBadgeText: {
-    color: "#FFF",
-    fontSize: 9,
-    fontWeight: "700",
-  },
+  cartBadgeText: { color: "#FFF", fontSize: 9, fontWeight: "700" },
 });

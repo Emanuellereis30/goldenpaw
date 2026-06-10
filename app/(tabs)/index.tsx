@@ -3,7 +3,15 @@ import { useCart } from "@/hooks/use-cart";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, doc, getDoc, onSnapshot, query } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -76,14 +84,34 @@ export default function HomeScreen() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsLoggedIn(!!user);
       if (user) {
-        try {
-          const userDoc = await getDoc(doc(db, "usuarios", user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setIsAdmin(userData.tipo === "admin");
+        // Verifica se é o admin padrão
+        if (user.email?.toLowerCase() === "admin@goldenpaw.com") {
+          setIsAdmin(true);
+        } else {
+          try {
+            // Verifica na coleção de admins
+            const q = query(
+              collection(db, "admin"),
+              where("uid", "==", user.uid),
+            );
+            const snapshot = await getDocs(q);
+
+            if (!snapshot.empty) {
+              setIsAdmin(true);
+            } else {
+              // Fallback para verificar se existe "tipo: admin" nos usuários
+              const userDoc = await getDoc(doc(db, "usuarios", user.uid));
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                setIsAdmin(userData.tipo === "admin");
+              } else {
+                setIsAdmin(false);
+              }
+            }
+          } catch (error) {
+            console.error("Erro ao verificar permissões de admin:", error);
+            setIsAdmin(false);
           }
-        } catch (error) {
-          console.error("Erro ao verificar permissões de admin:", error);
         }
       } else {
         setIsAdmin(false);
@@ -102,12 +130,10 @@ export default function HomeScreen() {
         ...doc.data(),
       })) as Produto[];
 
-      // 1. Remove os produtos esgotados (estoque <= 0)
       const produtosEmEstoque = produtosFirestore.filter(
         (p) => p.estoque && p.estoque > 0,
       );
 
-      // 2. Seleciona produtos com tag (ex: Popular, Promoção) ou os primeiros 5 como fallback
       const comTag = produtosEmEstoque.filter((p) => p.tag);
       setFeaturedProducts(
         comTag.length > 0 ? comTag.slice(0, 5) : produtosEmEstoque.slice(0, 5),
@@ -116,6 +142,7 @@ export default function HomeScreen() {
 
     return () => unsubscribe();
   }, []);
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -144,14 +171,6 @@ export default function HomeScreen() {
         </View>
       </View>
       <View style={styles.headerActions}>
-        {isAdmin && (
-          <TouchableOpacity
-            onPress={() => router.push("/admin/AdminDashboard")}
-            style={[styles.iconButton, { backgroundColor: theme.surface }]}
-          >
-            <Ionicons name="settings" size={22} color={theme.primary} />
-          </TouchableOpacity>
-        )}
         <TouchableOpacity
           onPress={toggleColorScheme}
           style={[styles.iconButton, { backgroundColor: theme.surface }]}
@@ -340,43 +359,31 @@ export default function HomeScreen() {
           >
             {isLoggedIn ? (
               <>
-                {/* Se for Administrador, exibe o link direto para o Painel Administrativo */}
-                {isAdmin && (
-                  <TouchableOpacity
-                    style={[
-                      styles.dropdownOption,
-                      { borderBottomColor: theme.border },
-                    ]}
-                    onPress={() => {
-                      setShowProfileMenu(false);
-                      (router.push as any)("/admin/AdminDashboard");
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownOptionText,
-                        { color: theme.primary, fontWeight: "700" },
-                      ]}
-                    >
-                      Painel Admin
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
+                {/* Botão Condicional: Se for Admin mostra "Admin", senão "Perfil" */}
                 <TouchableOpacity
                   style={[
                     styles.dropdownOption,
-                    { borderBottomColor: theme.border },
+                    { borderBottomColor: theme.border, borderBottomWidth: 1 },
                   ]}
                   onPress={() => {
                     setShowProfileMenu(false);
-                    router.push("/profile");
+                    if (isAdmin) {
+                      (router.push as any)("/admin/AdminDashboard");
+                    } else {
+                      router.push("/profile" as any);
+                    }
                   }}
                 >
                   <Text
-                    style={[styles.dropdownOptionText, { color: theme.text }]}
+                    style={[
+                      styles.dropdownOptionText,
+                      {
+                        color: isAdmin ? theme.primary : theme.text,
+                        fontWeight: isAdmin ? "800" : "600",
+                      },
+                    ]}
                   >
-                    Perfil
+                    {isAdmin ? "Admin" : "Perfil"}
                   </Text>
                 </TouchableOpacity>
 
@@ -396,11 +403,11 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   style={[
                     styles.dropdownOption,
-                    { borderBottomColor: theme.border },
+                    { borderBottomColor: theme.border, borderBottomWidth: 1 },
                   ]}
                   onPress={() => {
                     setShowProfileMenu(false);
-                    router.push("/login");
+                    router.push("/login" as any);
                   }}
                 >
                   <Text
@@ -413,7 +420,7 @@ export default function HomeScreen() {
                   style={styles.dropdownOption}
                   onPress={() => {
                     setShowProfileMenu(false);
-                    router.push("/register");
+                    router.push("/register" as any);
                   }}
                 >
                   <Text

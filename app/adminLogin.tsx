@@ -1,5 +1,6 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -48,10 +49,11 @@ export default function AdminLoginScreen() {
     setLoading(true);
     try {
       if (isHardcodedAdmin) {
+        await AsyncStorage.setItem("isAdminLoggedIn", "true");
         Alert.alert("Sucesso", `Bem-vindo, ${ADMIN_NAME}!`);
         setEmail("");
         setSenha("");
-        router.push("/adminDashboard");
+        router.replace("/(tabs)/admin" as any);
         return;
       }
 
@@ -66,17 +68,18 @@ export default function AdminLoginScreen() {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        Alert.alert("Erro", "Usuário admin não encontrado no banco de dados.");
+        Alert.alert("Erro", "Usuário admin não encontrado.");
         setLoading(false);
         return;
       }
 
       const adminData = querySnapshot.docs[0].data();
+      await AsyncStorage.setItem("isAdminLoggedIn", "true");
       Alert.alert("Sucesso", `Bem-vindo, ${adminData.nome}!`);
 
       setEmail("");
       setSenha("");
-      router.push("/adminDashboard");
+      router.replace("/(tabs)/admin" as any);
     } catch (error) {
       console.error("Erro ao fazer login:", error);
       Alert.alert("Erro", "Email ou senha incorretos");
@@ -103,12 +106,13 @@ export default function AdminLoginScreen() {
           },
         ]}
         onPress={() =>
-          router.canGoBack() ? router.back() : router.replace("/login")
+          router.canGoBack() ? router.back() : router.replace("/login" as any)
         }
         activeOpacity={0.7}
       >
         <Ionicons name="chevron-back" size={24} color={theme.primary} />
       </TouchableOpacity>
+
       <TouchableOpacity
         style={[
           styles.themeToggleButton,
@@ -192,7 +196,7 @@ export default function AdminLoginScreen() {
               />
               <TextInput
                 style={[styles.input, { color: theme.text }]}
-                placeholder="Digite sua senha"
+                placeholder="Digite a sua senha"
                 placeholderTextColor={theme.textSecondary}
                 value={senha}
                 onChangeText={setSenha}
@@ -226,27 +230,7 @@ export default function AdminLoginScreen() {
               </>
             )}
           </TouchableOpacity>
-
-          <View
-            style={[
-              styles.warningBox,
-              { backgroundColor: theme.primary + "10" },
-            ]}
-          >
-            <Ionicons
-              name="information-circle"
-              size={16}
-              color={theme.primary}
-            />
-            <Text style={[styles.warningText, { color: theme.text }]}>
-              Use apenas em conexões seguras
-            </Text>
-          </View>
         </View>
-
-        <Text style={[styles.footer, { color: theme.textSecondary }]}>
-          Golden Paw - Painel Administrativo
-        </Text>
       </View>
     </SafeAreaView>
   );
@@ -270,37 +254,21 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    justifyContent: "center",
-  },
+  content: { flex: 1, paddingHorizontal: 20, justifyContent: "center" },
   logoContainer: {
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
   },
-  logo: {
-    width: 150,
-    height: 150,
-  },
+  logo: { width: 150, height: 150 },
   title: {
     fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 30,
-  },
-  form: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 20,
-    marginBottom: 20,
-  },
+  subtitle: { fontSize: 14, textAlign: "center", marginBottom: 30 },
+  form: { borderRadius: 16, borderWidth: 1, padding: 20, marginBottom: 20 },
   inputContainer: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: "600", marginBottom: 8 },
   inputWrapper: {
@@ -324,16 +292,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   loginButtonText: { color: "#000", fontSize: 16, fontWeight: "bold" },
-  warningBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 8,
-  },
-  warningText: { fontSize: 12, flex: 1 },
-  footer: { fontSize: 12, textAlign: "center", marginTop: 20 },
   themeToggleButton: {
     position: "absolute",
     zIndex: 10,

@@ -1,6 +1,8 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { signOut } from "firebase/auth";
 import {
   addDoc,
   collection,
@@ -12,6 +14,7 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,7 +22,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { db } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 
 // Importações dos componentes das abas administrativas
 import DashboardTab from "./components/DashboardTab";
@@ -36,81 +39,58 @@ export default function AdminDashboard() {
     "dashboard" | "produtos" | "pets" | "pedidos" | "usuarios" | "funcionarios"
   >("dashboard");
 
-  // Estados para dados em tempo real vindos do Firestore
   const [produtos, setProdutos] = useState<any[]>([]);
   const [pets, setPets] = useState<any[]>([]);
-  const [requisicoes, setRequisicoes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Ativa listeners em tempo real para sincronização imediata
   useEffect(() => {
     setLoading(true);
-
     const unsubProdutos = onSnapshot(collection(db, "produtos"), (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setProdutos(docs);
+      setProdutos(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
     const unsubPets = onSnapshot(collection(db, "pets"), (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setPets(docs);
+      setPets(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
     });
-
-    const unsubRequisicoes = onSnapshot(
-      collection(db, "requisicoes_adocao"),
-      (snapshot) => {
-        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setRequisicoes(docs);
-        setLoading(false);
-      },
-    );
 
     return () => {
       unsubProdutos();
       unsubPets();
-      unsubRequisicoes();
     };
   }, []);
 
-  // ── OPERAÇÕES DO FIRESTORE: PRODUTOS ───────────────────────────────────────
+  // ── FUNÇÕES DO PRODUTO (Que estavam a faltar no ProdutosTab) ────────────
   const handleAddProduto = async (produtoData: any) => {
     await addDoc(collection(db, "produtos"), produtoData);
   };
-
   const handleEditProduto = async (id: string, produtoData: any) => {
     await updateDoc(doc(db, "produtos", id), produtoData);
   };
-
   const handleDeleteProduto = async (id: string) => {
     await deleteDoc(doc(db, "produtos", id));
   };
 
-  // ── OPERAÇÕES DO FIRESTORE: PETS E REQUISIÇÕES ─────────────────────────────
-  const handleAddPet = async (petData: any) => {
-    await addDoc(collection(db, "pets"), petData);
+  const handleLogoutAdmin = () => {
+    Alert.alert("Sair", "Desejas sair do painel administrativo?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Sair",
+        style: "destructive",
+        onPress: async () => {
+          await AsyncStorage.removeItem("isAdminLoggedIn");
+          await signOut(auth);
+          router.replace("/login" as any);
+        },
+      },
+    ]);
   };
 
-  const handleEditPet = async (id: string, petData: any) => {
-    await updateDoc(doc(db, "pets", id), petData);
-  };
-
-  const handleDeletePet = async (id: string) => {
-    await deleteDoc(doc(db, "pets", id));
-  };
-
-  const handleUpdateRequisicao = async (
-    id: string,
-    status: "aprovado" | "rejeitado",
-    visualizado: boolean,
-  ) => {
-    await updateDoc(doc(db, "requisicoes_adocao", id), { status, visualizado });
-  };
-
-  // Injeção de dependências e renderização do componente correspondente
   const renderTabContent = () => {
     switch (currentTab) {
       case "dashboard":
-        return <DashboardTab produtos={produtos} pets={pets} />;
+        return <DashboardTab />;
+
       case "produtos":
         return (
           <ProdutosTab
@@ -122,17 +102,7 @@ export default function AdminDashboard() {
           />
         );
       case "pets":
-        return (
-          <PetsAdocaoTab
-            pets={pets}
-            requisicoes={requisicoes}
-            loading={loading}
-            onAddPet={handleAddPet}
-            onEditPet={handleEditPet}
-            onDeletePet={handleDeletePet}
-            onUpdateRequisicao={handleUpdateRequisicao}
-          />
-        );
+        return <PetsAdocaoTab />;
       case "pedidos":
         return <PedidosTab />;
       case "usuarios":
@@ -146,24 +116,34 @@ export default function AdminDashboard() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      {/* Barra Superior de Ferramentas / Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity
-          onPress={() => router.replace("/(tabs)")}
+          onPress={() => router.replace("/(tabs)" as any)}
           style={[styles.backButton, { backgroundColor: theme.surface }]}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={18} color={theme.text} />
+          <Ionicons name="arrow-back" size={16} color={theme.text} />
           <Text style={[styles.backButtonText, { color: theme.text }]}>
-            Voltar para Home
+            Home
           </Text>
         </TouchableOpacity>
+
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           Painel Geral
         </Text>
+
+        <TouchableOpacity
+          onPress={handleLogoutAdmin}
+          style={[styles.backButton, { backgroundColor: theme.error + "15" }]}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="log-out-outline" size={16} color={theme.error} />
+          <Text style={[styles.backButtonText, { color: theme.error }]}>
+            Sair
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Menu Horizontal de Abas */}
       <View style={{ maxHeight: 54 }}>
         <ScrollView
           horizontal
@@ -212,7 +192,6 @@ export default function AdminDashboard() {
         </ScrollView>
       </View>
 
-      {/* Área de Visualização das Listagens */}
       <View style={styles.content}>
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -227,9 +206,7 @@ export default function AdminDashboard() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-  },
+  safe: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -246,14 +223,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 4,
   },
-  backButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
+  backButtonText: { fontSize: 13, fontWeight: "600" },
+  headerTitle: { fontSize: 16, fontWeight: "800" },
   tabBar: {
     flexDirection: "row",
     paddingHorizontal: 12,
@@ -269,16 +240,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },
-  tabLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  content: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  tabLabel: { fontSize: 14, fontWeight: "500" },
+  content: { flex: 1 },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
 });
