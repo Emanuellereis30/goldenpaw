@@ -31,6 +31,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { db } from "../../../firebaseConfig";
 import { adminStyles } from "../styles/adminStyles";
 
+// ── Funções Auxiliares ────────────────────────────────────────────────────────
 const uriToBlob = async (uri: string): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -47,6 +48,13 @@ const uriToBlob = async (uri: string): Promise<Blob> => {
   });
 };
 
+const formatBoolean = (val: boolean | null | undefined) => {
+  if (val === true) return "Sim";
+  if (val === false) return "Não";
+  return "Não informado";
+};
+
+// ── Componente Principal ──────────────────────────────────────────────────────
 export default function PetsAdocaoTab() {
   const { theme } = useAppTheme();
   const storage = getStorage();
@@ -65,7 +73,6 @@ export default function PetsAdocaoTab() {
   const [editingPet, setEditingPet] = useState<any | null>(null);
   const [imagePicked, setImagePicked] = useState(false);
 
-  // O formulário agora separa o número da unidade (anos/meses) e tem campo para tags
   const [form, setForm] = useState<any>({
     nome: "",
     raca: "SRD",
@@ -167,7 +174,6 @@ export default function PetsAdocaoTab() {
         finalImageUrl = await uploadImageAsync(form.image);
       }
 
-      // Junta o número e a unidade para guardar no Firebase (ex: "2 meses" ou "1 ano")
       const idadeFormatada = `${form.idadeNum} ${form.idadeUnidade === "anos" && form.idadeNum === 1 ? "ano" : form.idadeUnidade}`;
 
       const petData = {
@@ -211,8 +217,6 @@ export default function PetsAdocaoTab() {
 
   const handleEditOpen = (pet: any) => {
     setEditingPet(pet);
-
-    // Separa a idade guardada no banco de dados para preencher o formulário corretamente
     const isMeses = pet.idade && pet.idade.includes("mes");
     const parsedNum = parseInt(pet.idade) || 1;
 
@@ -260,9 +264,11 @@ export default function PetsAdocaoTab() {
   const filteredPets = pets.filter((p) =>
     (p.nome || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  // Utilizar o nomeCompleto (novo) ou as variáveis antigas para a pesquisa
   const filteredReqs = requisicoes.filter(
     (r) =>
-      (r.usuarioNome || r.clienteNome || "")
+      (r.nomeCompleto || r.usuarioNome || r.clienteNome || "")
         .toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
       (r.petNome || "").toLowerCase().includes(searchQuery.toLowerCase()),
@@ -456,7 +462,6 @@ export default function PetsAdocaoTab() {
                         {pet.raca} • {pet.idade} • {pet.porte}
                       </Text>
 
-                      {/* EXIBIÇÃO DA TAG SE EXISTIR */}
                       {pet.tags ? (
                         <Text
                           style={{
@@ -541,7 +546,10 @@ export default function PetsAdocaoTab() {
                             { color: theme.text, marginBottom: 0 },
                           ]}
                         >
-                          {req.usuarioNome || req.clienteNome || "Adotante"}
+                          {req.nomeCompleto ||
+                            req.usuarioNome ||
+                            req.clienteNome ||
+                            "Adotante"}
                         </Text>
                         <View
                           style={{
@@ -690,7 +698,6 @@ export default function PetsAdocaoTab() {
                 placeholderTextColor={theme.textSecondary}
               />
 
-              {/* IDADE: AGORA COM OPÇÃO DE ANOS OU MESES */}
               <Text style={[adminStyles.label, { color: theme.text }]}>
                 Idade *
               </Text>
@@ -835,7 +842,6 @@ export default function PetsAdocaoTab() {
                 ))}
               </View>
 
-              {/* CAMPO DE TAGS RECUPERADO */}
               <Text style={[adminStyles.label, { color: theme.text }]}>
                 Tags / Características
               </Text>
@@ -967,7 +973,7 @@ export default function PetsAdocaoTab() {
         </SafeAreaView>
       </Modal>
 
-      {/* MODAL: DETALHES DA REQUISIÇÃO */}
+      {/* MODAL: DETALHES DA REQUISIÇÃO (TUDO ATUALIZADO AQUI) */}
       <Modal visible={showReqModal} animationType="slide" transparent>
         <SafeAreaView
           style={[adminStyles.modal, { backgroundColor: theme.background }]}
@@ -985,75 +991,19 @@ export default function PetsAdocaoTab() {
               <Ionicons name="close" size={24} color={theme.text} />
             </TouchableOpacity>
           </View>
-          <ScrollView style={adminStyles.modalContent}>
+
+          <ScrollView
+            style={adminStyles.modalContent}
+            showsVerticalScrollIndicator={false}
+          >
             {selectedReq && (
-              <View style={adminStyles.modalForm}>
+              <View style={[adminStyles.modalForm, { paddingBottom: 40 }]}>
+                {/* INFO DO PET */}
                 <Text
                   style={[
                     adminStyles.sectionTitle,
                     { color: theme.primary, marginTop: 0 },
                   ]}
-                >
-                  Informações do Adotante
-                </Text>
-
-                <Text style={[adminStyles.label, { color: theme.text }]}>
-                  Nome Completo
-                </Text>
-                <Text
-                  style={[
-                    adminStyles.itemDetail,
-                    { color: theme.textSecondary, marginBottom: 12 },
-                  ]}
-                >
-                  {selectedReq.usuarioNome || selectedReq.clienteNome}
-                </Text>
-
-                <View style={{ flexDirection: "row", gap: 16 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[adminStyles.label, { color: theme.text }]}>
-                      Telefone
-                    </Text>
-                    <Text
-                      style={[
-                        adminStyles.itemDetail,
-                        { color: theme.textSecondary, marginBottom: 12 },
-                      ]}
-                    >
-                      {selectedReq.telefone || "Não informado"}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[adminStyles.label, { color: theme.text }]}>
-                      E-mail
-                    </Text>
-                    <Text
-                      style={[
-                        adminStyles.itemDetail,
-                        { color: theme.textSecondary, marginBottom: 12 },
-                      ]}
-                    >
-                      {selectedReq.email || "Não informado"}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={[adminStyles.label, { color: theme.text }]}>
-                  Endereço
-                </Text>
-                <Text
-                  style={[
-                    adminStyles.itemDetail,
-                    { color: theme.textSecondary, marginBottom: 20 },
-                  ]}
-                >
-                  {selectedReq.endereco ||
-                    selectedReq.cidade ||
-                    "Não informado"}
-                </Text>
-
-                <Text
-                  style={[adminStyles.sectionTitle, { color: theme.primary }]}
                 >
                   Sobre o Pet
                 </Text>
@@ -1064,6 +1014,7 @@ export default function PetsAdocaoTab() {
                       backgroundColor: theme.surface,
                       borderColor: theme.border,
                       padding: 12,
+                      marginBottom: 20,
                     },
                   ]}
                 >
@@ -1075,34 +1026,245 @@ export default function PetsAdocaoTab() {
                   </Text>
                 </View>
 
+                {/* ETAPA 1 */}
+                <Text
+                  style={[adminStyles.sectionTitle, { color: theme.primary }]}
+                >
+                  1. Dados Pessoais
+                </Text>
+                <DetailItem
+                  theme={theme}
+                  label="Nome Completo"
+                  value={
+                    selectedReq.nomeCompleto ||
+                    selectedReq.usuarioNome ||
+                    selectedReq.clienteNome
+                  }
+                />
+
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="CPF"
+                      value={selectedReq.cpf}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="Nascimento"
+                      value={selectedReq.dataNascimento}
+                    />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="Celular / Telefone"
+                      value={selectedReq.celular || selectedReq.telefone}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="E-mail"
+                      value={selectedReq.email}
+                    />
+                  </View>
+                </View>
+
+                {/* ETAPA 2 */}
                 <Text
                   style={[
                     adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 20 },
+                    { color: theme.primary, marginTop: 10 },
                   ]}
                 >
-                  Formulário
+                  2. Informações de Moradia
                 </Text>
-                <Text style={[adminStyles.label, { color: theme.text }]}>
-                  Por que quer adotar?
-                </Text>
+                <DetailItem
+                  theme={theme}
+                  label="Endereço Completo"
+                  value={
+                    selectedReq.endereco
+                      ? `${selectedReq.endereco}${selectedReq.bairro ? `, ${selectedReq.bairro}` : ""}${selectedReq.cidade ? ` - ${selectedReq.cidade}` : ""}`
+                      : selectedReq.cidade
+                  }
+                />
+
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="CEP"
+                      value={selectedReq.cep}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="Tipo de Imóvel"
+                      value={selectedReq.tipoResidencia}
+                    />
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="Situação"
+                      value={selectedReq.situacaoImovel}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    {selectedReq.situacaoImovel === "alugado" && (
+                      <DetailItem
+                        theme={theme}
+                        label="Proprietário permite?"
+                        value={formatBoolean(
+                          selectedReq.proprietarioPermiteAnimais,
+                        )}
+                      />
+                    )}
+                  </View>
+                </View>
+
+                <DetailItem
+                  theme={theme}
+                  label="Quintal fechado?"
+                  value={formatBoolean(selectedReq.quintalFechado)}
+                />
+                <DetailItem
+                  theme={theme}
+                  label="Existem rotas de fuga?"
+                  value={formatBoolean(selectedReq.rotasFuga)}
+                />
+                <DetailItem
+                  theme={theme}
+                  label="Possui telas de proteção?"
+                  value={formatBoolean(selectedReq.telasProtecao)}
+                />
+
+                {/* ETAPA 3 */}
                 <Text
                   style={[
-                    adminStyles.itemDetail,
-                    {
-                      color: theme.textSecondary,
-                      marginBottom: 16,
-                      fontStyle: "italic",
-                    },
+                    adminStyles.sectionTitle,
+                    { color: theme.primary, marginTop: 10 },
                   ]}
                 >
-                  "
-                  {selectedReq.motivo ||
-                    selectedReq.mensagem ||
-                    "Nenhuma mensagem enviada."}
-                  "
+                  3. Dinâmica Familiar
                 </Text>
+                <DetailItem
+                  theme={theme}
+                  label="Quantidade de pessoas na casa"
+                  value={selectedReq.quantidadePessoas}
+                />
 
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="Há crianças?"
+                      value={formatBoolean(selectedReq.temCriancas)}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <DetailItem
+                      theme={theme}
+                      label="Há idosos?"
+                      value={formatBoolean(selectedReq.temIdosos)}
+                    />
+                  </View>
+                </View>
+
+                <DetailItem
+                  theme={theme}
+                  label="Todos concordam com a adoção?"
+                  value={formatBoolean(selectedReq.todosAcordam)}
+                />
+                <DetailItem
+                  theme={theme}
+                  label="Alguém possui alergia a pelos?"
+                  value={
+                    selectedReq.temAlergias
+                      ? `Sim - Quem: ${selectedReq.temAlergiasQuem}`
+                      : formatBoolean(selectedReq.temAlergias)
+                  }
+                />
+                <DetailItem
+                  theme={theme}
+                  label="Tempo diário que o pet ficará sozinho"
+                  value={selectedReq.tempoSozinho}
+                />
+
+                {/* ETAPA 4 */}
+                <Text
+                  style={[
+                    adminStyles.sectionTitle,
+                    { color: theme.primary, marginTop: 10 },
+                  ]}
+                >
+                  4. Histórico com Animais
+                </Text>
+                <DetailItem
+                  theme={theme}
+                  label="Possui outros animais?"
+                  value={
+                    selectedReq.possuiOutrosAnimais
+                      ? `Sim - ${selectedReq.outrosAnimaisDescricao}`
+                      : formatBoolean(selectedReq.possuiOutrosAnimais)
+                  }
+                />
+                <DetailItem
+                  theme={theme}
+                  label="Já teve animais antes?"
+                  value={
+                    selectedReq.jaTeveAnimais
+                      ? `Sim - ${selectedReq.jaTeveAnimaisDescricao}`
+                      : formatBoolean(selectedReq.jaTeveAnimais)
+                  }
+                />
+
+                {/* ETAPA 5 */}
+                <Text
+                  style={[
+                    adminStyles.sectionTitle,
+                    { color: theme.primary, marginTop: 10 },
+                  ]}
+                >
+                  5. Termo de Responsabilidade
+                </Text>
+                <DetailItem
+                  theme={theme}
+                  label="Ciente dos custos financeiros e saúde?"
+                  value={formatBoolean(selectedReq.cienteFinanceiro)}
+                />
+                <DetailItem
+                  theme={theme}
+                  label="Planos para viagens e mudanças"
+                  value={selectedReq.planosViagem}
+                />
+                <DetailItem
+                  theme={theme}
+                  label="Concorda com acompanhamento / fotos?"
+                  value={formatBoolean(selectedReq.concordaAcompanhamento)}
+                />
+
+                <DetailItem
+                  theme={theme}
+                  label="Observações / Motivo da adoção"
+                  value={
+                    selectedReq.observacoes ||
+                    selectedReq.motivo ||
+                    selectedReq.mensagem
+                  }
+                />
+
+                {/* BOTÕES DE APROVAÇÃO */}
                 {selectedReq.status === "pendente" ? (
                   <View
                     style={{ flexDirection: "row", gap: 12, marginTop: 20 }}
@@ -1165,8 +1327,7 @@ export default function PetsAdocaoTab() {
                             : "#ef4444",
                       }}
                     >
-                      ESTA REQUISIÇÃO FOI{" "}
-                      {selectedReq.status?.toUpperCase() || "PENDENTE"}
+                      ESTA REQUISIÇÃO FOI {selectedReq.status?.toUpperCase()}
                     </Text>
                   </View>
                 )}
@@ -1176,5 +1337,35 @@ export default function PetsAdocaoTab() {
         </SafeAreaView>
       </Modal>
     </>
+  );
+}
+
+// ── Componente de Layout do Modal ─────────────────────────────────────────────
+function DetailItem({
+  label,
+  value,
+  theme,
+}: {
+  label: string;
+  value: any;
+  theme: any;
+}) {
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: "700",
+          color: theme.text,
+          marginBottom: 4,
+          opacity: 0.8,
+        }}
+      >
+        {label}
+      </Text>
+      <Text style={{ fontSize: 15, color: theme.textSecondary }}>
+        {value || "Não informado"}
+      </Text>
+    </View>
   );
 }
