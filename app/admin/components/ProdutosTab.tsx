@@ -31,6 +31,8 @@ interface ProdutosTabProps {
   onDeleteProduto: (id: string) => Promise<void>;
 }
 
+const CATEGORIAS_DISPONIVEIS = ["Cães", "Gatos", "Aves", "Peixes", "Outros"];
+
 export default function ProdutosTab({
   produtos,
   loading,
@@ -44,6 +46,8 @@ export default function ProdutosTab({
   const [showModal, setShowModal] = useState(false);
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
   const [imagePicked, setImagePicked] = useState(false);
+
+  // O estado do formulário agora inclui 'categorias' como um array de strings
   const [form, setForm] = useState({
     nome: "",
     preco: "",
@@ -51,6 +55,7 @@ export default function ProdutosTab({
     image: "",
     tag: "",
     estoque: "0",
+    categorias: [] as string[],
   });
 
   const ehRacao = form.nome.toLowerCase().includes("ração");
@@ -128,7 +133,7 @@ export default function ProdutosTab({
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [1, 1], // Produtos geralmente ficam melhores em 1:1 (quadrado)
+      aspect: [1, 1],
       quality: 0.8,
       base64: false,
     });
@@ -139,9 +144,28 @@ export default function ProdutosTab({
     }
   };
 
+  // Função para selecionar ou desmarcar categorias
+  const toggleCategoria = (cat: string) => {
+    setForm((prev) => {
+      if (prev.categorias.includes(cat)) {
+        return {
+          ...prev,
+          categorias: prev.categorias.filter((c) => c !== cat),
+        };
+      } else {
+        return { ...prev, categorias: [...prev.categorias, cat] };
+      }
+    });
+  };
+
   const handleSave = async () => {
     if (!form.nome || !form.preco || !form.image) {
       Alert.alert("Erro", "Preencha nome, preço e selecione uma imagem");
+      return;
+    }
+
+    if (form.categorias.length === 0) {
+      Alert.alert("Erro", "Selecione pelo menos uma categoria para o produto");
       return;
     }
 
@@ -157,6 +181,8 @@ export default function ProdutosTab({
         finalImageUrl = await uploadImageAsync(form.image);
       }
 
+      // Converte o array de categorias numa string separada por vírgula (ex: "Cães, Gatos")
+      // para facilitar a leitura no filtro da Loja
       const produtoData = {
         nome: form.nome,
         preco: form.preco,
@@ -164,13 +190,14 @@ export default function ProdutosTab({
         image: finalImageUrl,
         tag: form.tag,
         estoque: parseInt(form.estoque) || 0,
+        category: form.categorias.join(", "),
       };
 
       if (editingProduto) {
-        await onEditProduto(editingProduto.id, produtoData);
+        await onEditProduto(editingProduto.id, produtoData as any);
         Alert.alert("Sucesso", "Produto atualizado!");
       } else {
-        await onAddProduto(produtoData);
+        await onAddProduto(produtoData as any);
         Alert.alert("Sucesso", "Produto adicionado!");
       }
 
@@ -182,7 +209,15 @@ export default function ProdutosTab({
   };
 
   const resetForm = () => {
-    setForm({ nome: "", preco: "", kg: "", image: "", tag: "", estoque: "0" });
+    setForm({
+      nome: "",
+      preco: "",
+      kg: "",
+      image: "",
+      tag: "",
+      estoque: "0",
+      categorias: [],
+    });
     setEditingProduto(null);
     setImagePicked(false);
   };
@@ -190,6 +225,20 @@ export default function ProdutosTab({
   const handleEdit = (produto: Produto) => {
     setEditingProduto(produto);
     setImagePicked(false);
+
+    // Tenta ler as categorias antigas do banco, separando por vírgula se for string
+    let categoriasAtuais: string[] = [];
+    const catBanco = (produto as any).category || (produto as any).categoria;
+
+    if (typeof catBanco === "string") {
+      categoriasAtuais = catBanco
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
+    } else if (Array.isArray(catBanco)) {
+      categoriasAtuais = catBanco;
+    }
+
     setForm({
       nome: produto.nome,
       preco: produto.preco,
@@ -197,6 +246,7 @@ export default function ProdutosTab({
       image: produto.image,
       tag: produto.tag || "",
       estoque: (produto.estoque || 0).toString(),
+      categorias: categoriasAtuais,
     });
     setShowModal(true);
   };
@@ -281,7 +331,6 @@ export default function ProdutosTab({
                   { backgroundColor: theme.surface, borderColor: theme.border },
                 ]}
               >
-                {/* Exibe a miniatura da foto do produto na listagem */}
                 {produto.image ? (
                   <Image
                     source={{ uri: produto.image }}
@@ -308,23 +357,39 @@ export default function ProdutosTab({
                     R$ {produto.preco}
                     {produto.kg ? ` • ${produto.kg}kg` : ""}
                   </Text>
+
+                  {/* Exibe as categorias na listagem */}
+                  {((produto as any).category ||
+                    (produto as any).categoria) && (
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: theme.textSecondary,
+                        marginTop: 2,
+                      }}
+                    >
+                      Cat:{" "}
+                      {(produto as any).category || (produto as any).categoria}
+                    </Text>
+                  )}
+
                   <View
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
                       gap: 8,
+                      marginTop: 4,
                     }}
                   >
                     <Text
                       style={[
                         adminStyles.itemDetail,
-                        { color: theme.textSecondary },
+                        { color: theme.textSecondary, marginTop: 0 },
                       ]}
                     >
-                      Estoque: {produto.estoque || 0} unidades
+                      Estoque: {produto.estoque || 0}
                     </Text>
 
-                    {/* Sistema de Alerta de Estoque */}
                     {!produto.estoque || produto.estoque <= 0 ? (
                       <View
                         style={{
@@ -446,6 +511,52 @@ export default function ProdutosTab({
                 onChangeText={(text) => setForm({ ...form, nome: text })}
               />
 
+              {/* ── SEÇÃO DE CATEGORIAS (MÚLTIPLA ESCOLHA) ── */}
+              <Text
+                style={[adminStyles.label, { color: theme.text, marginTop: 8 }]}
+              >
+                Categorias *
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginBottom: 16,
+                }}
+              >
+                {CATEGORIAS_DISPONIVEIS.map((cat) => {
+                  const isSelected = form.categorias.includes(cat);
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => toggleCategoria(cat)}
+                      activeOpacity={0.7}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: isSelected ? theme.primary : theme.border,
+                        backgroundColor: isSelected
+                          ? theme.primary
+                          : theme.surface,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: isSelected ? "700" : "500",
+                          color: isSelected ? "#000" : theme.textSecondary,
+                        }}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               <View style={adminStyles.productInputRow}>
                 <View style={adminStyles.productInputColumn}>
                   <Text style={[adminStyles.label, { color: theme.text }]}>
@@ -527,7 +638,6 @@ export default function ProdutosTab({
                 </View>
               )}
 
-              {/* Novo Campo de Imagem (Substituindo o antigo URL) */}
               <Text style={[adminStyles.label, { color: theme.text }]}>
                 Foto do Produto *
               </Text>
@@ -599,7 +709,7 @@ export default function ProdutosTab({
               <TouchableOpacity
                 style={[
                   adminStyles.submitButton,
-                  { backgroundColor: theme.primary },
+                  { backgroundColor: theme.primary, marginTop: 10 },
                 ]}
                 onPress={handleSave}
               >

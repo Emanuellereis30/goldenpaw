@@ -48,7 +48,6 @@ interface Categoria {
   id: string;
   name: string;
   icon: keyof typeof Ionicons.glyphMap;
-  route: "/caes" | "/gatos" | "/aves" | "/peixes";
 }
 
 const IMAGES = {
@@ -56,11 +55,12 @@ const IMAGES = {
   logo: require("../../assets/img/logo.png"),
 };
 
+// ── Atualizado: removida a rota fixa, agora usaremos o "name" como parâmetro
 const CATEGORIES: Categoria[] = [
-  { id: "c1", name: "Cães", icon: "paw", route: "/caes" },
-  { id: "c2", name: "Gatos", icon: "logo-octocat", route: "/gatos" },
-  { id: "c3", name: "Aves", icon: "egg", route: "/aves" },
-  { id: "c4", name: "Peixes", icon: "fish", route: "/peixes" },
+  { id: "c1", name: "Cães", icon: "paw" },
+  { id: "c2", name: "Gatos", icon: "logo-octocat" },
+  { id: "c3", name: "Aves", icon: "egg" },
+  { id: "c4", name: "Peixes", icon: "fish" },
 ];
 
 export default function HomeScreen() {
@@ -251,7 +251,13 @@ export default function HomeScreen() {
             <TouchableOpacity
               key={cat.id}
               style={styles.categoryItem}
-              onPress={() => router.push(cat.route)}
+              // ── Atualizado: Redireciona para a loja passando o parâmetro de categoria ──
+              onPress={() =>
+                router.push({
+                  pathname: "/loja",
+                  params: { categoria: cat.name },
+                })
+              }
             >
               <View
                 style={[
