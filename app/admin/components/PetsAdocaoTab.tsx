@@ -2,34 +2,45 @@ import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    onSnapshot,
-    updateDoc,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  updateDoc,
 } from "firebase/firestore";
 import {
-    getDownloadURL,
-    getStorage,
-    ref,
-    uploadBytesResumable,
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytesResumable,
 } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Modal,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { db } from "../../../firebaseConfig";
 import { adminStyles } from "../styles/adminStyles";
+
+// ── Constantes dos Filtros ───────────────────────────────────────────────────
+const PORTES = ["Porte", "pequeno", "médio", "grande"];
+const SEXOS = ["Sexo", "macho", "fêmea"];
+
+const REQ_STATUS_FILTRO = ["Todos", "pendente", "aprovado", "rejeitado"];
+const REQ_ORDENACOES = [
+  { label: "Mais Recentes", value: "data_desc" },
+  { label: "Mais Antigos", value: "data_asc" },
+];
 
 // ── Funções Auxiliares ────────────────────────────────────────────────────────
 const uriToBlob = async (uri: string): Promise<Blob> => {
@@ -69,6 +80,20 @@ export default function PetsAdocaoTab() {
   );
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Filtros - Pets
+  const [porteFilter, setPorteFilter] = useState("Porte");
+  const [sexoFilter, setSexoFilter] = useState("Sexo");
+  const [showPorteDropdown, setShowPorteDropdown] = useState(false);
+  const [showSexoDropdown, setShowSexoDropdown] = useState(false);
+
+  // Filtros - Requisições
+  const [reqStatusFilter, setReqStatusFilter] = useState("Todos");
+  const [reqOrdenacao, setReqOrdenacao] = useState("data_desc");
+  const [showReqStatusDropdown, setShowReqStatusDropdown] = useState(false);
+  const [showReqOrdenacaoDropdown, setShowReqOrdenacaoDropdown] =
+    useState(false);
+
+  // Modais - Pets
   const [showPetModal, setShowPetModal] = useState(false);
   const [editingPet, setEditingPet] = useState<any | null>(null);
   const [imagePicked, setImagePicked] = useState(false);
@@ -85,6 +110,7 @@ export default function PetsAdocaoTab() {
     tags: "",
   });
 
+  // Modais - Requisições
   const [showReqModal, setShowReqModal] = useState(false);
   const [selectedReq, setSelectedReq] = useState<any | null>(null);
 
@@ -139,7 +165,6 @@ export default function PetsAdocaoTab() {
     const blob = await uriToBlob(uri);
     const filename = `pets/${Date.now()}-${form.nome.replace(/\s+/g, "").toLowerCase()}.jpg`;
     const storageRef = ref(storage, filename);
-
     const uploadTask = uploadBytesResumable(storageRef, blob);
 
     return new Promise((resolve, reject) => {
@@ -166,18 +191,13 @@ export default function PetsAdocaoTab() {
       );
       return;
     }
-
     setLoadingSave(true);
-
     try {
       let finalImageUrl = form.image;
-
       if (imagePicked && shouldUploadImage(form.image)) {
         finalImageUrl = await uploadImageAsync(form.image);
       }
-
       const idadeFormatada = `${form.idadeNum} ${form.idadeUnidade === "anos" && form.idadeNum === 1 ? "ano" : form.idadeUnidade}`;
-
       const petData = {
         nome: form.nome,
         raca: form.raca,
@@ -233,7 +253,6 @@ export default function PetsAdocaoTab() {
       porte: pet.porte || "médio",
       tags: pet.tags || "",
     });
-
     setImagePicked(false);
     setShowPetModal(true);
   };
@@ -263,18 +282,44 @@ export default function PetsAdocaoTab() {
     }
   };
 
-  const filteredPets = pets.filter((p) =>
-    (p.nome || "").toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  // ── Filtragem de Pets ──
+  const filteredPets = pets.filter((p) => {
+    const matchSearch = (p.nome || "")
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchPorte = porteFilter === "Porte" || p.porte === porteFilter;
+    const matchSexo = sexoFilter === "Sexo" || p.sexo === sexoFilter;
+    return matchSearch && matchPorte && matchSexo;
+  });
 
-  // Utilizar o nomeCompleto (novo) ou as variáveis antigas para a pesquisa
-  const filteredReqs = requisicoes.filter(
-    (r) =>
+  // ── Filtragem e Ordenação de Requisições ──
+  let filteredReqs = requisicoes.filter((r) => {
+    const matchSearch =
       (r.nomeCompleto || r.usuarioNome || r.clienteNome || "")
         .toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
-      (r.petNome || "").toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+      (r.petNome || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchStatus =
+      reqStatusFilter === "Todos" ||
+      (r.status || "pendente") === reqStatusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  filteredReqs.sort((a, b) => {
+    // Usa timestamp de criação ou compara pelo ID (Firestore gera os IDs em ordem cronológica)
+    const dateA = a.criadoEm ? new Date(a.criadoEm).getTime() : a.id;
+    const dateB = b.criadoEm ? new Date(b.criadoEm).getTime() : b.id;
+
+    if (reqOrdenacao === "data_desc") {
+      return a.criadoEm
+        ? (dateB as number) - (dateA as number)
+        : b.id.localeCompare(a.id);
+    } else {
+      return a.criadoEm
+        ? (dateA as number) - (dateB as number)
+        : a.id.localeCompare(b.id);
+    }
+  });
 
   if (loading) {
     return (
@@ -374,9 +419,150 @@ export default function PetsAdocaoTab() {
           />
         </View>
 
-        {/* VIEW: PETS */}
+        {/* ── VIEW: PETS ── */}
         {currentView === "pets" && (
           <>
+            <View style={localStyles.filtersRow}>
+              <View style={localStyles.filterWrap}>
+                <TouchableOpacity
+                  style={[
+                    localStyles.filterBtn,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setShowPorteDropdown(!showPorteDropdown);
+                    setShowSexoDropdown(false);
+                  }}
+                >
+                  <Ionicons
+                    name="filter-outline"
+                    size={16}
+                    color={theme.textSecondary}
+                  />
+                  <Text
+                    style={[localStyles.filterText, { color: theme.text }]}
+                    numberOfLines={1}
+                  >
+                    {porteFilter}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={14}
+                    color={theme.textSecondary}
+                  />
+                </TouchableOpacity>
+                {showPorteDropdown && (
+                  <View
+                    style={[
+                      localStyles.dropdown,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    {PORTES.map((p) => (
+                      <TouchableOpacity
+                        key={p}
+                        style={[
+                          localStyles.dropdownItem,
+                          { borderBottomColor: theme.border },
+                        ]}
+                        onPress={() => {
+                          setPorteFilter(p);
+                          setShowPorteDropdown(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            localStyles.dropdownText,
+                            {
+                              color:
+                                porteFilter === p ? theme.primary : theme.text,
+                            },
+                          ]}
+                        >
+                          {p}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <View style={localStyles.filterWrap}>
+                <TouchableOpacity
+                  style={[
+                    localStyles.filterBtn,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setShowSexoDropdown(!showSexoDropdown);
+                    setShowPorteDropdown(false);
+                  }}
+                >
+                  <Ionicons
+                    name="male-female-outline"
+                    size={16}
+                    color={theme.textSecondary}
+                  />
+                  <Text
+                    style={[localStyles.filterText, { color: theme.text }]}
+                    numberOfLines={1}
+                  >
+                    {sexoFilter}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={14}
+                    color={theme.textSecondary}
+                  />
+                </TouchableOpacity>
+                {showSexoDropdown && (
+                  <View
+                    style={[
+                      localStyles.dropdown,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    {SEXOS.map((s) => (
+                      <TouchableOpacity
+                        key={s}
+                        style={[
+                          localStyles.dropdownItem,
+                          { borderBottomColor: theme.border },
+                        ]}
+                        onPress={() => {
+                          setSexoFilter(s);
+                          setShowSexoDropdown(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            localStyles.dropdownText,
+                            {
+                              color:
+                                sexoFilter === s ? theme.primary : theme.text,
+                            },
+                          ]}
+                        >
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+
             <TouchableOpacity
               style={[
                 adminStyles.addButton,
@@ -405,7 +591,19 @@ export default function PetsAdocaoTab() {
               </Text>
             </TouchableOpacity>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  marginBottom: 12,
+                  color: theme.textSecondary,
+                }}
+              >
+                {filteredPets.length} pet(s) encontrado(s)
+              </Text>
               {filteredPets.length > 0 ? (
                 filteredPets.map((pet) => (
                   <View
@@ -463,7 +661,6 @@ export default function PetsAdocaoTab() {
                       >
                         {pet.raca} • {pet.idade} • {pet.porte}
                       </Text>
-
                       {pet.tags ? (
                         <Text
                           style={{
@@ -513,113 +710,285 @@ export default function PetsAdocaoTab() {
           </>
         )}
 
-        {/* VIEW: REQUISIÇÕES */}
+        {/* ── VIEW: REQUISIÇÕES ── */}
         {currentView === "requisicoes" && (
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {filteredReqs.length > 0 ? (
-              filteredReqs.map((req) => {
-                return (
-                  <TouchableOpacity
-                    key={req.id}
+          <>
+            <View style={localStyles.filtersRow}>
+              <View style={localStyles.filterWrap}>
+                <TouchableOpacity
+                  style={[
+                    localStyles.filterBtn,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setShowReqStatusDropdown(!showReqStatusDropdown);
+                    setShowReqOrdenacaoDropdown(false);
+                  }}
+                >
+                  <Ionicons
+                    name="filter-outline"
+                    size={16}
+                    color={theme.textSecondary}
+                  />
+                  <Text
+                    style={[localStyles.filterText, { color: theme.text }]}
+                    numberOfLines={1}
+                  >
+                    {reqStatusFilter === "Todos"
+                      ? "Status"
+                      : reqStatusFilter.toUpperCase()}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={14}
+                    color={theme.textSecondary}
+                  />
+                </TouchableOpacity>
+                {showReqStatusDropdown && (
+                  <View
                     style={[
-                      adminStyles.itemCard,
+                      localStyles.dropdown,
                       {
                         backgroundColor: theme.surface,
                         borderColor: theme.border,
                       },
                     ]}
-                    onPress={() => {
-                      setSelectedReq(req);
-                      setShowReqModal(true);
-                    }}
                   >
-                    <View style={adminStyles.itemInfo}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 4,
+                    {REQ_STATUS_FILTRO.map((st) => (
+                      <TouchableOpacity
+                        key={st}
+                        style={[
+                          localStyles.dropdownItem,
+                          { borderBottomColor: theme.border },
+                        ]}
+                        onPress={() => {
+                          setReqStatusFilter(st);
+                          setShowReqStatusDropdown(false);
                         }}
                       >
                         <Text
                           style={[
-                            adminStyles.itemName,
-                            { color: theme.text, marginBottom: 0 },
+                            localStyles.dropdownText,
+                            {
+                              color:
+                                reqStatusFilter === st
+                                  ? theme.primary
+                                  : theme.text,
+                            },
                           ]}
                         >
-                          {req.nomeCompleto ||
-                            req.usuarioNome ||
-                            req.clienteNome ||
-                            "Adotante"}
+                          {st === "Todos"
+                            ? "Todos os Status"
+                            : st.toUpperCase()}
                         </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View style={localStyles.filterWrap}>
+                <TouchableOpacity
+                  style={[
+                    localStyles.filterBtn,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    setShowReqOrdenacaoDropdown(!showReqOrdenacaoDropdown);
+                    setShowReqStatusDropdown(false);
+                  }}
+                >
+                  <Ionicons
+                    name="swap-vertical-outline"
+                    size={16}
+                    color={theme.textSecondary}
+                  />
+                  <Text
+                    style={[localStyles.filterText, { color: theme.text }]}
+                    numberOfLines={1}
+                  >
+                    {
+                      REQ_ORDENACOES.find((o) => o.value === reqOrdenacao)
+                        ?.label
+                    }
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={14}
+                    color={theme.textSecondary}
+                  />
+                </TouchableOpacity>
+                {showReqOrdenacaoDropdown && (
+                  <View
+                    style={[
+                      localStyles.dropdown,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    {REQ_ORDENACOES.map((ord) => (
+                      <TouchableOpacity
+                        key={ord.value}
+                        style={[
+                          localStyles.dropdownItem,
+                          { borderBottomColor: theme.border },
+                        ]}
+                        onPress={() => {
+                          setReqOrdenacao(ord.value);
+                          setShowReqOrdenacaoDropdown(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            localStyles.dropdownText,
+                            {
+                              color:
+                                reqOrdenacao === ord.value
+                                  ? theme.primary
+                                  : theme.text,
+                            },
+                          ]}
+                        >
+                          {ord.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  marginBottom: 12,
+                  color: theme.textSecondary,
+                }}
+              >
+                {filteredReqs.length} requisição(ões) encontrada(s)
+              </Text>
+              {filteredReqs.length > 0 ? (
+                filteredReqs.map((req) => {
+                  return (
+                    <TouchableOpacity
+                      key={req.id}
+                      style={[
+                        adminStyles.itemCard,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        setSelectedReq(req);
+                        setShowReqModal(true);
+                      }}
+                    >
+                      <View style={adminStyles.itemInfo}>
                         <View
                           style={{
-                            backgroundColor:
-                              req.status === "aprovado"
-                                ? "#10b98120"
-                                : req.status === "rejeitado"
-                                  ? "#ef444420"
-                                  : "#f59e0b20",
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            borderRadius: 4,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 8,
+                            marginBottom: 4,
                           }}
                         >
                           <Text
+                            style={[
+                              adminStyles.itemName,
+                              { color: theme.text, marginBottom: 0 },
+                            ]}
+                          >
+                            {req.nomeCompleto ||
+                              req.usuarioNome ||
+                              req.clienteNome ||
+                              "Adotante"}
+                          </Text>
+                          <View
                             style={{
-                              fontSize: 10,
-                              fontWeight: "bold",
-                              color:
+                              backgroundColor:
                                 req.status === "aprovado"
-                                  ? "#10b981"
+                                  ? "#10b98120"
                                   : req.status === "rejeitado"
-                                    ? "#ef4444"
-                                    : "#f59e0b",
+                                    ? "#ef444420"
+                                    : "#f59e0b20",
+                              paddingHorizontal: 8,
+                              paddingVertical: 2,
+                              borderRadius: 4,
                             }}
                           >
-                            {req.status?.toUpperCase() || "PENDENTE"}
-                          </Text>
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                fontWeight: "bold",
+                                color:
+                                  req.status === "aprovado"
+                                    ? "#10b981"
+                                    : req.status === "rejeitado"
+                                      ? "#ef4444"
+                                      : "#f59e0b",
+                              }}
+                            >
+                              {req.status?.toUpperCase() || "PENDENTE"}
+                            </Text>
+                          </View>
                         </View>
+                        <Text
+                          style={[
+                            adminStyles.itemDetail,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          Pet desejado:{" "}
+                          <Text style={{ fontWeight: "700" }}>
+                            {req.petNome}
+                          </Text>
+                        </Text>
+                        <Text
+                          style={[
+                            adminStyles.itemDetail,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          Feito em: {req.data || "Recente"}
+                        </Text>
                       </View>
-                      <Text
-                        style={[
-                          adminStyles.itemDetail,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        Queria adotar:{" "}
-                        <Text style={{ fontWeight: "700" }}>{req.petNome}</Text>
-                      </Text>
-                      <Text
-                        style={[
-                          adminStyles.itemDetail,
-                          { color: theme.textSecondary },
-                        ]}
-                      >
-                        Feito em: {req.data || "Recente"}
-                      </Text>
-                    </View>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={20}
-                      color={theme.textSecondary}
-                    />
-                  </TouchableOpacity>
-                );
-              })
-            ) : (
-              <Text
-                style={[adminStyles.emptyText, { color: theme.textSecondary }]}
-              >
-                Nenhuma requisição encontrada
-              </Text>
-            )}
-          </ScrollView>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color={theme.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <Text
+                  style={[
+                    adminStyles.emptyText,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  Nenhuma requisição encontrada
+                </Text>
+              )}
+            </ScrollView>
+          </>
         )}
       </View>
 
-      {/* MODAL: REGISTRO DE PET */}
+      {/* ── MODAL: REGISTRO DE PET ── */}
       <Modal visible={showPetModal} animationType="slide" transparent>
         <SafeAreaView
           style={[adminStyles.modal, { backgroundColor: theme.background }]}
@@ -918,36 +1287,13 @@ export default function PetsAdocaoTab() {
                 placeholderTextColor={theme.textSecondary}
               />
 
-              <View
-                style={[
-                  adminStyles.tipsBox,
-                  { borderColor: theme.border, backgroundColor: theme.surface },
-                ]}
-              >
-                <View style={adminStyles.tipsTitleRow}>
-                  <Ionicons
-                    name="bulb-outline"
-                    size={18}
-                    color={theme.primary}
-                  />
-                  <Text style={[adminStyles.tipsTitle, { color: theme.text }]}>
-                    Dica de Preenchimento
-                  </Text>
-                </View>
-                <Text
-                  style={[adminStyles.tipText, { color: theme.textSecondary }]}
-                >
-                  Mantenha os dados atualizados para facilitar o contato com os
-                  possíveis adotantes.
-                </Text>
-              </View>
-
               <TouchableOpacity
                 style={[
                   adminStyles.submitButton,
                   {
                     backgroundColor: theme.primary,
                     opacity: loadingSave ? 0.6 : 1,
+                    marginTop: 20,
                   },
                 ]}
                 onPress={handleSavePet}
@@ -975,7 +1321,7 @@ export default function PetsAdocaoTab() {
         </SafeAreaView>
       </Modal>
 
-      {/* MODAL: DETALHES DA REQUISIÇÃO (TUDO ATUALIZADO AQUI) */}
+      {/* ── MODAL: DETALHES DA REQUISIÇÃO (Design Compacto e Centralizado) ── */}
       <Modal visible={showReqModal} animationType="slide" transparent>
         <SafeAreaView
           style={[adminStyles.modal, { backgroundColor: theme.background }]}
@@ -996,31 +1342,41 @@ export default function PetsAdocaoTab() {
 
           <ScrollView
             style={adminStyles.modalContent}
+            contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }}
             showsVerticalScrollIndicator={false}
           >
             {selectedReq && (
-              <View style={[adminStyles.modalForm, { paddingBottom: 40 }]}>
+              <View
+                style={{ width: "100%", maxWidth: 480, alignSelf: "center" }}
+              >
                 {/* INFO DO PET */}
-                <Text
-                  style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 0 },
-                  ]}
-                >
-                  Sobre o Pet
-                </Text>
                 <View
                   style={[
-                    adminStyles.itemCard,
+                    styles.card,
                     {
                       backgroundColor: theme.surface,
                       borderColor: theme.border,
-                      padding: 12,
-                      marginBottom: 20,
                     },
                   ]}
                 >
-                  <Text style={[adminStyles.itemName, { color: theme.text }]}>
+                  <Text
+                    style={{
+                      color: theme.primary,
+                      fontWeight: "800",
+                      fontSize: 13,
+                      marginBottom: 8,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    PET DESEJADO
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: "700",
+                      color: theme.text,
+                    }}
+                  >
                     {selectedReq.petNome}
                   </Text>
                   <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
@@ -1029,248 +1385,304 @@ export default function PetsAdocaoTab() {
                 </View>
 
                 {/* ETAPA 1 */}
-                <Text
-                  style={[adminStyles.sectionTitle, { color: theme.primary }]}
+                <View
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
                 >
-                  1. Dados Pessoais
-                </Text>
-                <DetailItem
-                  theme={theme}
-                  label="Nome Completo"
-                  value={
-                    selectedReq.nomeCompleto ||
-                    selectedReq.usuarioNome ||
-                    selectedReq.clienteNome
-                  }
-                />
-
-                <View style={{ flexDirection: "row", gap: 16 }}>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="CPF"
-                      value={selectedReq.cpf}
+                  <View style={styles.cardHeader}>
+                    <Ionicons
+                      name="person-circle-outline"
+                      size={18}
+                      color={theme.primary}
                     />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>
+                      1. Dados Pessoais
+                    </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="Nascimento"
-                      value={selectedReq.dataNascimento}
-                    />
+                  <DetailItem
+                    theme={theme}
+                    label="Nome Completo"
+                    value={
+                      selectedReq.nomeCompleto ||
+                      selectedReq.usuarioNome ||
+                      selectedReq.clienteNome
+                    }
+                  />
+                  <View style={{ flexDirection: "row", gap: 16 }}>
+                    <View style={{ flex: 1 }}>
+                      <DetailItem
+                        theme={theme}
+                        label="CPF"
+                        value={selectedReq.cpf}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <DetailItem
+                        theme={theme}
+                        label="Nascimento"
+                        value={selectedReq.dataNascimento}
+                      />
+                    </View>
                   </View>
-                </View>
-
-                <View style={{ flexDirection: "row", gap: 16 }}>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="Celular / Telefone"
-                      value={selectedReq.celular || selectedReq.telefone}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="E-mail"
-                      value={selectedReq.email}
-                    />
+                  <View style={{ flexDirection: "row", gap: 16 }}>
+                    <View style={{ flex: 1 }}>
+                      <DetailItem
+                        theme={theme}
+                        label="Celular"
+                        value={selectedReq.celular || selectedReq.telefone}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <DetailItem
+                        theme={theme}
+                        label="E-mail"
+                        value={selectedReq.email}
+                      />
+                    </View>
                   </View>
                 </View>
 
                 {/* ETAPA 2 */}
-                <Text
+                <View
                   style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 10 },
+                    styles.card,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
                   ]}
                 >
-                  2. Informações de Moradia
-                </Text>
-                <DetailItem
-                  theme={theme}
-                  label="Endereço Completo"
-                  value={
-                    selectedReq.endereco
-                      ? `${selectedReq.endereco}${selectedReq.bairro ? `, ${selectedReq.bairro}` : ""}${selectedReq.cidade ? ` - ${selectedReq.cidade}` : ""}`
-                      : selectedReq.cidade
-                  }
-                />
-
-                <View style={{ flexDirection: "row", gap: 16 }}>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="CEP"
-                      value={selectedReq.cep}
+                  <View style={styles.cardHeader}>
+                    <Ionicons
+                      name="home-outline"
+                      size={18}
+                      color={theme.primary}
                     />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>
+                      2. Informações de Moradia
+                    </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="Tipo de Imóvel"
-                      value={selectedReq.tipoResidencia}
-                    />
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: "row", gap: 16 }}>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="Situação"
-                      value={selectedReq.situacaoImovel}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    {selectedReq.situacaoImovel === "alugado" && (
+                  <DetailItem
+                    theme={theme}
+                    label="Endereço Completo"
+                    value={
+                      selectedReq.endereco
+                        ? `${selectedReq.endereco}${selectedReq.bairro ? `, ${selectedReq.bairro}` : ""}${selectedReq.cidade ? ` - ${selectedReq.cidade}` : ""}`
+                        : selectedReq.cidade
+                    }
+                  />
+                  <View style={{ flexDirection: "row", gap: 16 }}>
+                    <View style={{ flex: 1 }}>
                       <DetailItem
                         theme={theme}
-                        label="Proprietário permite?"
-                        value={formatBoolean(
-                          selectedReq.proprietarioPermiteAnimais,
-                        )}
+                        label="CEP"
+                        value={selectedReq.cep}
                       />
-                    )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <DetailItem
+                        theme={theme}
+                        label="Imóvel"
+                        value={selectedReq.tipoResidencia}
+                      />
+                    </View>
                   </View>
+                  <View style={{ flexDirection: "row", gap: 16 }}>
+                    <View style={{ flex: 1 }}>
+                      <DetailItem
+                        theme={theme}
+                        label="Situação"
+                        value={selectedReq.situacaoImovel}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      {selectedReq.situacaoImovel === "alugado" && (
+                        <DetailItem
+                          theme={theme}
+                          label="Permite Animais?"
+                          value={formatBoolean(
+                            selectedReq.proprietarioPermiteAnimais,
+                          )}
+                        />
+                      )}
+                    </View>
+                  </View>
+                  <DetailItem
+                    theme={theme}
+                    label="Quintal fechado?"
+                    value={formatBoolean(selectedReq.quintalFechado)}
+                    inline
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Rotas de fuga?"
+                    value={formatBoolean(selectedReq.rotasFuga)}
+                    inline
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Telas de proteção?"
+                    value={formatBoolean(selectedReq.telasProtecao)}
+                    inline
+                  />
                 </View>
-
-                <DetailItem
-                  theme={theme}
-                  label="Quintal fechado?"
-                  value={formatBoolean(selectedReq.quintalFechado)}
-                />
-                <DetailItem
-                  theme={theme}
-                  label="Existem rotas de fuga?"
-                  value={formatBoolean(selectedReq.rotasFuga)}
-                />
-                <DetailItem
-                  theme={theme}
-                  label="Possui telas de proteção?"
-                  value={formatBoolean(selectedReq.telasProtecao)}
-                />
 
                 {/* ETAPA 3 */}
-                <Text
+                <View
                   style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 10 },
+                    styles.card,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
                   ]}
                 >
-                  3. Dinâmica Familiar
-                </Text>
-                <DetailItem
-                  theme={theme}
-                  label="Quantidade de pessoas na casa"
-                  value={selectedReq.quantidadePessoas}
-                />
-
-                <View style={{ flexDirection: "row", gap: 16 }}>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="Há crianças?"
-                      value={formatBoolean(selectedReq.temCriancas)}
+                  <View style={styles.cardHeader}>
+                    <Ionicons
+                      name="people-outline"
+                      size={18}
+                      color={theme.primary}
                     />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>
+                      3. Dinâmica Familiar
+                    </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <DetailItem
-                      theme={theme}
-                      label="Há idosos?"
-                      value={formatBoolean(selectedReq.temIdosos)}
-                    />
-                  </View>
+                  <DetailItem
+                    theme={theme}
+                    label="Pessoas na casa"
+                    value={selectedReq.quantidadePessoas}
+                    inline
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Há crianças?"
+                    value={formatBoolean(selectedReq.temCriancas)}
+                    inline
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Há idosos?"
+                    value={formatBoolean(selectedReq.temIdosos)}
+                    inline
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Todos concordam?"
+                    value={formatBoolean(selectedReq.todosAcordam)}
+                    inline
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Alergia a pelos?"
+                    value={
+                      selectedReq.temAlergias
+                        ? `Sim - ${selectedReq.temAlergiasQuem}`
+                        : formatBoolean(selectedReq.temAlergias)
+                    }
+                    inline
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Tempo diário sozinho"
+                    value={selectedReq.tempoSozinho}
+                    inline
+                  />
                 </View>
 
-                <DetailItem
-                  theme={theme}
-                  label="Todos concordam com a adoção?"
-                  value={formatBoolean(selectedReq.todosAcordam)}
-                />
-                <DetailItem
-                  theme={theme}
-                  label="Alguém possui alergia a pelos?"
-                  value={
-                    selectedReq.temAlergias
-                      ? `Sim - Quem: ${selectedReq.temAlergiasQuem}`
-                      : formatBoolean(selectedReq.temAlergias)
-                  }
-                />
-                <DetailItem
-                  theme={theme}
-                  label="Tempo diário que o pet ficará sozinho"
-                  value={selectedReq.tempoSozinho}
-                />
-
                 {/* ETAPA 4 */}
-                <Text
+                <View
                   style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 10 },
+                    styles.card,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
                   ]}
                 >
-                  4. Histórico com Animais
-                </Text>
-                <DetailItem
-                  theme={theme}
-                  label="Possui outros animais?"
-                  value={
-                    selectedReq.possuiOutrosAnimais
-                      ? `Sim - ${selectedReq.outrosAnimaisDescricao}`
-                      : formatBoolean(selectedReq.possuiOutrosAnimais)
-                  }
-                />
-                <DetailItem
-                  theme={theme}
-                  label="Já teve animais antes?"
-                  value={
-                    selectedReq.jaTeveAnimais
-                      ? `Sim - ${selectedReq.jaTeveAnimaisDescricao}`
-                      : formatBoolean(selectedReq.jaTeveAnimais)
-                  }
-                />
+                  <View style={styles.cardHeader}>
+                    <Ionicons
+                      name="paw-outline"
+                      size={18}
+                      color={theme.primary}
+                    />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>
+                      4. Histórico com Animais
+                    </Text>
+                  </View>
+                  <DetailItem
+                    theme={theme}
+                    label="Possui outros animais?"
+                    value={
+                      selectedReq.possuiOutrosAnimais
+                        ? `Sim - ${selectedReq.outrosAnimaisDescricao}`
+                        : formatBoolean(selectedReq.possuiOutrosAnimais)
+                    }
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Já teve animais antes?"
+                    value={
+                      selectedReq.jaTeveAnimais
+                        ? `Sim - ${selectedReq.jaTeveAnimaisDescricao}`
+                        : formatBoolean(selectedReq.jaTeveAnimais)
+                    }
+                  />
+                </View>
 
                 {/* ETAPA 5 */}
-                <Text
+                <View
                   style={[
-                    adminStyles.sectionTitle,
-                    { color: theme.primary, marginTop: 10 },
+                    styles.card,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
                   ]}
                 >
-                  5. Termo de Responsabilidade
-                </Text>
-                <DetailItem
-                  theme={theme}
-                  label="Ciente dos custos financeiros e saúde?"
-                  value={formatBoolean(selectedReq.cienteFinanceiro)}
-                />
-                <DetailItem
-                  theme={theme}
-                  label="Planos para viagens e mudanças"
-                  value={selectedReq.planosViagem}
-                />
-                <DetailItem
-                  theme={theme}
-                  label="Concorda com acompanhamento / fotos?"
-                  value={formatBoolean(selectedReq.concordaAcompanhamento)}
-                />
-
-                <DetailItem
-                  theme={theme}
-                  label="Observações / Motivo da adoção"
-                  value={
-                    selectedReq.observacoes ||
-                    selectedReq.motivo ||
-                    selectedReq.mensagem
-                  }
-                />
+                  <View style={styles.cardHeader}>
+                    <Ionicons
+                      name="document-text-outline"
+                      size={18}
+                      color={theme.primary}
+                    />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>
+                      5. Termo de Responsabilidade
+                    </Text>
+                  </View>
+                  <DetailItem
+                    theme={theme}
+                    label="Ciente dos custos (financeiro e saúde)?"
+                    value={formatBoolean(selectedReq.cienteFinanceiro)}
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Planos para viagens e mudanças"
+                    value={selectedReq.planosViagem}
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Concorda com acompanhamento (fotos)?"
+                    value={formatBoolean(selectedReq.concordaAcompanhamento)}
+                  />
+                  <DetailItem
+                    theme={theme}
+                    label="Motivo da adoção / Observações"
+                    value={
+                      selectedReq.observacoes ||
+                      selectedReq.motivo ||
+                      selectedReq.mensagem
+                    }
+                  />
+                </View>
 
                 {/* BOTÕES DE APROVAÇÃO */}
                 {selectedReq.status === "pendente" ? (
-                  <View
-                    style={{ flexDirection: "row", gap: 12, marginTop: 20 }}
-                  >
+                  <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
                     <TouchableOpacity
                       style={[
                         adminStyles.submitButton,
@@ -1282,7 +1694,7 @@ export default function PetsAdocaoTab() {
                         style={{
                           color: "#FFF",
                           fontWeight: "700",
-                          fontSize: 16,
+                          fontSize: 15,
                         }}
                       >
                         Aprovar
@@ -1299,7 +1711,7 @@ export default function PetsAdocaoTab() {
                         style={{
                           color: "#FFF",
                           fontWeight: "700",
-                          fontSize: 16,
+                          fontSize: 15,
                         }}
                       >
                         Rejeitar
@@ -1309,20 +1721,25 @@ export default function PetsAdocaoTab() {
                 ) : (
                   <View
                     style={{
-                      marginTop: 20,
+                      marginTop: 4,
                       alignItems: "center",
-                      padding: 16,
+                      padding: 14,
+                      borderRadius: 10,
                       backgroundColor:
                         selectedReq.status === "aprovado"
-                          ? "#10b98120"
-                          : "#ef444420",
-                      borderRadius: 12,
+                          ? "#10b98115"
+                          : "#ef444415",
+                      borderWidth: 1,
+                      borderColor:
+                        selectedReq.status === "aprovado"
+                          ? "#10b981"
+                          : "#ef4444",
                     }}
                   >
                     <Text
                       style={{
-                        fontWeight: "bold",
-                        fontSize: 16,
+                        fontWeight: "800",
+                        fontSize: 14,
                         color:
                           selectedReq.status === "aprovado"
                             ? "#10b981"
@@ -1347,27 +1764,120 @@ function DetailItem({
   label,
   value,
   theme,
+  inline = false,
 }: {
   label: string;
   value: any;
   theme: any;
+  inline?: boolean;
 }) {
+  if (inline) {
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: "#00000008",
+          paddingBottom: 6,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 13,
+            fontWeight: "600",
+            color: theme.text,
+            opacity: 0.8,
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontSize: 13,
+            color: theme.textSecondary,
+            fontWeight: "500",
+          }}
+        >
+          {value || "N/I"}
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ marginBottom: 16 }}>
+    <View style={{ marginBottom: 12 }}>
       <Text
         style={{
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: "700",
           color: theme.text,
           marginBottom: 4,
           opacity: 0.8,
+          textTransform: "uppercase",
         }}
       >
         {label}
       </Text>
-      <Text style={{ fontSize: 15, color: theme.textSecondary }}>
+      <Text
+        style={{ fontSize: 14, color: theme.textSecondary, lineHeight: 20 }}
+      >
         {value || "Não informado"}
       </Text>
     </View>
   );
 }
+
+// ── ESTILOS ───────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12 },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#00000010",
+    paddingBottom: 8,
+  },
+  cardTitle: { fontSize: 14, fontWeight: "700" },
+});
+
+const localStyles = StyleSheet.create({
+  filtersRow: { flexDirection: "row", gap: 12, marginBottom: 16, zIndex: 10 },
+  filterWrap: { flex: 1, zIndex: 10 },
+  filterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+    gap: 6,
+  },
+  filterText: { flex: 1, fontSize: 14, fontWeight: "500" },
+  dropdown: {
+    position: "absolute",
+    top: 52,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+    zIndex: 99,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  dropdownText: { fontSize: 14, fontWeight: "500" },
+});

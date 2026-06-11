@@ -40,6 +40,20 @@ const statusLabels: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+const STATUS_FILTRO = [
+  "Todos",
+  "pendente",
+  "confirmado",
+  "enviado",
+  "entregue",
+  "cancelado",
+];
+const ORDENACOES = [
+  { label: "Mais Recentes", value: "data_desc" },
+  { label: "Mais Antigos", value: "data_asc" },
+  { label: "A-Z (Cliente)", value: "nome_asc" },
+];
+
 export default function PedidosTab() {
   const { theme } = useAppTheme();
 
@@ -49,6 +63,11 @@ export default function PedidosTab() {
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+
+  const [statusFilter, setStatusFilter] = useState("Todos");
+  const [ordenacao, setOrdenacao] = useState("data_desc");
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showOrdenacaoDropdown, setShowOrdenacaoDropdown] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "pedidos"), (snapshot) => {
@@ -71,13 +90,22 @@ export default function PedidosTab() {
     await deleteDoc(doc(db, "pedidos", id));
   };
 
-  const filteredPedidos = pedidos.filter(
-    (p) =>
+  let filteredPedidos = pedidos.filter((p) => {
+    const matchSearch =
       (p?.clienteNome || "")
         .toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
-      (p?.id || "").toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+      (p?.id || "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchStatus =
+      statusFilter === "Todos" || (p?.status || "pendente") === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  filteredPedidos.sort((a, b) => {
+    if (ordenacao === "nome_asc")
+      return (a.clienteNome || "").localeCompare(b.clienteNome || "");
+    return ordenacao === "data_desc" ? -1 : 1;
+  });
 
   const handleSelectPedido = (pedido: Pedido) => {
     setSelectedPedido(pedido);
@@ -115,20 +143,6 @@ export default function PedidosTab() {
     ]);
   };
 
-  if (loading) {
-    return (
-      <View
-        style={[
-          adminStyles.centerContainer,
-          { backgroundColor: theme.background },
-        ]}
-      >
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
-
-  // --- Função de Formatação do Pagamento ---
   const formatarMetodoPagamento = (pedido: Pedido) => {
     let formPagamento = pedido.metodoPagamento || "Não informado";
     if (formPagamento === "card" || formPagamento === "credito")
@@ -145,6 +159,19 @@ export default function PedidosTab() {
 
     return formPagamento;
   };
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          adminStyles.centerContainer,
+          { backgroundColor: theme.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
 
   return (
     <>
@@ -170,7 +197,152 @@ export default function PedidosTab() {
           />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={localStyles.filtersRow}>
+          <View style={localStyles.filterWrap}>
+            <TouchableOpacity
+              style={[
+                localStyles.filterBtn,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+              onPress={() => {
+                setShowStatusDropdown(!showStatusDropdown);
+                setShowOrdenacaoDropdown(false);
+              }}
+            >
+              <Ionicons
+                name="filter-outline"
+                size={16}
+                color={theme.textSecondary}
+              />
+              <Text
+                style={[localStyles.filterText, { color: theme.text }]}
+                numberOfLines={1}
+              >
+                {statusFilter === "Todos"
+                  ? "Status"
+                  : statusLabels[statusFilter]}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={14}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+            {showStatusDropdown && (
+              <View
+                style={[
+                  localStyles.dropdown,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                {STATUS_FILTRO.map((st) => (
+                  <TouchableOpacity
+                    key={st}
+                    style={[
+                      localStyles.dropdownItem,
+                      { borderBottomColor: theme.border },
+                    ]}
+                    onPress={() => {
+                      setStatusFilter(st);
+                      setShowStatusDropdown(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        localStyles.dropdownText,
+                        {
+                          color:
+                            statusFilter === st ? theme.primary : theme.text,
+                        },
+                      ]}
+                    >
+                      {st === "Todos" ? "Todos os Status" : statusLabels[st]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+          <View style={localStyles.filterWrap}>
+            <TouchableOpacity
+              style={[
+                localStyles.filterBtn,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+              onPress={() => {
+                setShowOrdenacaoDropdown(!showOrdenacaoDropdown);
+                setShowStatusDropdown(false);
+              }}
+            >
+              <Ionicons
+                name="swap-vertical-outline"
+                size={16}
+                color={theme.textSecondary}
+              />
+              <Text
+                style={[localStyles.filterText, { color: theme.text }]}
+                numberOfLines={1}
+              >
+                {ORDENACOES.find((o) => o.value === ordenacao)?.label}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={14}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+            {showOrdenacaoDropdown && (
+              <View
+                style={[
+                  localStyles.dropdown,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                {ORDENACOES.map((ord) => (
+                  <TouchableOpacity
+                    key={ord.value}
+                    style={[
+                      localStyles.dropdownItem,
+                      { borderBottomColor: theme.border },
+                    ]}
+                    onPress={() => {
+                      setOrdenacao(ord.value);
+                      setShowOrdenacaoDropdown(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        localStyles.dropdownText,
+                        {
+                          color:
+                            ordenacao === ord.value
+                              ? theme.primary
+                              : theme.text,
+                        },
+                      ]}
+                    >
+                      {ord.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              marginBottom: 12,
+              color: theme.textSecondary,
+            }}
+          >
+            {filteredPedidos.length} pedido(s) encontrado(s)
+          </Text>
           {filteredPedidos.length > 0 ? (
             filteredPedidos.map((pedido) => {
               const status = pedido?.status || "pendente";
@@ -285,13 +457,16 @@ export default function PedidosTab() {
             </TouchableOpacity>
           </View>
 
+          {/* ── Padding horizontal e alinhamento adicionados aqui ── */}
           <ScrollView
             style={adminStyles.modalContent}
-            contentContainerStyle={{ paddingBottom: 40 }}
+            contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }}
           >
             {selectedPedido && (
-              <View>
-                {/* Banner de Status Mais Compacto */}
+              // ── Limite de largura adicionado aqui (maxWidth: 480) ──
+              <View
+                style={{ width: "100%", maxWidth: 480, alignSelf: "center" }}
+              >
                 <View
                   style={[
                     styles.statusBanner,
@@ -316,7 +491,7 @@ export default function PedidosTab() {
                     </Text>
                     <Text
                       style={{
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: "800",
                         color:
                           statusColors[selectedPedido.status || "pendente"],
@@ -362,7 +537,7 @@ export default function PedidosTab() {
                   <View style={styles.cardHeader}>
                     <Ionicons
                       name="person-circle-outline"
-                      size={22}
+                      size={18}
                       color={theme.primary}
                     />
                     <Text style={[styles.cardTitle, { color: theme.text }]}>
@@ -414,7 +589,7 @@ export default function PedidosTab() {
                   <View style={styles.cardHeader}>
                     <Ionicons
                       name="location-outline"
-                      size={22}
+                      size={18}
                       color={theme.primary}
                     />
                     <Text style={[styles.cardTitle, { color: theme.text }]}>
@@ -424,8 +599,8 @@ export default function PedidosTab() {
                   <Text
                     style={{
                       color: theme.textSecondary,
-                      lineHeight: 22,
-                      fontSize: 14,
+                      lineHeight: 20,
+                      fontSize: 13,
                     }}
                   >
                     {selectedPedido.endereco || "Endereço não fornecido"}
@@ -445,7 +620,7 @@ export default function PedidosTab() {
                   <View style={styles.cardHeader}>
                     <Ionicons
                       name="receipt-outline"
-                      size={22}
+                      size={18}
                       color={theme.primary}
                     />
                     <Text style={[styles.cardTitle, { color: theme.text }]}>
@@ -487,7 +662,7 @@ export default function PedidosTab() {
                   <View style={styles.cardHeader}>
                     <Ionicons
                       name="cart-outline"
-                      size={22}
+                      size={18}
                       color={theme.primary}
                     />
                     <Text style={[styles.cardTitle, { color: theme.text }]}>
@@ -512,7 +687,7 @@ export default function PedidosTab() {
                           style={{
                             color: "#FFF",
                             fontWeight: "bold",
-                            fontSize: 12,
+                            fontSize: 11,
                           }}
                         >
                           {item.quantidade}x
@@ -523,7 +698,7 @@ export default function PedidosTab() {
                           style={{
                             color: theme.text,
                             fontWeight: "600",
-                            fontSize: 14,
+                            fontSize: 13,
                           }}
                         >
                           {item.produtoNome}
@@ -531,14 +706,20 @@ export default function PedidosTab() {
                         <Text
                           style={{
                             color: theme.textSecondary,
-                            fontSize: 12,
+                            fontSize: 11,
                             marginTop: 2,
                           }}
                         >
                           Unidade: R$ {item.preco}
                         </Text>
                       </View>
-                      <Text style={{ color: theme.primary, fontWeight: "700" }}>
+                      <Text
+                        style={{
+                          color: theme.primary,
+                          fontWeight: "700",
+                          fontSize: 13,
+                        }}
+                      >
                         R${" "}
                         {(
                           parseFloat(item.preco.replace(",", ".")) *
@@ -551,7 +732,7 @@ export default function PedidosTab() {
                   ))}
                 </View>
 
-                {/* Resumo Total Mais Compacto */}
+                {/* Resumo Total */}
                 <View
                   style={[
                     styles.totalCard,
@@ -591,7 +772,7 @@ export default function PedidosTab() {
                     onPress={() => setShowStatusModal(true)}
                   >
                     <Text
-                      style={[adminStyles.submitButtonText, { fontSize: 15 }]}
+                      style={[adminStyles.submitButtonText, { fontSize: 14 }]}
                     >
                       Alterar Status
                     </Text>
@@ -605,7 +786,7 @@ export default function PedidosTab() {
                     onPress={() => handleDeletePedido(selectedPedido.id)}
                   >
                     <Text
-                      style={[adminStyles.submitButtonText, { fontSize: 15 }]}
+                      style={[adminStyles.submitButtonText, { fontSize: 14 }]}
                     >
                       Excluir Pedido
                     </Text>
@@ -680,7 +861,7 @@ export default function PedidosTab() {
                         ? "#FFF"
                         : statusColors[status],
                     fontWeight: "700",
-                    fontSize: 16,
+                    fontSize: 15,
                   }}
                 >
                   {statusLabels[status]}
@@ -717,71 +898,82 @@ export default function PedidosTab() {
 }
 
 const styles = StyleSheet.create({
-  // Status Banner mais compacto (espaçamentos menores)
   statusBanner: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 12, // Antes era 16
-    borderRadius: 10, // Antes era 12
+    padding: 10,
+    borderRadius: 10,
     borderWidth: 1,
-    marginBottom: 16, // Antes era 20
+    marginBottom: 12,
   },
-  card: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 16,
-  },
+  card: { borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 12 },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
-    gap: 8,
+    marginBottom: 10,
+    gap: 6,
     borderBottomWidth: 1,
     borderBottomColor: "#00000010",
-    paddingBottom: 8,
+    paddingBottom: 6,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  infoRow: {
-    flexDirection: "row",
-    marginBottom: 10,
-    alignItems: "flex-start",
-  },
-  infoLabel: {
-    fontWeight: "600",
-    width: 90,
-    fontSize: 14,
-  },
-  infoValue: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  itemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-  },
+  cardTitle: { fontSize: 14, fontWeight: "700" },
+  infoRow: { flexDirection: "row", marginBottom: 6, alignItems: "flex-start" },
+  infoLabel: { fontWeight: "600", width: 80, fontSize: 13 },
+  infoValue: { flex: 1, fontSize: 13, lineHeight: 18 },
+  itemRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
   itemQtyBadge: {
     backgroundColor: "#3b82f6",
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
   },
-  // Card de Valor Total mais compacto (espaçamentos e fontes menores)
   totalCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 14, // Antes era 20
-    borderRadius: 10, // Antes era 12
+    padding: 14,
+    borderRadius: 10,
     borderWidth: 1,
-    marginBottom: 16, // Antes era 20
+    marginBottom: 12,
   },
+});
+
+const localStyles = StyleSheet.create({
+  filtersRow: { flexDirection: "row", gap: 12, marginBottom: 16, zIndex: 10 },
+  filterWrap: { flex: 1, zIndex: 10 },
+  filterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+    gap: 6,
+  },
+  filterText: { flex: 1, fontSize: 14, fontWeight: "500" },
+  dropdown: {
+    position: "absolute",
+    top: 52,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+    zIndex: 99,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  dropdownText: { fontSize: 14, fontWeight: "500" },
 });
