@@ -2,7 +2,8 @@ import { useAppTheme } from "@/hooks/use-app-theme";
 import { useCart } from "@/hooks/use-cart";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig";
 
 type PaymentMethod = "card" | "pix" | "boleto";
 
@@ -24,48 +25,15 @@ interface DeliveryInfo {
   fee: number;
 }
 
-interface CepData {
-  latitude: number;
-  longitude: number;
-}
-
-// Coordenadas da loja (Golden Paw) - exemplo: São Paulo
-const STORE_LAT = -23.5505;
-const STORE_LNG = -46.6333;
-
-// Função para calcular distância em km usando Haversine
-const calculateDistance = (
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-): number => {
-  const R = 6371; // Raio da Terra em km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
-// Função para calcular valor de entrega baseado em distância
 const calculateDeliveryFee = (distance: number): number => {
   const baseFee = 10.0;
   const perKm = 2.5;
   return baseFee + distance * perKm;
 };
 
-// Função para buscar coordenadas do CEP via ViaCEP
-// Simular cálculo de distância baseado em CEP (em produção, integrar com API real)
 const simulateDistanceFromCep = (cep: string): number => {
-  // Usa os dígitos do CEP para gerar uma distância pseudo-aleatória mas consistente
-  const cepNum = parseInt(cep.substring(0, 5));
-  const distance = 5 + (cepNum % 30); // Simula 5-35 km
+  const cepNum = parseInt(cep.substring(0, 5) || "0");
+  const distance = 5 + (cepNum % 30);
   return distance;
 };
 
@@ -73,44 +41,115 @@ export default function PaymentScreen() {
   const { cart, calculateTotal, createOrder, clearCart } = useCart();
   const { theme } = useAppTheme();
   const router = useRouter();
-  const [processing, setProcessing] = useState(false);
   const user = auth.currentUser;
+
+  const [processing, setProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
+
+  // Estados de Contato
+  const [checkoutName, setCheckoutName] = useState("");
+  const [checkoutEmail, setCheckoutEmail] = useState("");
+  const [checkoutPhone, setCheckoutPhone] = useState("");
+
+  // Estados de Endereço
   const [cep, setCep] = useState("");
+  const [street, setStreet] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+
+  // Estados de Cartão
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
+  const [installments, setInstallments] = useState(1);
+
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
   const [pixData, setPixData] = useState("");
   const [boletoData, setBoletoData] = useState("");
 
+  // Tenta preencher automaticamente os dados do cliente caso existam no banco
+  useEffect(() => {
+    if (user) {
+      const fetchUserData = async () => {
+        try {
+          const docRef = doc(db, "usuarios", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.nome) setCheckoutName(data.nome);
+            if (data.email) setCheckoutEmail(data.email);
+            if (data.telefone) setCheckoutPhone(data.telefone);
+          } else if (user.email) {
+            setCheckoutEmail(user.email);
+          }
+        } catch (e) {
+          console.log("Erro ao buscar dados do usuário", e);
+        }
+      };
+      fetchUserData();
+    }
+  }, [user]);
+
+  const subtotal = parseFloat(calculateTotal().replace(",", "."));
+  const deliveryFee = deliveryInfo?.fee ?? 15.0;
+  const total = subtotal + deliveryFee;
+
   const handlePaymentMethodChange = (method: PaymentMethod) => {
     setPaymentMethod(method);
   };
 
-  // Função para buscar e calcular entrega
-  const handleCepChange = (text: string) => {
-    setCep(text);
-    if (text.length === 8) {
+  const maskCep = (v: string) => {
+    v = v.replace(/\D/g, "");
+    v = v.replace(/(\d{5})(\d)/, "$1-$2");
+    return v;
+  };
+
+  const maskPhone = (v: string) => {
+    v = v.replace(/\D/g, "");
+    v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+    v = v.replace(/(\d{5})(\d)/, "$1-$2");
+    return v;
+  };
+
+  const handleCepChange = async (text: string) => {
+    const formatted = maskCep(text);
+    setCep(formatted);
+    const cleanCep = formatted.replace(/\D/g, "");
+
+    if (cleanCep.length === 8) {
       setLoadingDelivery(true);
-      setTimeout(() => {
-        const distance = simulateDistanceFromCep(text);
+      try {
+        const response = await fetch(
+          `https://viacep.com.br/ws/${cleanCep}/json/`,
+        );
+        const data = await response.json();
+
+        if (!data.erro) {
+          setStreet(data.logradouro);
+          setNeighborhood(data.bairro);
+          setCity(data.localidade);
+          setState(data.uf);
+        }
+
+        const distance = simulateDistanceFromCep(cleanCep);
         const fee = calculateDeliveryFee(distance);
         setDeliveryInfo({ distance, fee });
         setPixData(generatePixKey());
+      } catch (e) {
+        Alert.alert("Erro", "Não foi possível buscar o endereço pelo CEP.");
+      } finally {
         setLoadingDelivery(false);
-      }, 500);
+      }
     }
   };
 
-  // Gerar chave PIX aleatória (mock)
-  const generatePixKey = () => {
-    return "goldenpaw-" + Math.random().toString(36).substring(7);
-  };
+  const generatePixKey = () =>
+    "goldenpaw-" + Math.random().toString(36).substring(7);
 
-  // Gerar código de boleto (mock - em produção, integrar com Gerencianet)
   const generateBoletoCode = () => {
     const code = Math.random().toString().substring(2, 47).padEnd(47, "0");
     setBoletoData(code);
@@ -118,24 +157,31 @@ export default function PaymentScreen() {
 
   const handlePay = async () => {
     if (!user) {
-      Alert.alert(
-        "Login necessário",
-        "Faça login para continuar com o pagamento.",
-      );
+      Alert.alert("Login necessário", "Faça login para continuar.");
       router.replace("/login");
       return;
     }
 
     if (cart.length === 0) {
+      Alert.alert("Carrinho vazio", "Adicione produtos antes de pagar.");
+      return;
+    }
+
+    // Validação de Dados Pessoais
+    if (!checkoutName || !checkoutEmail || !checkoutPhone) {
       Alert.alert(
-        "Carrinho vazio",
-        "Adicione produtos antes de realizar o pagamento.",
+        "Dados incompletos",
+        "Por favor, preencha seus dados de contato.",
       );
       return;
     }
 
-    if (!cep || cep.length < 8) {
-      Alert.alert("CEP inválido", "Por favor, digite um CEP válido.");
+    // Validação de Endereço
+    if (!cep || !street || !addressNumber || !neighborhood || !city || !state) {
+      Alert.alert(
+        "Endereço incompleto",
+        "Por favor, preencha todos os campos de entrega.",
+      );
       return;
     }
 
@@ -166,11 +212,24 @@ export default function PaymentScreen() {
     setProcessing(true);
     setTimeout(async () => {
       try {
-        await createOrder("confirmado", paymentMethod, cep);
-        clearCart();
+        const fullAddress = `${street}, ${addressNumber} - ${neighborhood}, ${city}/${state} - CEP: ${cep}`;
+
+        // Passando todos os parâmetros na ordem correta
+        await createOrder(
+          "confirmado",
+          paymentMethod,
+          fullAddress,
+          installments,
+          checkoutName,
+          checkoutEmail,
+          checkoutPhone,
+        );
+
+        const parcelamentoMsg =
+          paymentMethod === "card" ? ` em ${installments}x` : "";
         Alert.alert(
           "Pagamento confirmado",
-          `Seu pedido foi processado com sucesso! Entrega em ${deliveryInfo.distance.toFixed(1)}km. Obrigado pela compra.`,
+          `Pedido processado com sucesso${parcelamentoMsg}! Entrega em ${deliveryInfo.distance.toFixed(1)}km.`,
         );
         router.replace("/");
       } catch (error) {
@@ -190,7 +249,6 @@ export default function PaymentScreen() {
             backgroundColor: theme.background,
             justifyContent: "center",
             alignItems: "center",
-            flex: 1,
           },
         ]}
       >
@@ -203,14 +261,7 @@ export default function PaymentScreen() {
           Faça login para acessar o pagamento
         </Text>
         <TouchableOpacity
-          style={[
-            styles.checkoutButton,
-            {
-              backgroundColor: theme.primary,
-              paddingHorizontal: 24,
-              paddingVertical: 12,
-            },
-          ]}
+          style={[styles.checkoutButton, { backgroundColor: theme.primary }]}
           onPress={() => router.replace("/login")}
         >
           <Text style={styles.checkoutButtonText}>Ir para Login</Text>
@@ -219,19 +270,180 @@ export default function PaymentScreen() {
     );
   }
 
-  const subtotal = parseFloat(calculateTotal().replace(",", "."));
-  const deliveryFee = deliveryInfo?.fee ?? 15.0;
-  const total = subtotal + deliveryFee;
-
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
+      contentContainerStyle={{ paddingBottom: 40 }}
     >
       <Text style={[styles.title, { color: theme.text }]}>
-        Resumo do Pedido
+        Finalizar Compra
       </Text>
 
-      {/* Carrinho */}
+      {/* Dados de Contato */}
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          Dados de Contato
+        </Text>
+
+        <TextInput
+          style={[
+            styles.input,
+            { borderColor: theme.border, color: theme.text, marginBottom: 10 },
+          ]}
+          placeholder="Nome Completo"
+          placeholderTextColor={theme.textSecondary}
+          value={checkoutName}
+          onChangeText={setCheckoutName}
+        />
+        <TextInput
+          style={[
+            styles.input,
+            { borderColor: theme.border, color: theme.text, marginBottom: 10 },
+          ]}
+          placeholder="E-mail"
+          placeholderTextColor={theme.textSecondary}
+          value={checkoutEmail}
+          onChangeText={setCheckoutEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={[
+            styles.input,
+            { borderColor: theme.border, color: theme.text },
+          ]}
+          placeholder="Celular"
+          placeholderTextColor={theme.textSecondary}
+          value={checkoutPhone}
+          onChangeText={(t) => setCheckoutPhone(maskPhone(t))}
+          keyboardType="phone-pad"
+          maxLength={15}
+        />
+      </View>
+
+      {/* Endereço de Entrega */}
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
+      >
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          Endereço de Entrega
+        </Text>
+
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 10,
+            alignItems: "center",
+            marginBottom: 10,
+          }}
+        >
+          <TextInput
+            style={[
+              styles.input,
+              { borderColor: theme.border, color: theme.text, flex: 1 },
+            ]}
+            placeholder="CEP"
+            placeholderTextColor={theme.textSecondary}
+            value={cep}
+            onChangeText={handleCepChange}
+            maxLength={9}
+            keyboardType="numeric"
+            editable={!loadingDelivery}
+          />
+          {loadingDelivery && <ActivityIndicator color={theme.primary} />}
+        </View>
+
+        <TextInput
+          style={[
+            styles.input,
+            { borderColor: theme.border, color: theme.text, marginBottom: 10 },
+          ]}
+          placeholder="Rua"
+          placeholderTextColor={theme.textSecondary}
+          value={street}
+          onChangeText={setStreet}
+        />
+
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+          <TextInput
+            style={[
+              styles.input,
+              { borderColor: theme.border, color: theme.text, flex: 1 },
+            ]}
+            placeholder="Nº"
+            placeholderTextColor={theme.textSecondary}
+            value={addressNumber}
+            onChangeText={setAddressNumber}
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={[
+              styles.input,
+              { borderColor: theme.border, color: theme.text, flex: 2 },
+            ]}
+            placeholder="Bairro"
+            placeholderTextColor={theme.textSecondary}
+            value={neighborhood}
+            onChangeText={setNeighborhood}
+          />
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <TextInput
+            style={[
+              styles.input,
+              { borderColor: theme.border, color: theme.text, flex: 3 },
+            ]}
+            placeholder="Cidade"
+            placeholderTextColor={theme.textSecondary}
+            value={city}
+            onChangeText={setCity}
+          />
+          <TextInput
+            style={[
+              styles.input,
+              { borderColor: theme.border, color: theme.text, flex: 1 },
+            ]}
+            placeholder="UF"
+            placeholderTextColor={theme.textSecondary}
+            value={state}
+            onChangeText={setState}
+            maxLength={2}
+          />
+        </View>
+
+        {deliveryInfo && (
+          <View
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTopWidth: 1,
+              borderTopColor: theme.border,
+            }}
+          >
+            <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+              Distância estimada: {deliveryInfo.distance.toFixed(1)} km
+            </Text>
+            <Text
+              style={[
+                { color: theme.primary, fontWeight: "600", marginTop: 4 },
+              ]}
+            >
+              Frete: R$ {deliveryInfo.fee.toFixed(2).replace(".", ",")}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Carrinho Resumo */}
       <View
         style={[
           styles.section,
@@ -261,55 +473,6 @@ export default function PaymentScreen() {
             </Text>
           </View>
         ))}
-      </View>
-
-      {/* CEP */}
-      <View
-        style={[
-          styles.section,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
-      >
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Endereço de Entrega
-        </Text>
-        <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
-          <TextInput
-            style={[
-              styles.input,
-              { borderColor: theme.border, color: theme.text, flex: 1 },
-            ]}
-            placeholder="Digite seu CEP"
-            placeholderTextColor={theme.textSecondary}
-            value={cep}
-            onChangeText={handleCepChange}
-            maxLength={8}
-            keyboardType="numeric"
-            editable={!loadingDelivery}
-          />
-          {loadingDelivery && <ActivityIndicator color={theme.primary} />}
-        </View>
-        {deliveryInfo && (
-          <View
-            style={{
-              marginTop: 12,
-              paddingTop: 12,
-              borderTopWidth: 1,
-              borderTopColor: theme.border,
-            }}
-          >
-            <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-              Distância: {deliveryInfo.distance.toFixed(1)} km
-            </Text>
-            <Text
-              style={[
-                { color: theme.primary, fontWeight: "600", marginTop: 4 },
-              ]}
-            >
-              Frete: R$ {deliveryInfo.fee.toFixed(2).replace(".", ",")}
-            </Text>
-          </View>
-        )}
       </View>
 
       {/* Formas de Pagamento */}
@@ -386,7 +549,7 @@ export default function PaymentScreen() {
               keyboardType="numeric"
               maxLength={16}
             />
-            <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
               <TextInput
                 style={[
                   styles.input,
@@ -412,6 +575,50 @@ export default function PaymentScreen() {
                 maxLength={3}
               />
             </View>
+
+            {/* Seleção de Parcelas (Até 6x) */}
+            <Text
+              style={[
+                styles.paymentLabel,
+                { color: theme.text, marginTop: 10, marginBottom: 8 },
+              ]}
+            >
+              Parcelamento
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 5 }}
+            >
+              {[1, 2, 3, 4, 5, 6].map((num) => {
+                const installmentValue = total / num;
+                const isSelected = installments === num;
+                return (
+                  <TouchableOpacity
+                    key={num}
+                    style={[
+                      styles.installmentChip,
+                      { borderColor: theme.border },
+                      isSelected && {
+                        backgroundColor: theme.primary,
+                        borderColor: theme.primary,
+                      },
+                    ]}
+                    onPress={() => setInstallments(num)}
+                  >
+                    <Text
+                      style={{
+                        color: isSelected ? "#FFF" : theme.text,
+                        fontWeight: isSelected ? "bold" : "normal",
+                      }}
+                    >
+                      {num}x de R${" "}
+                      {installmentValue.toFixed(2).replace(".", ",")}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         )}
 
@@ -423,7 +630,7 @@ export default function PaymentScreen() {
               borderColor: theme.primary,
               borderWidth: 2,
             },
-            { borderColor: theme.border },
+            { borderColor: theme.border, marginTop: 10 },
           ]}
           onPress={() => handlePaymentMethodChange("pix")}
         >
@@ -656,6 +863,13 @@ const styles = StyleSheet.create({
   },
   paymentLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
   cardFields: { marginTop: 12, paddingTop: 12, borderTopWidth: 1 },
+  installmentChip: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 10,
+  },
   pixContainer: {
     marginTop: 16,
     padding: 16,
@@ -718,10 +932,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
   },
-  checkoutButtonText: {
-    color: "#FFF",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
+  checkoutButtonText: { color: "#FFF", fontWeight: "bold", fontSize: 16 },
 });

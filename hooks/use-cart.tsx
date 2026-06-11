@@ -1,9 +1,7 @@
 import {
   addDoc,
   collection,
-  doc,
-  getDoc,
-  serverTimestamp,
+  serverTimestamp
 } from "firebase/firestore";
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { Alert } from "react-native";
@@ -32,7 +30,11 @@ type CartContextValue = {
   createOrder: (
     status?: string,
     paymentMethod?: string,
-    cep?: string,
+    enderecoCompleto?: string,
+    parcelas?: number,
+    nome?: string,
+    email?: string,
+    telefone?: string,
   ) => Promise<void>;
 };
 
@@ -116,7 +118,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const createOrder = async (
     status = "pendente",
     paymentMethod = "Não informado",
-    cep = "",
+    enderecoCompleto = "Não informado",
+    parcelas = 1,
+    nome = "",
+    email = "",
+    telefone = "",
   ) => {
     if (!auth.currentUser) {
       Alert.alert("Login necessário", "Faça login para finalizar a compra.");
@@ -139,29 +145,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         minute: "2-digit",
       });
 
-      // Busca a ficha cadastral do usuário no Firestore para obter o endereço completo e contatos
-      const userDocRef = doc(db, "usuarios", auth.currentUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
+      // Usa os dados que vieram do formulário de pagamento
       let nomeCliente =
-        auth.currentUser.displayName || auth.currentUser.email || "Cliente";
-      let emailCliente = auth.currentUser.email || "Não informado";
-      let telefoneCliente = "Não informado";
-      let enderecoCompleto = cep ? `CEP: ${cep}` : "Não informado";
-
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        nomeCliente = userData.nome || nomeCliente;
-        emailCliente = userData.email || emailCliente;
-        telefoneCliente = userData.telefone || telefoneCliente;
-
-        // Concatena os campos do perfil criando a linha de endereço completo
-        const rua = userData.endereco || "Rua não preenchida";
-        const cidade = userData.cidade || "";
-        const estado = userData.estado || "";
-        const cepFinal = cep || userData.cep || "";
-        enderecoCompleto = `${rua}, ${cidade} - ${estado} (CEP: ${cepFinal})`;
-      }
+        nome ||
+        auth.currentUser.displayName ||
+        auth.currentUser.email ||
+        "Cliente";
+      let emailCliente = email || auth.currentUser.email || "Não informado";
+      let telefoneCliente = telefone || "Não informado";
 
       const order = {
         userId: auth.currentUser.uid,
@@ -171,6 +162,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         data: dataFormatada,
         horario: horarioFormatado,
         metodoPagamento: paymentMethod,
+        parcelas: parcelas,
         endereco: enderecoCompleto,
         status: status,
         total: calculateTotal(),
@@ -185,13 +177,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       await addDoc(collection(db, "pedidos"), order);
       clearCart();
-      Alert.alert("Pedido enviado", "Seu pedido foi salvo com sucesso.");
     } catch (error) {
       console.error("Erro ao salvar pedido:", error);
-      Alert.alert(
-        "Erro",
-        "Não foi possível salvar o pedido. Tente novamente mais tarde.",
-      );
+      throw error; // Repassa o erro para ser tratado no botão de pagar
     }
   };
 

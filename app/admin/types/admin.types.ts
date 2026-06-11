@@ -29,12 +29,15 @@ export interface Pedido {
   id: string;
   clienteId: string;
   clienteNome: string;
+  clienteEmail?: string;
+  clienteTelefone?: string;
   data: string;
   horario: string;
   itens: ItemPedido[];
   total: string;
   endereco: string;
-  metodoPagamento: "credito" | "debito" | "pix" | "boleto";
+  metodoPagamento: "credito" | "debito" | "pix" | "boleto" | string;
+  parcelas?: number; // <---- ADICIONE ESTA LINHA AQUI
   status: "pendente" | "confirmado" | "enviado" | "entregue" | "cancelado";
   rastreamento?: string;
 }
@@ -87,6 +90,7 @@ export interface Funcionario {
   salario: string;
   status: "ativo" | "inativo";
   endereco?: string;
+  isAdmin?: boolean;
 }
 
 export interface DashboardStats {

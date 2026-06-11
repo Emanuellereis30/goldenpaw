@@ -46,6 +46,7 @@ export default function FuncionariosTab() {
     salario: string;
     status: "ativo" | "inativo";
     endereco: string;
+    isAdmin: boolean;
   }>({
     nome: "",
     email: "",
@@ -55,6 +56,7 @@ export default function FuncionariosTab() {
     salario: "",
     status: "ativo",
     endereco: "",
+    isAdmin: false, // Novo campo de permissão
   });
 
   useEffect(() => {
@@ -112,6 +114,7 @@ export default function FuncionariosTab() {
         salario: form.salario,
         status: form.status,
         endereco: form.endereco,
+        isAdmin: form.isAdmin, // Salvando a permissão
       };
 
       if (editingFuncionario) {
@@ -139,6 +142,7 @@ export default function FuncionariosTab() {
       salario: "",
       status: "ativo",
       endereco: "",
+      isAdmin: false,
     });
     setEditingFuncionario(null);
   };
@@ -154,13 +158,14 @@ export default function FuncionariosTab() {
       salario: funcionario.salario,
       status: funcionario.status,
       endereco: funcionario.endereco || "",
+      isAdmin: funcionario.isAdmin || false, // Carregando a permissão
     });
     setShowModal(true);
   };
 
   const handleDelete = (id: string) => {
     Alert.alert("Confirmar", "Deseja excluir este funcionário?", [
-      { text: "Cancelar" },
+      { text: "Cancelar", style: "cancel" },
       {
         text: "Excluir",
         style: "destructive",
@@ -257,20 +262,40 @@ export default function FuncionariosTab() {
                       }}
                     >
                       <Text
-                        style={[
-                          {
-                            fontSize: 10,
-                            fontWeight: "bold",
-                            color:
-                              funcionario.status === "ativo"
-                                ? "#10b981"
-                                : "#ef4444",
-                          },
-                        ]}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: "bold",
+                          color:
+                            funcionario.status === "ativo"
+                              ? "#10b981"
+                              : "#ef4444",
+                        }}
                       >
                         {funcionario.status === "ativo" ? "ATIVO" : "INATIVO"}
                       </Text>
                     </View>
+
+                    {/* Badge de Administrador */}
+                    {funcionario.isAdmin && (
+                      <View
+                        style={{
+                          backgroundColor: "#8b5cf620",
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "bold",
+                            color: "#8b5cf6",
+                          }}
+                        >
+                          ADMIN
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <Text
                     style={[
@@ -391,6 +416,7 @@ export default function FuncionariosTab() {
                 value={form.email}
                 onChangeText={(text) => setForm({ ...form, email: text })}
                 keyboardType="email-address"
+                autoCapitalize="none"
               />
 
               <Text style={[adminStyles.label, { color: theme.text }]}>
@@ -496,8 +522,65 @@ export default function FuncionariosTab() {
                 keyboardType="decimal-pad"
               />
 
+              <Text
+                style={[
+                  adminStyles.sectionTitle,
+                  { color: theme.primary, marginTop: 20 },
+                ]}
+              >
+                Configurações de Sistema
+              </Text>
+
               <Text style={[adminStyles.label, { color: theme.text }]}>
-                Status
+                Nível de Acesso
+              </Text>
+              <View style={[adminStyles.typeSelector, { marginBottom: 16 }]}>
+                <TouchableOpacity
+                  style={[
+                    adminStyles.typeButton,
+                    {
+                      backgroundColor: !form.isAdmin
+                        ? theme.primary
+                        : theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => setForm({ ...form, isAdmin: false })}
+                >
+                  <Text
+                    style={[
+                      adminStyles.typeButtonText,
+                      { color: !form.isAdmin ? "#000" : theme.text },
+                    ]}
+                  >
+                    Padrão
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    adminStyles.typeButton,
+                    {
+                      backgroundColor: form.isAdmin
+                        ? theme.primary
+                        : theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => setForm({ ...form, isAdmin: true })}
+                >
+                  <Text
+                    style={[
+                      adminStyles.typeButtonText,
+                      { color: form.isAdmin ? "#000" : theme.text },
+                    ]}
+                  >
+                    Administrador
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[adminStyles.label, { color: theme.text }]}>
+                Status do Funcionário
               </Text>
               <View style={adminStyles.typeSelector}>
                 {["ativo", "inativo"].map((status) => (
@@ -530,7 +613,7 @@ export default function FuncionariosTab() {
               <TouchableOpacity
                 style={[
                   adminStyles.submitButton,
-                  { backgroundColor: theme.primary },
+                  { backgroundColor: theme.primary, marginTop: 20 },
                 ]}
                 onPress={handleSave}
               >
