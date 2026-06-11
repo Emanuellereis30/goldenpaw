@@ -2,30 +2,30 @@ import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  updateDoc,
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    onSnapshot,
+    updateDoc,
 } from "firebase/firestore";
 import {
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytesResumable,
+    getDownloadURL,
+    getStorage,
+    ref,
+    uploadBytesResumable,
 } from "firebase/storage";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { db } from "../../../firebaseConfig";
@@ -89,6 +89,11 @@ export default function PetsAdocaoTab() {
   const [selectedReq, setSelectedReq] = useState<any | null>(null);
 
   const racasSugeridas = ["SRD", "Poodle", "Pinscher", "Persa", "Siamês"];
+
+  const shouldUploadImage = (uri: string) => {
+    if (!uri) return false;
+    return !/^(https?:\/\/|data:|gs:\/\/)/i.test(uri);
+  };
 
   useEffect(() => {
     const unsubPets = onSnapshot(collection(db, "pets"), (snapshot) => {
@@ -167,10 +172,7 @@ export default function PetsAdocaoTab() {
     try {
       let finalImageUrl = form.image;
 
-      if (
-        imagePicked &&
-        (form.image.startsWith("file:") || form.image.startsWith("/"))
-      ) {
+      if (imagePicked && shouldUploadImage(form.image)) {
         finalImageUrl = await uploadImageAsync(form.image);
       }
 

@@ -1,6 +1,12 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import {
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytesResumable,
+} from "firebase/storage";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -33,9 +39,11 @@ export default function ProdutosTab({
   onDeleteProduto,
 }: ProdutosTabProps) {
   const { theme } = useAppTheme();
+  const storage = getStorage();
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
+  const [imagePicked, setImagePicked] = useState(false);
   const [form, setForm] = useState({
     nome: "",
     preco: "",
@@ -46,6 +54,47 @@ export default function ProdutosTab({
   });
 
   const ehRacao = form.nome.toLowerCase().includes("ração");
+
+  const shouldUploadImage = (uri: string) => {
+    if (!uri) return false;
+    return !/^(https?:\/\/|data:|gs:\/\/)/i.test(uri);
+  };
+
+  const uriToBlob = async (uri: string): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.onload = () => resolve(xhr.response as Blob);
+      xhr.onerror = () => reject(new TypeError("Falha na requisição de rede"));
+      xhr.responseType = "blob";
+      xhr.open("GET", uri, true);
+      xhr.send(null);
+    });
+  };
+
+  const uploadImageAsync = async (uri: string): Promise<string> => {
+    const blob = await uriToBlob(uri);
+    const filename = `produtos/${Date.now()}-${form.nome
+      .replace(/\s+/g, "")
+      .toLowerCase()}.jpg`;
+    const storageRef = ref(storage, filename);
+
+    const uploadTask = uploadBytesResumable(storageRef, blob);
+
+    return new Promise((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        null,
+        (error) => {
+          console.error("Erro ao subir imagem do produto:", error);
+          reject(error);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(downloadURL);
+        },
+      );
+    });
+  };
 
   const formatarPrecoDinheiro = (text: string) => {
     const apenasNumeros = text.replace(/\D/g, "").slice(0, 8);
@@ -86,6 +135,7 @@ export default function ProdutosTab({
 
     if (!result.canceled && result.assets.length > 0) {
       setForm((prev) => ({ ...prev, image: result.assets[0].uri }));
+      setImagePicked(true);
     }
   };
 
@@ -101,11 +151,17 @@ export default function ProdutosTab({
     }
 
     try {
+      let finalImageUrl = form.image;
+
+      if (imagePicked && shouldUploadImage(form.image)) {
+        finalImageUrl = await uploadImageAsync(form.image);
+      }
+
       const produtoData = {
         nome: form.nome,
         preco: form.preco,
         kg: ehRacao ? form.kg : "",
-        image: form.image,
+        image: finalImageUrl,
         tag: form.tag,
         estoque: parseInt(form.estoque) || 0,
       };
@@ -128,10 +184,12 @@ export default function ProdutosTab({
   const resetForm = () => {
     setForm({ nome: "", preco: "", kg: "", image: "", tag: "", estoque: "0" });
     setEditingProduto(null);
+    setImagePicked(false);
   };
 
   const handleEdit = (produto: Produto) => {
     setEditingProduto(produto);
+    setImagePicked(false);
     setForm({
       nome: produto.nome,
       preco: produto.preco,
