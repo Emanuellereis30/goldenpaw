@@ -66,7 +66,11 @@ const formatBoolean = (val: boolean | null | undefined) => {
 };
 
 // ── Componente Principal ──────────────────────────────────────────────────────
-export default function PetsAdocaoTab() {
+export default function PetsAdocaoTab({
+  initialView = "pets",
+}: {
+  initialView?: "pets" | "requisicoes";
+}) {
   const { theme } = useAppTheme();
   const storage = getStorage();
 
@@ -76,7 +80,7 @@ export default function PetsAdocaoTab() {
   const [loadingSave, setLoadingSave] = useState(false);
 
   const [currentView, setCurrentView] = useState<"pets" | "requisicoes">(
-    "pets",
+    initialView,
   );
   const [searchQuery, setSearchQuery] = useState("");
 

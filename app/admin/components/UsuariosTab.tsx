@@ -1,24 +1,16 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { db } from "../../../firebaseConfig";
@@ -47,6 +39,7 @@ export default function UsuariosTab() {
 
   const [userPedidos, setUserPedidos] = useState<any[]>([]);
   const [userAdocoes, setUserAdocoes] = useState<any[]>([]);
+  const [userPets, setUserPets] = useState<any[]>([]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "usuarios"), (snapshot) => {
@@ -80,34 +73,17 @@ export default function UsuariosTab() {
       setUserAdocoes(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
 
+    const petsRef = collection(db, "usuarios", selectedUsuario.id, "pets");
+    const unsubPets = onSnapshot(petsRef, (snapshot) => {
+      setUserPets(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubPedidos();
       unsubAdocoes();
+      unsubPets();
     };
   }, [selectedUsuario]);
-
-  const handleDeleteUsuario = (id: string) => {
-    Alert.alert(
-      "Confirmar",
-      "Deseja realmente excluir este usuário? Esta ação não pode ser desfeita.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteDoc(doc(db, "usuarios", id));
-              Alert.alert("Sucesso", "Usuário removido com sucesso!");
-              if (selectedUsuario?.id === id) setShowDetailModal(false);
-            } catch (error) {
-              Alert.alert("Erro", "Falha ao excluir o usuário.");
-            }
-          },
-        },
-      ],
-    );
-  };
 
   // ── Lógica Reforçada de Filtragem ──
   let filteredUsuarios = usuarios.filter((u) => {
@@ -346,22 +322,6 @@ export default function UsuariosTab() {
                     </View>
                   </View>
                 </View>
-
-                {/* ── Botão Excluir Direto na Lista ── */}
-                <View style={adminStyles.itemActions}>
-                  <TouchableOpacity
-                    style={[
-                      adminStyles.actionButton,
-                      { backgroundColor: theme.error },
-                    ]}
-                    onPress={(e) => {
-                      e.stopPropagation(); // Impede que abra o modal ao clicar em excluir
-                      handleDeleteUsuario(usuario.id);
-                    }}
-                  >
-                    <Ionicons name="trash" size={18} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
               </TouchableOpacity>
             ))
           ) : (
@@ -387,7 +347,12 @@ export default function UsuariosTab() {
             <Text style={[adminStyles.modalTitle, { color: theme.text }]}>
               Detalhes do Cliente
             </Text>
-            <TouchableOpacity onPress={() => setShowDetailModal(false)}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowDetailModal(false);
+                setUserPets([]);
+              }}
+            >
               <Ionicons name="close" size={28} color={theme.text} />
             </TouchableOpacity>
           </View>
@@ -712,35 +677,35 @@ export default function UsuariosTab() {
                 </View>
 
                 {/* PETS CADASTRADOS */}
-                {selectedUsuario.pets && selectedUsuario.pets.length > 0 && (
-                  <View
-                    style={[
-                      styles.card,
-                      {
-                        backgroundColor: theme.surface,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                  >
-                    <View style={styles.cardHeader}>
-                      <Ionicons
-                        name="paw-outline"
-                        size={18}
-                        color={theme.primary}
-                      />
-                      <Text style={[styles.cardTitle, { color: theme.text }]}>
-                        Pets Cadastrados ({selectedUsuario.pets.length})
-                      </Text>
-                    </View>
-                    {selectedUsuario.pets.map((pet, index) => (
+                <View
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.cardHeader}>
+                    <Ionicons
+                      name="paw-outline"
+                      size={18}
+                      color={theme.primary}
+                    />
+                    <Text style={[styles.cardTitle, { color: theme.text }]}>
+                      Pets Cadastrados ({userPets.length})
+                    </Text>
+                  </View>
+                  {userPets.length > 0 ? (
+                    userPets.map((pet, index) => (
                       <View
-                        key={index}
+                        key={pet.id}
                         style={[
                           styles.listItem,
                           {
                             borderBottomColor: theme.border,
                             borderBottomWidth:
-                              index === selectedUsuario.pets.length - 1 ? 0 : 1,
+                              index === userPets.length - 1 ? 0 : 1,
                           },
                         ]}
                       >
@@ -748,21 +713,133 @@ export default function UsuariosTab() {
                           style={{
                             color: theme.text,
                             fontWeight: "700",
-                            marginBottom: 2,
+                            marginBottom: 4,
                             fontSize: 13,
                           }}
                         >
                           {pet.nome}
                         </Text>
-                        <Text
-                          style={{ color: theme.textSecondary, fontSize: 11 }}
-                        >
-                          {pet.tipo} • {pet.raca} • {pet.idade} anos
-                        </Text>
+                        {/* Linha 1: espécie · raça · sexo */}
+                        {(pet.especie || pet.raca || pet.sexo) && (
+                          <Text
+                            style={{
+                              color: theme.textSecondary,
+                              fontSize: 11,
+                              marginBottom: 2,
+                            }}
+                          >
+                            {[pet.especie, pet.raca, pet.sexo]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </Text>
+                        )}
+                        {/* Linha 2: data de nascimento · idade */}
+                        {(pet.dataNascimento || pet.idade) && (
+                          <Text
+                            style={{
+                              color: theme.textSecondary,
+                              fontSize: 11,
+                              marginBottom: 2,
+                            }}
+                          >
+                            {[
+                              pet.dataNascimento
+                                ? `Nasc: ${pet.dataNascimento}`
+                                : null,
+                              pet.idade ? `${pet.idade}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </Text>
+                        )}
+                        {/* Linha 3: peso · cor · castrado */}
+                        {(pet.peso || pet.cor || pet.castrado) && (
+                          <Text
+                            style={{
+                              color: theme.textSecondary,
+                              fontSize: 11,
+                              marginBottom: 2,
+                            }}
+                          >
+                            {[
+                              pet.peso ? `Peso: ${pet.peso}` : null,
+                              pet.cor ? `Cor: ${pet.cor}` : null,
+                              pet.castrado ? `Castrado: ${pet.castrado}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </Text>
+                        )}
+                        {/* Saúde */}
+                        {pet.alergias && pet.alergias !== "Nenhuma" && (
+                          <Text
+                            style={{
+                              color: "#f59e0b",
+                              fontSize: 11,
+                              marginBottom: 2,
+                            }}
+                          >
+                            ⚠ Alergias: {pet.alergias}
+                          </Text>
+                        )}
+                        {pet.doencas && pet.doencas !== "Nenhuma" && (
+                          <Text
+                            style={{
+                              color: "#ef4444",
+                              fontSize: 11,
+                              marginBottom: 2,
+                            }}
+                          >
+                            ⚠ Doenças: {pet.doencas}
+                          </Text>
+                        )}
+                        {pet.medicamentos && pet.medicamentos !== "Nenhum" && (
+                          <Text
+                            style={{
+                              color: "#ef4444",
+                              fontSize: 11,
+                              marginBottom: 2,
+                            }}
+                          >
+                            💊 Medicamentos: {pet.medicamentos}
+                          </Text>
+                        )}
+                        {pet.vacinas && pet.vacinas !== "Não informado" && (
+                          <Text
+                            style={{
+                              color: "#10b981",
+                              fontSize: 11,
+                              marginBottom: 2,
+                            }}
+                          >
+                            ✓ Vacinas: {pet.vacinas}
+                          </Text>
+                        )}
+                        {pet.observacoes ? (
+                          <Text
+                            style={{
+                              color: theme.textSecondary,
+                              fontSize: 11,
+                              fontStyle: "italic",
+                            }}
+                          >
+                            Obs: {pet.observacoes}
+                          </Text>
+                        ) : null}
                       </View>
-                    ))}
-                  </View>
-                )}
+                    ))
+                  ) : (
+                    <Text
+                      style={{
+                        color: theme.textSecondary,
+                        fontStyle: "italic",
+                        fontSize: 13,
+                      }}
+                    >
+                      Nenhum pet cadastrado.
+                    </Text>
+                  )}
+                </View>
 
                 {/* Total Gasto */}
                 <View
@@ -801,21 +878,6 @@ export default function UsuariosTab() {
                       .replace(".", ",")}
                   </Text>
                 </View>
-
-                {/* ── Botão Excluir Usuário no final do modal ── */}
-                <TouchableOpacity
-                  style={[
-                    adminStyles.submitButton,
-                    { backgroundColor: theme.error, marginTop: 4 },
-                  ]}
-                  onPress={() => handleDeleteUsuario(selectedUsuario.id)}
-                >
-                  <Text
-                    style={[adminStyles.submitButtonText, { fontSize: 14 }]}
-                  >
-                    Excluir Usuário
-                  </Text>
-                </TouchableOpacity>
               </View>
             )}
           </ScrollView>
@@ -851,6 +913,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     marginBottom: 12,
+  },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#EF4444",
+  },
+  deleteBtnText: {
+    color: "#EF4444",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
 

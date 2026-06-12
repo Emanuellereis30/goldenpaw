@@ -104,7 +104,18 @@ export default function PedidosTab() {
   filteredPedidos.sort((a, b) => {
     if (ordenacao === "nome_asc")
       return (a.clienteNome || "").localeCompare(b.clienteNome || "");
-    return ordenacao === "data_desc" ? -1 : 1;
+    // Parse "DD/MM/YYYY" + "HH:MM" into comparable timestamps
+    const parseDate = (p: any) => {
+      try {
+        const [d, m, y] = (p.data || "01/01/2000").split("/");
+        const [h, min] = (p.horario || "00:00").split(":");
+        return new Date(+y, +m - 1, +d, +h, +min).getTime();
+      } catch {
+        return 0;
+      }
+    };
+    const diff = parseDate(a) - parseDate(b);
+    return ordenacao === "data_desc" ? -diff : diff;
   });
 
   const handleSelectPedido = (pedido: Pedido) => {
@@ -775,20 +786,6 @@ export default function PedidosTab() {
                       style={[adminStyles.submitButtonText, { fontSize: 14 }]}
                     >
                       Alterar Status
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      adminStyles.submitButton,
-                      { backgroundColor: theme.error, flex: 1 },
-                    ]}
-                    onPress={() => handleDeletePedido(selectedPedido.id)}
-                  >
-                    <Text
-                      style={[adminStyles.submitButtonText, { fontSize: 14 }]}
-                    >
-                      Excluir Pedido
                     </Text>
                   </TouchableOpacity>
                 </View>

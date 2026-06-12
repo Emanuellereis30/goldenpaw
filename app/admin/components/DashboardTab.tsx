@@ -1,74 +1,31 @@
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
-import { collection, onSnapshot } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
-import { db } from "../../../firebaseConfig";
+import React from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { adminStyles } from "../styles/adminStyles";
 
-export default function DashboardTab() {
+interface DashboardTabProps {
+  produtos: any[];
+  pets: any[];
+  pedidos: any[];
+  requisicoes: any[];
+  lowStockCount: number;
+  newOrdersCount: number;
+  pendingAdoptionsCount: number;
+  onNavigate: (tab: string) => void;
+}
+
+export default function DashboardTab({
+  produtos,
+  pets,
+  pedidos,
+  requisicoes,
+  lowStockCount,
+  newOrdersCount,
+  pendingAdoptionsCount,
+  onNavigate,
+}: DashboardTabProps) {
   const { theme } = useAppTheme();
-
-  const [produtos, setProdutos] = useState<any[]>([]);
-  const [pets, setPets] = useState<any[]>([]);
-  const [pedidos, setPedidos] = useState<any[]>([]);
-  const [requisicoes, setRequisicoes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Busca Produtos
-    const unsubProdutos = onSnapshot(collection(db, "produtos"), (snapshot) => {
-      setProdutos(snapshot.docs.map((doc) => doc.data()));
-    });
-
-    // Busca Pets
-    const unsubPets = onSnapshot(collection(db, "pets"), (snapshot) => {
-      setPets(snapshot.docs.map((doc) => doc.data()));
-    });
-
-    // Busca Pedidos
-    const unsubPedidos = onSnapshot(collection(db, "pedidos"), (snapshot) => {
-      setPedidos(snapshot.docs.map((doc) => doc.data()));
-    });
-
-    // Busca Requisições de Adoção
-    const unsubRequisicoes = onSnapshot(
-      collection(db, "requisicoes_adocao"),
-      (snapshot) => {
-        setRequisicoes(snapshot.docs.map((doc) => doc.data()));
-        setLoading(false);
-      },
-    );
-
-    return () => {
-      unsubProdutos();
-      unsubPets();
-      unsubPedidos();
-      unsubRequisicoes();
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <View
-        style={[
-          adminStyles.centerContainer,
-          { backgroundColor: theme.background },
-        ]}
-      >
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
-
-  // Cálculos de Estatísticas
-  const baixoEstoque = produtos.filter((p) => (p.estoque || 0) <= 5).length;
-  const requisicoesPendentes = requisicoes.filter(
-    (r) => r.status === "pendente",
-  ).length;
-  const pedidosPendentes = pedidos.filter(
-    (p) => p.status === "pendente",
-  ).length;
 
   const totalGeralGanho = pedidos.reduce((acc, pedido) => {
     const valor = parseFloat(
@@ -80,6 +37,13 @@ export default function DashboardTab() {
     return acc + (isNaN(valor) ? 0 : valor);
   }, 0);
 
+  const adocoesAprovadas = requisicoes.filter(
+    (r) => r.status === "aprovado",
+  ).length;
+
+  const hasAlerts =
+    lowStockCount > 0 || newOrdersCount > 0 || pendingAdoptionsCount > 0;
+
   return (
     <View
       style={[
@@ -88,17 +52,17 @@ export default function DashboardTab() {
       ]}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Bloco de Avisos / Alertas */}
-        {(baixoEstoque > 0 ||
-          requisicoesPendentes > 0 ||
-          pedidosPendentes > 0) && (
+        {/* ── Alertas ── */}
+        {hasAlerts && (
           <View style={{ marginBottom: 20 }}>
             <Text style={[adminStyles.sectionTitle, { color: theme.primary }]}>
               Alertas Pendentes
             </Text>
 
-            {baixoEstoque > 0 && (
-              <View
+            {lowStockCount > 0 && (
+              <TouchableOpacity
+                onPress={() => onNavigate("produtos")}
+                activeOpacity={0.75}
                 style={[
                   adminStyles.itemCard,
                   { backgroundColor: "#fef2f2", borderColor: "#fca5a5" },
@@ -110,39 +74,18 @@ export default function DashboardTab() {
                     Estoque Baixo
                   </Text>
                   <Text style={{ color: "#7f1d1d" }}>
-                    Você tem {baixoEstoque} produto(s) com 5 ou menos unidades
-                    em estoque.
+                    {lowStockCount} produto(s) com 5 ou menos unidades em
+                    estoque. Toque para ver.
                   </Text>
                 </View>
-              </View>
+                <Ionicons name="chevron-forward" size={16} color="#ef4444" />
+              </TouchableOpacity>
             )}
 
-            {requisicoesPendentes > 0 && (
-              <View
-                style={[
-                  adminStyles.itemCard,
-                  {
-                    backgroundColor: "#fffbeb",
-                    borderColor: "#fcd34d",
-                    marginTop: 10,
-                  },
-                ]}
-              >
-                <Ionicons name="paw" size={24} color="#f59e0b" />
-                <View style={{ marginLeft: 12, flex: 1 }}>
-                  <Text style={{ fontWeight: "700", color: "#b45309" }}>
-                    Adoções Pendentes
-                  </Text>
-                  <Text style={{ color: "#78350f" }}>
-                    Existem {requisicoesPendentes} solicitação(ões) de adoção
-                    aguardando análise.
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {pedidosPendentes > 0 && (
-              <View
+            {newOrdersCount > 0 && (
+              <TouchableOpacity
+                onPress={() => onNavigate("pedidos")}
+                activeOpacity={0.75}
                 style={[
                   adminStyles.itemCard,
                   {
@@ -158,22 +101,53 @@ export default function DashboardTab() {
                     Pedidos Pendentes
                   </Text>
                   <Text style={{ color: "#1e3a8a" }}>
-                    Você tem {pedidosPendentes} novo(s) pedido(s) na loja para
-                    confirmar e enviar.
+                    {newOrdersCount} novo(s) pedido(s) aguardando confirmação.
+                    Toque para ver.
                   </Text>
                 </View>
-              </View>
+                <Ionicons name="chevron-forward" size={16} color="#3b82f6" />
+              </TouchableOpacity>
+            )}
+
+            {pendingAdoptionsCount > 0 && (
+              <TouchableOpacity
+                onPress={() => onNavigate("pets:requisicoes")}
+                activeOpacity={0.75}
+                style={[
+                  adminStyles.itemCard,
+                  {
+                    backgroundColor: "#fffbeb",
+                    borderColor: "#fcd34d",
+                    marginTop: 10,
+                  },
+                ]}
+              >
+                <Ionicons name="paw" size={24} color="#f59e0b" />
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={{ fontWeight: "700", color: "#b45309" }}>
+                    Adoções Pendentes
+                  </Text>
+                  <Text style={{ color: "#78350f" }}>
+                    {pendingAdoptionsCount} solicitação(ões) de adoção
+                    aguardando análise. Toque para ver.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#f59e0b" />
+              </TouchableOpacity>
             )}
           </View>
         )}
 
+        {/* ── Visão Geral ── */}
         <Text style={[adminStyles.sectionTitle, { color: theme.primary }]}>
           Visão Geral
         </Text>
 
         <View style={adminStyles.dashboardGrid}>
           {/* Card Produtos */}
-          <View
+          <TouchableOpacity
+            onPress={() => onNavigate("produtos")}
+            activeOpacity={0.75}
             style={[
               adminStyles.dashboardCard,
               { backgroundColor: theme.surface, borderColor: theme.border },
@@ -193,10 +167,29 @@ export default function DashboardTab() {
             >
               Produtos
             </Text>
-          </View>
+            {lowStockCount > 0 && (
+              <View
+                style={{
+                  marginTop: 6,
+                  backgroundColor: "#fef2f2",
+                  borderRadius: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 11, color: "#b91c1c", fontWeight: "600" }}
+                >
+                  {lowStockCount} em falta
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
           {/* Card Pets */}
-          <View
+          <TouchableOpacity
+            onPress={() => onNavigate("pets")}
+            activeOpacity={0.75}
             style={[
               adminStyles.dashboardCard,
               { backgroundColor: theme.surface, borderColor: theme.border },
@@ -216,10 +209,30 @@ export default function DashboardTab() {
             >
               Pets para Adoção
             </Text>
-          </View>
+            {pendingAdoptionsCount > 0 && (
+              <View
+                style={{
+                  marginTop: 6,
+                  backgroundColor: "#fffbeb",
+                  borderRadius: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 11, color: "#b45309", fontWeight: "600" }}
+                >
+                  {pendingAdoptionsCount} pendente
+                  {pendingAdoptionsCount > 1 ? "s" : ""}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
           {/* Card Pedidos Total */}
-          <View
+          <TouchableOpacity
+            onPress={() => onNavigate("pedidos")}
+            activeOpacity={0.75}
             style={[
               adminStyles.dashboardCard,
               { backgroundColor: theme.surface, borderColor: theme.border },
@@ -239,10 +252,33 @@ export default function DashboardTab() {
             >
               Pedidos Realizados
             </Text>
-          </View>
+            {newOrdersCount > 0 && (
+              <View
+                style={{
+                  marginTop: 6,
+                  backgroundColor: theme.primary + "15",
+                  borderRadius: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: theme.primary,
+                    fontWeight: "600",
+                  }}
+                >
+                  {newOrdersCount} novo{newOrdersCount > 1 ? "s" : ""}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-          {/* Card Adoções (Revisadas e Concluídas) */}
-          <View
+          {/* Card Adoções Aprovadas */}
+          <TouchableOpacity
+            onPress={() => onNavigate("pets:requisicoes")}
+            activeOpacity={0.75}
             style={[
               adminStyles.dashboardCard,
               { backgroundColor: theme.surface, borderColor: theme.border },
@@ -252,7 +288,7 @@ export default function DashboardTab() {
             <Text
               style={[adminStyles.dashboardCardValue, { color: theme.text }]}
             >
-              {requisicoes.filter((r) => r.status === "aprovado").length}
+              {adocoesAprovadas}
             </Text>
             <Text
               style={[
@@ -262,15 +298,17 @@ export default function DashboardTab() {
             >
               Adoções Aprovadas
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
-        {/* Resumo Financeiro Simples */}
+        {/* ── Financeiro ── */}
         <View style={{ marginTop: 24, marginBottom: 40 }}>
           <Text style={[adminStyles.sectionTitle, { color: theme.primary }]}>
             Financeiro da Loja
           </Text>
-          <View
+          <TouchableOpacity
+            onPress={() => onNavigate("pedidos")}
+            activeOpacity={0.75}
             style={[
               adminStyles.itemCard,
               {
@@ -280,7 +318,9 @@ export default function DashboardTab() {
               },
             ]}
           >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
+            >
               <View
                 style={{
                   backgroundColor: "#10b98120",
@@ -290,7 +330,7 @@ export default function DashboardTab() {
               >
                 <Ionicons name="cash" size={28} color="#10b981" />
               </View>
-              <View style={{ marginLeft: 16 }}>
+              <View style={{ marginLeft: 16, flex: 1 }}>
                 <Text
                   style={{
                     color: theme.textSecondary,
@@ -314,8 +354,13 @@ export default function DashboardTab() {
                   })}
                 </Text>
               </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={theme.textSecondary}
+              />
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>

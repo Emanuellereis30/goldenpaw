@@ -90,6 +90,24 @@ export default function FuncionariosTab() {
     return v;
   };
 
+  const maskDate = (v: string) => {
+    v = v.replace(/\D/g, "");
+    if (v.length > 8) v = v.slice(0, 8);
+    v = v.replace(/(\d{2})(\d)/, "$1/$2");
+    v = v.replace(/(\d{2})\/(\d{2})(\d)/, "$1/$2/$3");
+    return v;
+  };
+
+  const maskSalario = (v: string) => {
+    v = v.replace(/\D/g, "");
+    if (!v) return "";
+    const num = parseInt(v, 10);
+    return (num / 100).toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   const handleCepChange = async (text: string) => {
     const formatted = maskCep(text);
     setForm((prev) => ({ ...prev, cep: formatted }));
@@ -1129,8 +1147,10 @@ export default function FuncionariosTab() {
                 placeholderTextColor={theme.textSecondary}
                 value={form.dataAdmissao}
                 onChangeText={(text) =>
-                  setForm({ ...form, dataAdmissao: text })
+                  setForm({ ...form, dataAdmissao: maskDate(text) })
                 }
+                keyboardType="numeric"
+                maxLength={10}
               />
 
               <TextInput
@@ -1145,8 +1165,10 @@ export default function FuncionariosTab() {
                 placeholder="Salário *"
                 placeholderTextColor={theme.textSecondary}
                 value={form.salario}
-                onChangeText={(text) => setForm({ ...form, salario: text })}
-                keyboardType="decimal-pad"
+                onChangeText={(text) =>
+                  setForm({ ...form, salario: maskSalario(text) })
+                }
+                keyboardType="numeric"
               />
 
               <Text

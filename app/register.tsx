@@ -2,22 +2,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import {
-    SafeAreaView,
-    useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -180,9 +177,43 @@ export default function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* Botão de voltar */}
+      <TouchableOpacity
+        style={[
+          styles.backButton,
+          {
+            top: insets.top + 10,
+            backgroundColor: theme.surface,
+            borderColor: theme.primary + "40",
+          },
+        ]}
+        onPress={handleBack}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="chevron-back" size={24} color={theme.primary} />
+      </TouchableOpacity>
+
+      {/* Toggle de tema */}
+      <TouchableOpacity
+        style={[
+          styles.themeToggleButton,
+          {
+            top: insets.top + 10,
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+          },
+        ]}
+        onPress={toggleColorScheme}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name={colorScheme === "dark" ? "sunny" : "moon"}
+          size={24}
+          color={theme.primary}
+        />
+      </TouchableOpacity>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -191,59 +222,29 @@ export default function RegisterScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: insets.top + 20 },
+            { paddingTop: insets.top + 74 },
           ]}
           automaticallyAdjustKeyboardInsets={true}
           keyboardShouldPersistTaps="handled"
         >
-          <TouchableOpacity
-            style={[
-              styles.backButton,
-              {
-                top: insets.top + 10,
-                backgroundColor: theme.buttonBackground ?? theme.surface,
-                borderColor: theme.primary + "40",
-              },
-            ]}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chevron-back" size={24} color={theme.primary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.themeToggleButton,
-              {
-                top: insets.top + 10,
-                backgroundColor: theme.surface,
-                borderColor: theme.border,
-              },
-            ]}
-            onPress={toggleColorScheme}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={colorScheme === "dark" ? "sunny" : "moon"}
-              size={24}
-              color={theme.primary}
-            />
-          </TouchableOpacity>
-
           <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
           <Text style={[styles.title, { color: theme.text }]}>
             Cadastro Golden Paw
           </Text>
 
-          <CustomInput
+          {/* ── DADOS PESSOAIS ── */}
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+            Informações Pessoais
+          </Text>
+
+          <FormInput
             theme={theme}
             placeholder="Nome Completo"
             value={fullName}
             onChange={setFullName}
             errorMessage={errors.fullName}
           />
-
-          <CustomInput
+          <FormInput
             theme={theme}
             placeholder="CPF"
             value={cpf}
@@ -252,8 +253,7 @@ export default function RegisterScreen() {
             keyboard="numeric"
             errorMessage={errors.cpf}
           />
-
-          <CustomInput
+          <FormInput
             theme={theme}
             placeholder="Celular"
             value={phone}
@@ -262,8 +262,7 @@ export default function RegisterScreen() {
             keyboard="phone-pad"
             errorMessage={errors.phone}
           />
-
-          <CustomInput
+          <FormInput
             theme={theme}
             placeholder="E-mail"
             value={email}
@@ -272,9 +271,13 @@ export default function RegisterScreen() {
             errorMessage={errors.email}
           />
 
+          {/* ── ENDEREÇO ── */}
           <View style={styles.divider} />
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+            Endereço
+          </Text>
 
-          <CustomInput
+          <FormInput
             theme={theme}
             placeholder="CEP"
             value={zipCode}
@@ -283,8 +286,7 @@ export default function RegisterScreen() {
             keyboard="numeric"
             errorMessage={errors.zipCode}
           />
-
-          <CustomInput
+          <FormInput
             theme={theme}
             placeholder="Rua"
             value={street}
@@ -293,7 +295,7 @@ export default function RegisterScreen() {
 
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <CustomInput
+              <FormInput
                 theme={theme}
                 placeholder="Nº"
                 value={number}
@@ -302,7 +304,7 @@ export default function RegisterScreen() {
               />
             </View>
             <View style={{ flex: 2 }}>
-              <CustomInput
+              <FormInput
                 theme={theme}
                 placeholder="Bairro"
                 value={neighborhood}
@@ -313,7 +315,7 @@ export default function RegisterScreen() {
 
           <View style={styles.row}>
             <View style={{ flex: 3 }}>
-              <CustomInput
+              <FormInput
                 theme={theme}
                 placeholder="Cidade"
                 value={city}
@@ -321,7 +323,7 @@ export default function RegisterScreen() {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <CustomInput
+              <FormInput
                 theme={theme}
                 placeholder="UF"
                 value={state}
@@ -331,13 +333,17 @@ export default function RegisterScreen() {
             </View>
           </View>
 
+          {/* ── SENHA ── */}
           <View style={styles.divider} />
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+            Senha de Acesso
+          </Text>
 
-          {/* SENHA 1 */}
+          {/* Senha */}
           <View style={styles.inputWrapper}>
             <View
               style={[
-                styles.inputContainer,
+                styles.passwordContainer,
                 {
                   backgroundColor: theme.surface,
                   borderColor: errors.password ? "#FF4D4D" : theme.border,
@@ -365,11 +371,11 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          {/* CONFIRMAR SENHA */}
+          {/* Confirmar Senha */}
           <View style={styles.inputWrapper}>
             <View
               style={[
-                styles.inputContainer,
+                styles.passwordContainer,
                 {
                   backgroundColor: theme.surface,
                   borderColor: errors.confirmPassword
@@ -402,24 +408,24 @@ export default function RegisterScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.btn, { backgroundColor: theme.primary }]}
+            style={[styles.submitButton, { backgroundColor: theme.primary }]}
             onPress={handleRegister}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.btnText}>Finalizar Cadastro</Text>
+              <Text style={styles.submitButtonText}>Finalizar Cadastro</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-// COMPONENTE ATUALIZADO COM MENSAGEM DE ERRO
-function CustomInput({
+// Componente de campo com label + erro — estilo FuncionariosTab
+function FormInput({
   theme,
   placeholder,
   value,
@@ -431,27 +437,25 @@ function CustomInput({
 }: any) {
   return (
     <View style={styles.inputWrapper}>
-      <View
+      <TextInput
         style={[
-          styles.inputContainer,
+          styles.input,
+          styles.inputField,
           {
             backgroundColor: theme.surface,
+            color: theme.text,
             borderColor: errorMessage ? "#FF4D4D" : theme.border,
           },
         ]}
-      >
-        <TextInput
-          style={[styles.input, { color: theme.text }]}
-          placeholder={placeholder}
-          placeholderTextColor={theme.textSecondary}
-          value={value}
-          onChangeText={onChange}
-          maxLength={maxLength}
-          secureTextEntry={isPassword}
-          keyboardType={keyboard}
-          autoCapitalize="none"
-        />
-      </View>
+        placeholder={placeholder}
+        placeholderTextColor={theme.textSecondary}
+        value={value}
+        onChangeText={onChange}
+        maxLength={maxLength}
+        secureTextEntry={isPassword}
+        keyboardType={keyboard}
+        autoCapitalize="none"
+      />
       {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
     </View>
   );
@@ -462,7 +466,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 100,
-    alignItems: "center",
   },
   backButton: {
     position: "absolute",
@@ -496,34 +499,54 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  logo: { width: 100, height: 60, marginBottom: 10 },
-  title: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
-  inputWrapper: { width: "100%", marginBottom: 12 },
-  inputContainer: {
-    width: "100%",
-    height: 55,
-    borderRadius: 12,
+  logo: { width: 100, height: 60, marginBottom: 10, alignSelf: "center" },
+  title: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 20,
+    alignSelf: "center",
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  inputWrapper: { marginBottom: 12 },
+  inputField: {
+    height: 48,
     borderWidth: 1,
-    paddingHorizontal: 15,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+  input: { flex: 1, fontSize: 15 },
+  passwordContainer: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
   },
-  input: { flex: 1, fontSize: 16 },
-  errorText: { color: "#FF4D4D", fontSize: 12, marginTop: 4, marginLeft: 5 },
-  row: { flexDirection: "row", gap: 10, width: "100%" },
+  errorText: { color: "#FF4D4D", fontSize: 12, marginTop: 4, marginLeft: 2 },
+  row: { flexDirection: "row", gap: 10 },
   divider: {
     height: 1,
     width: "100%",
-    backgroundColor: "#eee",
-    marginVertical: 10,
+    backgroundColor: "#ccc",
+    marginVertical: 14,
+    opacity: 0.3,
   },
-  btn: {
+  submitButton: {
     width: "100%",
-    height: 55,
-    borderRadius: 12,
+    height: 50,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 16,
   },
-  btnText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
+  submitButtonText: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
 });

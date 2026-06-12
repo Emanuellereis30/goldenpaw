@@ -33,7 +33,12 @@ interface ProdutosTabProps {
 }
 
 const CATEGORIAS_DISPONIVEIS = ["Cães", "Gatos", "Aves", "Peixes", "Outros"];
-const CATEGORIAS_FILTRO = ["Categorias", ...CATEGORIAS_DISPONIVEIS];
+const CATEGORIAS_FILTRO = [
+  "Categorias",
+  ...CATEGORIAS_DISPONIVEIS,
+  "Baixo Estoque",
+  "Esgotado",
+];
 const ORDENACOES = [
   { label: "A-Z", value: "nome_asc" },
   { label: "Menor Preço", value: "preco_asc" },
@@ -237,6 +242,16 @@ export default function ProdutosTab({
     const matchSearch = item.nome
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
+
+    if (categoriaSelecionada === "Baixo Estoque") {
+      const estoque = item.estoque ?? 0;
+      return matchSearch && estoque > 0 && estoque <= 5;
+    }
+
+    if (categoriaSelecionada === "Esgotado") {
+      return matchSearch && (item.estoque ?? 0) === 0;
+    }
+
     if (categoriaSelecionada === "Categorias") return matchSearch;
     const catBanco = (item as any).category || (item as any).categoria || "";
     const norm = (t: string) =>
@@ -373,19 +388,49 @@ export default function ProdutosTab({
                       setShowCategoriaDropdown(false);
                     }}
                   >
-                    <Text
-                      style={[
-                        localStyles.dropdownText,
-                        {
-                          color:
-                            categoriaSelecionada === cat
-                              ? theme.primary
-                              : theme.text,
-                        },
-                      ]}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
                     >
-                      {cat}
-                    </Text>
+                      {cat === "Baixo Estoque" && (
+                        <Ionicons
+                          name="warning-outline"
+                          size={14}
+                          color="#f59e0b"
+                        />
+                      )}
+                      {cat === "Esgotado" && (
+                        <Ionicons
+                          name="close-circle-outline"
+                          size={14}
+                          color="#ef4444"
+                        />
+                      )}
+                      <Text
+                        style={[
+                          localStyles.dropdownText,
+                          {
+                            color:
+                              cat === "Esgotado"
+                                ? "#ef4444"
+                                : cat === "Baixo Estoque"
+                                  ? "#f59e0b"
+                                  : categoriaSelecionada === cat
+                                    ? theme.primary
+                                    : theme.text,
+                            fontWeight:
+                              cat === "Baixo Estoque" || cat === "Esgotado"
+                                ? "700"
+                                : "500",
+                          },
+                        ]}
+                      >
+                        {cat}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -481,7 +526,12 @@ export default function ProdutosTab({
               color: theme.textSecondary,
             }}
           >
-            {produtosFiltrados.length} produto(s) encontrado(s)
+            {produtosFiltrados.length} produto(s)
+            {categoriaSelecionada === "Baixo Estoque"
+              ? " com baixo estoque (1–5 unidades)"
+              : categoriaSelecionada === "Esgotado"
+                ? " esgotado(s)"
+                : " encontrado(s)"}
           </Text>
           {produtosFiltrados.length > 0 ? (
             produtosFiltrados.map((produto) => (
