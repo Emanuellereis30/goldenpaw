@@ -1,13 +1,13 @@
 import {
-    completeReminder,
-    createReminder,
-    CreateReminderInput,
-    deleteReminder,
-    filterRemindersByStatus,
-    getUserReminders,
-    Reminder,
-    requestNotificationPermissions,
-    updateReminder,
+  completeReminder,
+  createReminder,
+  CreateReminderInput,
+  deleteReminder,
+  filterRemindersByStatus,
+  getUserReminders,
+  Reminder,
+  requestNotificationPermissions,
+  updateReminder,
 } from '@/app/services/ReminderService';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,17 +15,17 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Timestamp } from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -686,7 +686,7 @@ export default function RemindersScreen({
                     styles.formInput,
                     { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
                   ]}
-                  type="date"
+                  inputMode="numeric"
                   value={formData.scheduledAt.toISOString().split('T')[0]}
                   onChange={(e) => {
                     const date = new Date(e.nativeEvent.text);
@@ -738,7 +738,7 @@ export default function RemindersScreen({
                     styles.formInput,
                     { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
                   ]}
-                  type="time"
+                  inputMode="numeric"
                   value={formData.scheduledAt.toTimeString().substring(0, 5)}
                   onChange={(e) => {
                     const [hours, minutes] = e.nativeEvent.text.split(':');

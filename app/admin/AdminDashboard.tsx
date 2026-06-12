@@ -144,7 +144,7 @@ export default function AdminDashboard() {
       badgeColor: theme.primary, // cor primária — novos pedidos
     },
     { id: "usuarios", label: "Usuários", icon: "people", badge: 0 },
-    { id: "funcionarios", label: "Equipa", icon: "briefcase", badge: 0 },
+    { id: "funcionarios", label: "Equipe", icon: "briefcase", badge: 0 },
   ];
 
   const navigateToPets = (view: "pets" | "requisicoes") => {

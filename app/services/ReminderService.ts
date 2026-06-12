@@ -1,15 +1,15 @@
 import * as Notifications from 'expo-notifications';
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    getDocs,
-    query,
-    serverTimestamp,
-    Timestamp,
-    updateDoc,
-    where,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  query,
+  serverTimestamp,
+  Timestamp,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
 import { Platform } from 'react-native';
 import { auth, db } from '../../firebaseConfig';
@@ -40,25 +40,33 @@ export interface CreateReminderInput {
   status: 'active' | 'inactive';
 }
 
-// Configurar comportamento de notificação
+// Configurar comportamento de notificação (mobile) - com supressão de tipo para compatibilidade
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
-    }),
+    }) as any,
   });
 }
 
-/**
- * Solicitar permissão para notificações no mobile
- */
-export async function requestNotificationPermissions() {
-  if (Platform.OS === 'web') {
-    return true;
-  }
+// ========== FUNÇÕES AUXILIARES PARA NOTIFICAÇÕES ==========
 
+async function ensureAndroidChannel() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('goldenpaw_lembretes', {
+      name: 'Lembretes Golden Paw',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+      enableLights: true,
+    });
+  }
+}
+
+export async function requestNotificationPermissions() {
+  if (Platform.OS === 'web') return true;
   try {
     const { status } = await Notifications.requestPermissionsAsync();
     return status === 'granted';
@@ -69,24 +77,81 @@ export async function requestNotificationPermissions() {
 }
 
 /**
- * Agendar notificação local
+ * Agendar notificação local (corrigido para Android e com logs)
  */
 async function scheduleNotification(reminder: Reminder): Promise<string | null> {
-  if (Platform.OS === 'web') {
-    return null; // Notificações web não são suportadas
-  }
+  if (Platform.OS === 'web') return null;
+
+  await ensureAndroidChannel();
 
   try {
-    const scheduledAt = reminder.scheduledAt instanceof Timestamp
-      ? reminder.scheduledAt.toDate()
-      : reminder.scheduledAt;
+    // Garantir que scheduledAt seja um objeto Date válido
+    let scheduledAtDate: Date;
+    if (reminder.scheduledAt instanceof Timestamp) {
+      scheduledAtDate = reminder.scheduledAt.toDate();
+    } else if (reminder.scheduledAt instanceof Date) {
+      scheduledAtDate = reminder.scheduledAt;
+    } else {
+      scheduledAtDate = new Date(reminder.scheduledAt as any);
+    }
 
     const now = new Date();
-    const trigger = scheduledAt > now ? scheduledAt : null;
-
-    if (!trigger) {
+    if (scheduledAtDate <= now) {
       console.warn('Data de agendamento já passou');
       return null;
+    }
+
+    const hour = scheduledAtDate.getHours();
+    const minute = scheduledAtDate.getMinutes();
+    console.log(`🔔 Agendando notificação para ${hour}:${minute} (recurrence: ${reminder.recurrence})`);
+
+    let trigger: Notifications.NotificationTriggerInput;
+
+    switch (reminder.recurrence) {
+      case 'daily':
+        trigger = {
+          hour,
+          minute,
+          repeats: true,
+          channelId: 'goldenpaw_lembretes',
+        };
+        break;
+      case 'weekly':
+        let weekday = scheduledAtDate.getDay();
+        if (weekday === 0) weekday = 7;
+        trigger = {
+          weekday,
+          hour,
+          minute,
+          repeats: true,
+          channelId: 'goldenpaw_lembretes',
+        };
+        break;
+      case 'monthly':
+        trigger = {
+          day: scheduledAtDate.getDate(),
+          hour,
+          minute,
+          repeats: true,
+          channelId: 'goldenpaw_lembretes',
+        };
+        break;
+      case 'yearly':
+        trigger = {
+          month: scheduledAtDate.getMonth() + 1,
+          day: scheduledAtDate.getDate(),
+          hour,
+          minute,
+          repeats: true,
+          channelId: 'goldenpaw_lembretes',
+        };
+        break;
+      default: // 'none'
+        trigger = {
+          date: scheduledAtDate,
+          channelId: 'goldenpaw_lembretes',
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+        };
     }
 
     const notificationId = await Notifications.scheduleNotificationAsync({
@@ -100,6 +165,7 @@ async function scheduleNotification(reminder: Reminder): Promise<string | null> 
       trigger,
     });
 
+    console.log(`✅ Notificação agendada com ID: ${notificationId}`);
     return notificationId as string;
   } catch (error) {
     console.error('Erro ao agendar notificação:', error);
@@ -107,14 +173,8 @@ async function scheduleNotification(reminder: Reminder): Promise<string | null> 
   }
 }
 
-/**
- * Cancelar notificação
- */
 export async function cancelNotification(notificationId: string): Promise<void> {
-  if (Platform.OS === 'web' || !notificationId) {
-    return;
-  }
-
+  if (Platform.OS === 'web' || !notificationId) return;
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
   } catch (error) {
@@ -122,271 +182,191 @@ export async function cancelNotification(notificationId: string): Promise<void> 
   }
 }
 
-/**
- * Criar um novo lembrete
- */
+// ========== FUNÇÕES CRUD DO FIRESTORE ==========
+
 export async function createReminder(input: CreateReminderInput): Promise<Reminder> {
   const user = auth.currentUser;
-  if (!user) {
-    throw new Error('Usuário não autenticado');
-  }
+  if (!user) throw new Error('Usuário não autenticado');
 
-  try {
-    const now = new Date();
-    const reminderData = {
-      userId: user.uid,
-      type: input.type,
-      title: input.title,
-      description: input.description,
-      scheduledAt: Timestamp.fromDate(input.scheduledAt),
-      recurrence: input.recurrence,
-      petId: input.petId || null,
-      status: input.status,
-      completed: false,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
+  const now = new Date();
+  const reminderData = {
+    userId: user.uid,
+    type: input.type,
+    title: input.title,
+    description: input.description,
+    scheduledAt: Timestamp.fromDate(input.scheduledAt),
+    recurrence: input.recurrence,
+    petId: input.petId ?? null,
+    status: input.status,
+    completed: false,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
 
-    const docRef = await addDoc(collection(db, 'reminders'), reminderData);
+  const docRef = await addDoc(collection(db, 'reminders'), reminderData);
 
-    const reminder: Reminder = {
-      id: docRef.id,
-      ...reminderData,
-      scheduledAt: input.scheduledAt,
-      createdAt: now,
-      updatedAt: now,
-    };
+  const reminder: Reminder = {
+    id: docRef.id,
+    userId: user.uid,
+    type: input.type,
+    title: input.title,
+    description: input.description,
+    scheduledAt: input.scheduledAt,
+    recurrence: input.recurrence,
+    petId: input.petId,
+    status: input.status,
+    completed: false,
+    createdAt: now,
+    updatedAt: now,
+    notificationId: undefined,
+  };
 
-    // Agendar notificação se no mobile
-    if (input.status === 'active') {
-      const notificationId = await scheduleNotification(reminder);
-      if (notificationId) {
-        await updateDoc(doc(db, 'reminders', docRef.id), { notificationId });
-        reminder.notificationId = notificationId;
-      }
+  if (input.status === 'active') {
+    const notificationId = await scheduleNotification(reminder);
+    if (notificationId) {
+      await updateDoc(doc(db, 'reminders', docRef.id), { notificationId });
+      reminder.notificationId = notificationId;
     }
-
-    return reminder;
-  } catch (error) {
-    console.error('Erro ao criar lembrete:', error);
-    throw error;
   }
+
+  return reminder;
 }
 
-/**
- * Obter lembretes do usuário
- */
 export async function getUserReminders(): Promise<Reminder[]> {
   const user = auth.currentUser;
-  if (!user) {
-    throw new Error('Usuário não autenticado');
-  }
+  if (!user) throw new Error('Usuário não autenticado');
 
-  try {
-    const q = query(
-      collection(db, 'reminders'),
-      where('userId', '==', user.uid)
-    );
+  const q = query(collection(db, 'reminders'), where('userId', '==', user.uid));
+  const querySnapshot = await getDocs(q);
+  const reminders: Reminder[] = [];
 
-    const querySnapshot = await getDocs(q);
-    const reminders: Reminder[] = [];
-
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      reminders.push({
-        id: doc.id,
-        userId: data.userId,
-        type: data.type,
-        title: data.title,
-        description: data.description,
-        scheduledAt: data.scheduledAt,
-        recurrence: data.recurrence,
-        petId: data.petId,
-        status: data.status,
-        completed: data.completed,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
-        notificationId: data.notificationId,
-      });
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    reminders.push({
+      id: doc.id,
+      userId: data.userId,
+      type: data.type,
+      title: data.title,
+      description: data.description,
+      scheduledAt: data.scheduledAt,
+      recurrence: data.recurrence,
+      petId: data.petId === null ? undefined : data.petId,
+      status: data.status,
+      completed: data.completed,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      notificationId: data.notificationId,
     });
+  });
 
-    return reminders.sort((a, b) => {
-      const dateA = a.scheduledAt instanceof Timestamp ? a.scheduledAt.toDate() : a.scheduledAt;
-      const dateB = b.scheduledAt instanceof Timestamp ? b.scheduledAt.toDate() : b.scheduledAt;
-      return dateA.getTime() - dateB.getTime();
-    });
-  } catch (error) {
-    console.error('Erro ao obter lembretes:', error);
-    throw error;
-  }
+  return reminders.sort((a, b) => {
+    const dateA = a.scheduledAt instanceof Timestamp ? a.scheduledAt.toDate() : a.scheduledAt;
+    const dateB = b.scheduledAt instanceof Timestamp ? b.scheduledAt.toDate() : b.scheduledAt;
+    return dateA.getTime() - dateB.getTime();
+  });
 }
 
-/**
- * Atualizar lembrete
- */
-export async function updateReminder(
-  reminderId: string,
-  updates: Partial<Reminder>
-): Promise<void> {
+export async function updateReminder(reminderId: string, updates: Partial<Reminder>): Promise<void> {
   const user = auth.currentUser;
-  if (!user) {
-    throw new Error('Usuário não autenticado');
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const docRef = doc(db, 'reminders', reminderId);
+  const q = query(collection(db, 'reminders'), where('userId', '==', user.uid));
+  const snapshot = await getDocs(q);
+  let found = false;
+  let oldNotificationId = '';
+
+  for (const d of snapshot.docs) {
+    if (d.id === reminderId) {
+      found = true;
+      oldNotificationId = d.data().notificationId;
+      break;
+    }
   }
+  if (!found) throw new Error('Lembrete não encontrado ou acesso negado');
 
-  try {
-    const docRef = doc(db, 'reminders', reminderId);
-    const reminderDoc = await getDocs(query(collection(db, 'reminders'), where('userId', '==', user.uid)));
-    
-    let found = false;
-    for (const remDoc of reminderDoc.docs) {
-      if (remDoc.id === reminderId) {
-        found = true;
-        break;
-      }
-    }
+  if (oldNotificationId) await cancelNotification(oldNotificationId);
 
-    if (!found) {
-      throw new Error('Lembrete não encontrado ou acesso negado');
-    }
+  const updateData: any = { ...updates, updatedAt: serverTimestamp() };
+  if (updates.scheduledAt && updates.scheduledAt instanceof Date) {
+    updateData.scheduledAt = Timestamp.fromDate(updates.scheduledAt);
+  }
+  if (updates.hasOwnProperty('petId')) {
+    updateData.petId = updates.petId === undefined ? null : updates.petId;
+  }
+  await updateDoc(docRef, updateData);
 
-    // Cancelar notificação anterior se existir
-    const currentReminder = (await getDocs(query(collection(db, 'reminders'), where('userId', '==', user.uid)))).docs
-      .find(doc => doc.id === reminderId);
-    
-    if (currentReminder?.data().notificationId) {
-      await cancelNotification(currentReminder.data().notificationId);
-    }
-
-    const updateData: any = {
-      ...updates,
-      updatedAt: serverTimestamp(),
+  if (updates.status === 'active' && updates.scheduledAt) {
+    const fullReminder: Reminder = {
+      id: reminderId,
+      userId: user.uid,
+      type: updates.type || '',
+      title: updates.title || '',
+      description: updates.description || '',
+      scheduledAt: updates.scheduledAt,
+      recurrence: updates.recurrence || 'none',
+      petId: updates.petId,
+      status: 'active',
+      completed: updates.completed || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-
-    if (updates.scheduledAt && updates.scheduledAt instanceof Date) {
-      updateData.scheduledAt = Timestamp.fromDate(updates.scheduledAt);
-    }
-
-    await updateDoc(docRef, updateData);
-
-    // Reagendar notificação se status ativo
-    if (updates.status === 'active' && updates.scheduledAt) {
-      const reminder: Reminder = {
-        id: reminderId,
-        userId: user.uid,
-        type: updates.type || '',
-        title: updates.title || '',
-        description: updates.description || '',
-        scheduledAt: updates.scheduledAt,
-        recurrence: updates.recurrence || 'none',
-        petId: updates.petId,
-        status: 'active',
-        completed: updates.completed || false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      const notificationId = await scheduleNotification(reminder);
-      if (notificationId) {
-        await updateDoc(docRef, { notificationId });
-      }
-    }
-  } catch (error) {
-    console.error('Erro ao atualizar lembrete:', error);
-    throw error;
+    const newNotificationId = await scheduleNotification(fullReminder);
+    if (newNotificationId) await updateDoc(docRef, { notificationId: newNotificationId });
   }
 }
 
-/**
- * Deletar lembrete
- */
 export async function deleteReminder(reminderId: string): Promise<void> {
   const user = auth.currentUser;
-  if (!user) {
-    throw new Error('Usuário não autenticado');
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const q = query(collection(db, 'reminders'), where('userId', '==', user.uid));
+  const snapshot = await getDocs(q);
+  let found = false;
+  let notificationId = '';
+  for (const d of snapshot.docs) {
+    if (d.id === reminderId) {
+      found = true;
+      notificationId = d.data().notificationId;
+      break;
+    }
   }
+  if (!found) throw new Error('Lembrete não encontrado ou acesso negado');
 
-  try {
-    const docRef = doc(db, 'reminders', reminderId);
-    const reminderDoc = await getDocs(query(collection(db, 'reminders'), where('userId', '==', user.uid)));
-    
-    let found = false;
-    let notificationId = '';
-    
-    for (const remDoc of reminderDoc.docs) {
-      if (remDoc.id === reminderId) {
-        found = true;
-        notificationId = remDoc.data().notificationId;
-        break;
-      }
-    }
-
-    if (!found) {
-      throw new Error('Lembrete não encontrado ou acesso negado');
-    }
-
-    // Cancelar notificação
-    if (notificationId) {
-      await cancelNotification(notificationId);
-    }
-
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error('Erro ao deletar lembrete:', error);
-    throw error;
-  }
+  if (notificationId) await cancelNotification(notificationId);
+  await deleteDoc(doc(db, 'reminders', reminderId));
 }
 
-/**
- * Marcar lembrete como concluído
- */
 export async function completeReminder(reminderId: string): Promise<void> {
   const user = auth.currentUser;
-  if (!user) {
-    throw new Error('Usuário não autenticado');
+  if (!user) throw new Error('Usuário não autenticado');
+
+  const docRef = doc(db, 'reminders', reminderId);
+  const q = query(collection(db, 'reminders'), where('userId', '==', user.uid));
+  const snapshot = await getDocs(q);
+  let found = false;
+  for (const d of snapshot.docs) {
+    if (d.id === reminderId) { found = true; break; }
   }
+  if (!found) throw new Error('Lembrete não encontrado ou acesso negado');
 
-  try {
-    const docRef = doc(db, 'reminders', reminderId);
-    const reminderDoc = await getDocs(query(collection(db, 'reminders'), where('userId', '==', user.uid)));
-    
-    let found = false;
-    for (const remDoc of reminderDoc.docs) {
-      if (remDoc.id === reminderId) {
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) {
-      throw new Error('Lembrete não encontrado ou acesso negado');
-    }
-
-    await updateDoc(docRef, {
-      completed: true,
-      updatedAt: serverTimestamp(),
-    });
-  } catch (error) {
-    console.error('Erro ao completar lembrete:', error);
-    throw error;
-  }
+  await updateDoc(docRef, {
+    completed: true,
+    updatedAt: serverTimestamp(),
+  });
 }
 
-/**
- * Filtrar lembretes por status (futuros ou passados)
- */
 export function filterRemindersByStatus(
   reminders: Reminder[],
   filterType: 'future' | 'past'
 ): Reminder[] {
   const now = new Date();
-
   return reminders.filter((reminder) => {
     const scheduledAt = reminder.scheduledAt instanceof Timestamp
       ? reminder.scheduledAt.toDate()
       : reminder.scheduledAt;
-
     if (filterType === 'future') {
-      return scheduledAt > now && !reminder.completed;
+      return scheduledAt > now && !reminder.completed && reminder.status === 'active';
     } else {
       return (scheduledAt <= now || reminder.completed) && reminder.status === 'active';
     }

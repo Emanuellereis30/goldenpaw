@@ -30,6 +30,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { useFontSize } from "../../contexts/FontSizeContext";
 import { auth, db } from "../../firebaseConfig";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -55,7 +56,6 @@ const IMAGES = {
   logo: require("../../assets/img/logo.png"),
 };
 
-// ── Atualizado: removida a rota fixa, agora usaremos o "name" como parâmetro
 const CATEGORIES: Categoria[] = [
   { id: "c1", name: "Cães", icon: "paw" },
   { id: "c2", name: "Gatos", icon: "logo-octocat" },
@@ -68,6 +68,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
   const { addToCart } = useCart();
+  const { fontSize, increaseFontSize, decreaseFontSize } = useFontSize();
 
   const [featuredProducts, setFeaturedProducts] = useState<Produto[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -79,27 +80,19 @@ export default function HomeScreen() {
   });
   const profileButtonRef = useRef<View>(null);
 
-  // Monitoriza o estado de autenticação e permissões de administrador
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsLoggedIn(!!user);
       if (user) {
-        // Verifica se é o admin padrão
         if (user.email?.toLowerCase() === "admin@goldenpaw.com") {
           setIsAdmin(true);
         } else {
           try {
-            // Verifica na coleção de admins
-            const q = query(
-              collection(db, "admin"),
-              where("uid", "==", user.uid),
-            );
+            const q = query(collection(db, "admin"), where("uid", "==", user.uid));
             const snapshot = await getDocs(q);
-
             if (!snapshot.empty) {
               setIsAdmin(true);
             } else {
-              // Fallback para verificar se existe "tipo: admin" nos usuários
               const userDoc = await getDoc(doc(db, "usuarios", user.uid));
               if (userDoc.exists()) {
                 const userData = userDoc.data();
@@ -117,11 +110,9 @@ export default function HomeScreen() {
         setIsAdmin(false);
       }
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Escuta os produtos do Firestore em tempo real para extrair os destaques
   useEffect(() => {
     const q = query(collection(db, "produtos"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -129,17 +120,14 @@ export default function HomeScreen() {
         id: doc.id,
         ...doc.data(),
       })) as Produto[];
-
       const produtosEmEstoque = produtosFirestore.filter(
-        (p) => p.estoque && p.estoque > 0,
+        (p) => p.estoque && p.estoque > 0
       );
-
       const comTag = produtosEmEstoque.filter((p) => p.tag);
       setFeaturedProducts(
-        comTag.length > 0 ? comTag.slice(0, 5) : produtosEmEstoque.slice(0, 5),
+        comTag.length > 0 ? comTag.slice(0, 5) : produtosEmEstoque.slice(0, 5)
       );
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -156,16 +144,12 @@ export default function HomeScreen() {
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
       <View style={styles.headerLeft}>
-        <Image
-          source={IMAGES.logo}
-          style={styles.headerLogo}
-          resizeMode="contain"
-        />
+        <Image source={IMAGES.logo} style={styles.headerLogo} resizeMode="contain" />
         <View>
-          <Text style={[styles.welcomeText, { color: theme.textSecondary }]}>
+          <Text style={[styles.welcomeText, { color: theme.textSecondary, fontSize: fontSize - 2 }]}>
             Olá, Pet Lover!
           </Text>
-          <Text style={[styles.brandText, { color: theme.text }]}>
+          <Text style={[styles.brandText, { color: theme.text, fontSize: fontSize + 4 }]}>
             Golden Paw
           </Text>
         </View>
@@ -175,11 +159,7 @@ export default function HomeScreen() {
           onPress={toggleColorScheme}
           style={[styles.iconButton, { backgroundColor: theme.surface }]}
         >
-          <Ionicons
-            name={colorScheme === "dark" ? "sunny" : "moon"}
-            size={22}
-            color={theme.primary}
-          />
+          <Ionicons name={colorScheme === "dark" ? "sunny" : "moon"} size={22} color={theme.primary} />
         </TouchableOpacity>
         <TouchableOpacity
           ref={profileButtonRef}
@@ -193,144 +173,74 @@ export default function HomeScreen() {
           onPress={() => setShowProfileMenu(!showProfileMenu)}
           style={[styles.iconButton, { backgroundColor: theme.surface }]}
         >
-          <Ionicons
-            name={isLoggedIn ? "person" : "person-outline"}
-            size={22}
-            color={theme.text}
-          />
+          <Ionicons name={isLoggedIn ? "person" : "person-outline"} size={22} color={theme.text} />
         </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
-      <StatusBar
-        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
-      />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={colorScheme === "dark" ? "light-content" : "dark-content"} />
       {renderHeader()}
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Banner Hero */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={[styles.heroBanner, { backgroundColor: theme.primary }]}>
-          <Image
-            source={IMAGES.banner}
-            style={styles.heroBackgroundImage}
-            resizeMode="cover"
-          />
+          <Image source={IMAGES.banner} style={styles.heroBackgroundImage} resizeMode="cover" />
           <View style={styles.heroOverlay} />
           <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>Tudo para o seu melhor amigo</Text>
-            <Text style={styles.heroSubtitle}>
+            <Text style={[styles.heroTitle, { fontSize: fontSize + 8 }]}>Tudo para o seu melhor amigo</Text>
+            <Text style={[styles.heroSubtitle, { fontSize: fontSize }]}>
               Descontos especiais em produtos selecionados.
             </Text>
-            <TouchableOpacity
-              style={styles.heroButton}
-              onPress={() => router.push("/loja")}
-            >
-              <Text style={styles.heroButtonText}>Comprar Agora</Text>
+            <TouchableOpacity style={styles.heroButton} onPress={() => router.push("/loja")}>
+              <Text style={[styles.heroButtonText, { fontSize: fontSize }]}>Comprar Agora</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Categorias */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Categorias
-        </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesScroll}
-        >
+        <Text style={[styles.sectionTitle, { color: theme.text, fontSize: fontSize + 2 }]}>Categorias</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat.id}
               style={styles.categoryItem}
-              // ── Atualizado: Redireciona para a loja passando o parâmetro de categoria ──
-              onPress={() =>
-                router.push({
-                  pathname: "/loja",
-                  params: { categoria: cat.name },
-                })
-              }
+              onPress={() => router.push({ pathname: "/loja", params: { categoria: cat.name } })}
             >
-              <View
-                style={[
-                  styles.categoryIcon,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                <Ionicons
-                  name={cat.icon as any}
-                  size={28}
-                  color={theme.primary}
-                />
+              <View style={[styles.categoryIcon, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <Ionicons name={cat.icon as any} size={28} color={theme.primary} />
               </View>
-              <Text
-                style={[styles.categoryName, { color: theme.textSecondary }]}
-              >
+              <Text style={[styles.categoryName, { color: theme.textSecondary, fontSize: fontSize - 2 }]}>
                 {cat.name}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {/* Destaques */}
         <View style={styles.sectionHeader}>
-          <Text
-            style={[
-              styles.sectionTitle,
-              { color: theme.text, paddingHorizontal: 0 },
-            ]}
-          >
+          <Text style={[styles.sectionTitle, { color: theme.text, paddingHorizontal: 0, fontSize: fontSize + 2 }]}>
             Destaques
           </Text>
           <TouchableOpacity onPress={() => router.push("/loja")}>
-            <Text style={{ color: theme.primary, fontWeight: "600" }}>
-              Ver tudo
-            </Text>
+            <Text style={{ color: theme.primary, fontWeight: "600", fontSize: fontSize - 2 }}>Ver tudo</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalScroll}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
           {featuredProducts.map((item) => {
-            const imageSource =
-              typeof item.image === "string" ? { uri: item.image } : item.image;
-
+            const imageSource = typeof item.image === "string" ? { uri: item.image } : item.image;
             return (
-              <View
-                key={`feat-${item.id}`}
-                style={[
-                  styles.featuredCard,
-                  { backgroundColor: theme.surface },
-                ]}
-              >
+              <View key={`feat-${item.id}`} style={[styles.featuredCard, { backgroundColor: theme.surface }]}>
                 {item.tag && (
                   <View style={styles.tagBadge}>
-                    <Text style={styles.tagText}>{item.tag}</Text>
+                    <Text style={[styles.tagText, { fontSize: fontSize - 4 }]}>{item.tag}</Text>
                   </View>
                 )}
-                <Image
-                  source={imageSource}
-                  style={styles.featuredImage}
-                  resizeMode="contain"
-                />
-                <Text
-                  style={[styles.productName, { color: theme.text }]}
-                  numberOfLines={1}
-                >
+                <Image source={imageSource} style={styles.featuredImage} resizeMode="contain" />
+                <Text style={[styles.productName, { color: theme.text, fontSize: fontSize }]} numberOfLines={1}>
                   {item.nome}
                 </Text>
-                <Text style={[styles.productPrice, { color: theme.primary }]}>
+                <Text style={[styles.productPrice, { color: theme.primary, fontSize: fontSize + 2 }]}>
                   R$ {item.preco}
                 </Text>
                 <TouchableOpacity
@@ -346,13 +256,10 @@ export default function HomeScreen() {
         </ScrollView>
       </ScrollView>
 
-      {/* Menu Dropdown de Perfil */}
+      {/* Menu dropdown de perfil – controles de fonte sempre visíveis */}
       {showProfileMenu && (
         <>
-          <Pressable
-            style={styles.dropdownOverlay}
-            onPress={() => setShowProfileMenu(false)}
-          />
+          <Pressable style={styles.dropdownOverlay} onPress={() => setShowProfileMenu(false)} />
           <View
             style={[
               styles.dropdownMenu,
@@ -363,21 +270,41 @@ export default function HomeScreen() {
               },
             ]}
           >
+            {/* Controles de fonte – sempre disponíveis */}
+            <TouchableOpacity
+              style={[styles.dropdownOption, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
+              onPress={() => {
+                decreaseFontSize();
+                setShowProfileMenu(false);
+              }}
+            >
+              <Text style={[styles.dropdownOptionText, { color: theme.text, fontSize: fontSize }]}>
+                Diminuir fonte (A-)
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dropdownOption, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
+              onPress={() => {
+                increaseFontSize();
+                setShowProfileMenu(false);
+              }}
+            >
+              <Text style={[styles.dropdownOptionText, { color: theme.text, fontSize: fontSize }]}>
+                Aumentar fonte (A+)
+              </Text>
+            </TouchableOpacity>
+
+            <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 4 }} />
+
+            {/* Opções de login / perfil conforme estado */}
             {isLoggedIn ? (
               <>
-                {/* Botão Condicional: Se for Admin mostra "Admin", senão "Perfil" */}
                 <TouchableOpacity
-                  style={[
-                    styles.dropdownOption,
-                    { borderBottomColor: theme.border, borderBottomWidth: 1 },
-                  ]}
+                  style={[styles.dropdownOption, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
                   onPress={() => {
                     setShowProfileMenu(false);
-                    if (isAdmin) {
-                      (router.push as any)("/admin/AdminDashboard");
-                    } else {
-                      router.push("/profile" as any);
-                    }
+                    if (isAdmin) router.push("/admin/AdminDashboard");
+                    else router.push("/profile");
                   }}
                 >
                   <Text
@@ -386,54 +313,36 @@ export default function HomeScreen() {
                       {
                         color: isAdmin ? theme.primary : theme.text,
                         fontWeight: isAdmin ? "800" : "600",
+                        fontSize: fontSize,
                       },
                     ]}
                   >
                     {isAdmin ? "Admin" : "Perfil"}
                   </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.dropdownOption}
-                  onPress={handleLogout}
-                >
-                  <Text
-                    style={[styles.dropdownOptionText, { color: "#EF4444" }]}
-                  >
-                    Sair
-                  </Text>
+                <TouchableOpacity style={styles.dropdownOption} onPress={handleLogout}>
+                  <Text style={[styles.dropdownOptionText, { color: "#EF4444", fontSize: fontSize }]}>Sair</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <TouchableOpacity
-                  style={[
-                    styles.dropdownOption,
-                    { borderBottomColor: theme.border, borderBottomWidth: 1 },
-                  ]}
+                  style={[styles.dropdownOption, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
                   onPress={() => {
                     setShowProfileMenu(false);
-                    router.push("/login" as any);
+                    router.push("/login");
                   }}
                 >
-                  <Text
-                    style={[styles.dropdownOptionText, { color: theme.text }]}
-                  >
-                    Login
-                  </Text>
+                  <Text style={[styles.dropdownOptionText, { color: theme.text, fontSize: fontSize }]}>Login</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.dropdownOption}
                   onPress={() => {
                     setShowProfileMenu(false);
-                    router.push("/register" as any);
+                    router.push("/register");
                   }}
                 >
-                  <Text
-                    style={[styles.dropdownOptionText, { color: theme.text }]}
-                  >
-                    Registrar
-                  </Text>
+                  <Text style={[styles.dropdownOptionText, { color: theme.text, fontSize: fontSize }]}>Registrar</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -456,9 +365,9 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: "row", alignItems: "center" },
   headerLogo: { width: 45, height: 45, marginRight: 12, borderRadius: 10 },
-  welcomeText: { fontSize: 12, fontWeight: "500" },
-  brandText: { fontSize: 18, fontWeight: "800" },
-  headerActions: { flexDirection: "row", gap: 10 },
+  welcomeText: { fontWeight: "500" },
+  brandText: { fontWeight: "800" },
+  headerActions: { flexDirection: "row", gap: 10, alignItems: "center" },
   iconButton: {
     width: 44,
     height: 44,
@@ -485,17 +394,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
   },
   heroContent: { flex: 1, justifyContent: "center", zIndex: 2, padding: 25 },
-  heroTitle: {
-    color: "#FFF",
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-  heroSubtitle: {
-    color: "rgba(255,255,255,0.9)",
-    fontSize: 14,
-    marginBottom: 16,
-  },
+  heroTitle: { color: "#FFF", fontWeight: "800", marginBottom: 8 },
+  heroSubtitle: { color: "rgba(255,255,255,0.9)", marginBottom: 16 },
   heroButton: {
     backgroundColor: "#FFF",
     paddingHorizontal: 20,
@@ -503,13 +403,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignSelf: "flex-start",
   },
-  heroButtonText: { color: "#D4AF37", fontWeight: "bold", fontSize: 14 },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    paddingHorizontal: 20,
-    marginBottom: 15,
-  },
+  heroButtonText: { color: "#D4AF37", fontWeight: "bold" },
+  sectionTitle: { fontWeight: "700", paddingHorizontal: 20, marginBottom: 15 },
   categoriesScroll: { paddingHorizontal: 15, marginBottom: 25 },
   categoryItem: { alignItems: "center", marginHorizontal: 8 },
   categoryIcon: {
@@ -521,7 +416,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  categoryName: { fontSize: 12, fontWeight: "600" },
+  categoryName: { fontWeight: "600" },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -553,9 +448,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     zIndex: 1,
   },
-  tagText: { color: "#D4AF37", fontSize: 10, fontWeight: "700" },
-  productName: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
-  productPrice: { fontSize: 16, fontWeight: "800" },
+  tagText: { color: "#D4AF37", fontWeight: "700" },
+  productName: { fontWeight: "700", marginBottom: 4 },
+  productPrice: { fontWeight: "800" },
   addButton: {
     position: "absolute",
     bottom: 12,
@@ -576,7 +471,7 @@ const styles = StyleSheet.create({
   },
   dropdownMenu: {
     position: "absolute",
-    width: 150,
+    width: 180,
     borderRadius: 12,
     overflow: "hidden",
     zIndex: 99,
@@ -587,5 +482,5 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   dropdownOption: { padding: 14, alignItems: "center" },
-  dropdownOptionText: { fontSize: 15, fontWeight: "600" },
+  dropdownOptionText: { fontWeight: "600" },
 });

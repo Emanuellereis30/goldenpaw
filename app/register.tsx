@@ -110,12 +110,12 @@ export default function RegisterScreen() {
     let newErrors: any = {};
     const emailRegex = /\S+@\S+\.\S+/;
 
-    // REGEX DA SENHA: Mínimo 8 caracteres, 1 maiúscula, 1 minúscula, 1 número e 1 caractere especial
+    // REGEX DA SENHA: Mínimo 6 caracteres, 1 maiúscula, 1 minúscula, 1 número e 1 caractere especial
     const passwordRegex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
 
-    if (fullName.trim().length < 15)
-      newErrors.fullName = "O nome deve ter no mínimo 15 letras.";
+    if (fullName.trim().length < 10 || fullName.trim().length > 60)
+      newErrors.fullName = "O nome deve ter entre 10 e 60 caracteres.";
     if (cpf.length < 14) newErrors.cpf = "CPF inválido.";
     if (phone.length < 14) newErrors.phone = "Telefone inválido.";
     if (!emailRegex.test(email)) newErrors.email = "E-mail inválido.";
@@ -126,7 +126,7 @@ export default function RegisterScreen() {
       newErrors.password = "A senha é obrigatória.";
     } else if (!passwordRegex.test(password)) {
       newErrors.password =
-        "A senha deve ter 8+ caracteres, com letra maiúscula, minúscula e símbolo.";
+        "A senha deve ter no mínimo 6 caracteres, com letra maiúscula, minúscula, número e símbolo.";
     }
 
     if (password !== confirmPassword) {
@@ -169,11 +169,9 @@ export default function RegisterScreen() {
         { text: "OK", onPress: () => router.replace("/login") },
       ]);
     } catch (error: any) {
-      // ... seu tratamento de erro atual
-      Alert.alert("Erro", "Falha ao cadastrar.");
-    } finally {
-      setLoading(false);
-    }
+  console.error("Erro detalhado:", error);
+  Alert.alert("Erro", error.message || "Falha ao cadastrar.");
+}
   };
 
   return (
@@ -222,18 +220,28 @@ export default function RegisterScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: insets.top + 74 },
+            { paddingTop: insets.top + 64 },
           ]}
           automaticallyAdjustKeyboardInsets={true}
           keyboardShouldPersistTaps="handled"
         >
           <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
-          <Text style={[styles.title, { color: theme.text }]}>
+          <Text
+            style={[
+              styles.title,
+              { color: theme.text },
+            ]}
+          >
             Cadastro Golden Paw
           </Text>
 
           {/* ── DADOS PESSOAIS ── */}
-          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: theme.primary },
+            ]}
+          >
             Informações Pessoais
           </Text>
 
@@ -273,7 +281,12 @@ export default function RegisterScreen() {
 
           {/* ── ENDEREÇO ── */}
           <View style={styles.divider} />
-          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: theme.primary },
+            ]}
+          >
             Endereço
           </Text>
 
@@ -297,7 +310,7 @@ export default function RegisterScreen() {
             <View style={{ flex: 1 }}>
               <FormInput
                 theme={theme}
-                placeholder="Nº"
+                placeholder="Número"
                 value={number}
                 onChange={setNumber}
                 keyboard="numeric"
@@ -335,7 +348,12 @@ export default function RegisterScreen() {
 
           {/* ── SENHA ── */}
           <View style={styles.divider} />
-          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: theme.primary },
+            ]}
+          >
             Senha de Acesso
           </Text>
 
@@ -351,7 +369,10 @@ export default function RegisterScreen() {
               ]}
             >
               <TextInput
-                style={[styles.input, { color: theme.text }]}
+                style={[
+                  styles.input,
+                  { color: theme.text },
+                ]}
                 placeholder="Senha"
                 placeholderTextColor={theme.textSecondary}
                 secureTextEntry={!showPassword}
@@ -367,7 +388,9 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
             {errors.password && (
-              <Text style={styles.errorText}>{errors.password}</Text>
+              <Text style={[styles.errorText]}>
+                {errors.password}
+              </Text>
             )}
           </View>
 
@@ -385,7 +408,10 @@ export default function RegisterScreen() {
               ]}
             >
               <TextInput
-                style={[styles.input, { color: theme.text }]}
+                style={[
+                  styles.input,
+                  { color: theme.text },
+                ]}
                 placeholder="Confirmar Senha"
                 placeholderTextColor={theme.textSecondary}
                 secureTextEntry={!showConfirmPassword}
@@ -403,7 +429,9 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
             {errors.confirmPassword && (
-              <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+              <Text style={[styles.errorText]}>
+                {errors.confirmPassword}
+              </Text>
             )}
           </View>
 
@@ -415,7 +443,14 @@ export default function RegisterScreen() {
             {loading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.submitButtonText}>Finalizar Cadastro</Text>
+              <Text
+                style={[
+                  styles.submitButtonText,
+                  { fontWeight: "bold" },
+                ]}
+              >
+                Finalizar Cadastro
+              </Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -424,7 +459,7 @@ export default function RegisterScreen() {
   );
 }
 
-// Componente de campo com label + erro — estilo FuncionariosTab
+// Componente de campo com label + erro
 function FormInput({
   theme,
   placeholder,
@@ -456,7 +491,11 @@ function FormInput({
         keyboardType={keyboard}
         autoCapitalize="none"
       />
-      {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
+      {errorMessage && (
+        <Text style={[styles.errorText]}>
+          {errorMessage}
+        </Text>
+      )}
     </View>
   );
 }
@@ -486,7 +525,7 @@ const styles = StyleSheet.create({
   themeToggleButton: {
     position: "absolute",
     right: 20,
-    zIndex: 10,
+    top: 0,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -501,7 +540,7 @@ const styles = StyleSheet.create({
   },
   logo: { width: 100, height: 60, marginBottom: 10, alignSelf: "center" },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
     marginBottom: 20,
     alignSelf: "center",
@@ -520,9 +559,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
-    fontSize: 15,
   },
-  input: { flex: 1, fontSize: 15 },
+  input: { flex: 1, fontSize: 14 },
   passwordContainer: {
     height: 48,
     borderWidth: 1,
@@ -531,7 +569,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  errorText: { color: "#FF4D4D", fontSize: 12, marginTop: 4, marginLeft: 2 },
+  errorText: { color: "#FF4D4D", marginTop: 4, marginLeft: 2, fontSize: 12 },
   row: { flexDirection: "row", gap: 10 },
   divider: {
     height: 1,
@@ -548,5 +586,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 16,
   },
-  submitButtonText: { color: "#FFF", fontSize: 16, fontWeight: "bold" },
+  submitButtonText: { color: "#FFF", fontSize: 16 },
 });

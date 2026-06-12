@@ -12,6 +12,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.goldenpaw.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -26,7 +28,11 @@
       "favicon": "./assets/images/favicon.png"
     },
     "extra": {
-      "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+      "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY",
+      "router": {},
+      "eas": {
+        "projectId": "0fcb6b9b-1b48-460d-8174-3d7b7963b315"
+      }
     },
     "plugins": [
       "expo-router",
