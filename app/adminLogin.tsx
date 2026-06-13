@@ -1,3 +1,5 @@
+// app/adminLogin.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -7,7 +9,6 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   StatusBar,
   StyleSheet,
@@ -29,6 +30,7 @@ const ADMIN_NAME = "Administrador";
 export default function AdminLoginScreen() {
   const insets = useSafeAreaInsets();
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
+  const { showNotification } = useNotification();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -38,7 +40,7 @@ export default function AdminLoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !senha) {
-      Alert.alert("Erro", "Preencha email e senha");
+      showNotification("Erro", "Preencha email e senha", "error");
       return;
     }
 
@@ -50,7 +52,7 @@ export default function AdminLoginScreen() {
     try {
       if (isHardcodedAdmin) {
         await AsyncStorage.setItem("isAdminLoggedIn", "true");
-        Alert.alert("Sucesso", `Bem-vindo, ${ADMIN_NAME}!`);
+        showNotification("Sucesso", `Bem-vindo, ${ADMIN_NAME}!`, "success");
         setEmail("");
         setSenha("");
         router.replace("/(tabs)/admin" as any);
@@ -68,21 +70,21 @@ export default function AdminLoginScreen() {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        Alert.alert("Erro", "Usuário admin não encontrado.");
+        showNotification("Erro", "Usuário admin não encontrado.", "error");
         setLoading(false);
         return;
       }
 
       const adminData = querySnapshot.docs[0].data();
       await AsyncStorage.setItem("isAdminLoggedIn", "true");
-      Alert.alert("Sucesso", `Bem-vindo, ${adminData.nome}!`);
+      showNotification("Sucesso", `Bem-vindo, ${adminData.nome}!`, "success");
 
       setEmail("");
       setSenha("");
       router.replace("/(tabs)/admin" as any);
     } catch (error) {
       console.error("Erro ao fazer login:", error);
-      Alert.alert("Erro", "Email ou senha incorretos");
+      showNotification("Erro", "Email ou senha incorretos", "error");
     } finally {
       setLoading(false);
     }

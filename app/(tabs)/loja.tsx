@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -31,6 +32,7 @@ interface Produto {
   category?: string;
   kg?: string;
   estoque?: number;
+  descricao?: string;
 }
 
 const CATEGORIAS = ["Categorias", "Cães", "Gatos", "Aves", "Peixes", "Outros"];
@@ -60,6 +62,9 @@ export default function LojaScreen() {
   // Estados para controlar a exibição dos dropdowns
   const [showCategoriaDropdown, setShowCategoriaDropdown] = useState(false);
   const [showOrdenacaoDropdown, setShowOrdenacaoDropdown] = useState(false);
+
+  // Estado para o modal de detalhes do produto
+  const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
 
   // ── Se o usuário vier da Home clicando numa categoria, atualiza o filtro ──
   useEffect(() => {
@@ -391,7 +396,7 @@ export default function LojaScreen() {
                     : item.image;
 
                 return (
-                  <View
+                  <TouchableOpacity
                     key={`grid-${item.id}`}
                     style={[
                       styles.gridCard,
@@ -400,6 +405,8 @@ export default function LojaScreen() {
                         borderColor: theme.border,
                       },
                     ]}
+                    onPress={() => setSelectedProduto(item)}
+                    activeOpacity={0.85}
                   >
                     {item.tag && (
                       <View style={styles.tagBadge}>
@@ -432,14 +439,17 @@ export default function LojaScreen() {
                         styles.gridAddButton,
                         { backgroundColor: theme.primary },
                       ]}
-                      onPress={() => addToCart(item as any)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        addToCart(item as any);
+                      }}
                       activeOpacity={0.8}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <Ionicons name="cart-outline" size={18} color="#FFF" />
                       <Text style={styles.gridAddButtonText}>Adicionar</Text>
                     </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -465,6 +475,126 @@ export default function LojaScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ── Modal de Detalhes do Produto ── */}
+      <Modal
+        visible={!!selectedProduto}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedProduto(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedProduto(null)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.modalCard, { backgroundColor: theme.surface }]}
+          >
+            {selectedProduto && (
+              <>
+                {/* Botão fechar */}
+                <TouchableOpacity
+                  style={[
+                    styles.modalCloseBtn,
+                    { backgroundColor: theme.border },
+                  ]}
+                  onPress={() => setSelectedProduto(null)}
+                >
+                  <Ionicons name="close" size={20} color={theme.text} />
+                </TouchableOpacity>
+
+                {/* Tag */}
+                {selectedProduto.tag && (
+                  <View style={[styles.tagBadge, { top: 16, left: 16 }]}>
+                    <Text style={styles.tagText}>{selectedProduto.tag}</Text>
+                  </View>
+                )}
+
+                {/* Imagem */}
+                <Image
+                  source={
+                    typeof selectedProduto.image === "string"
+                      ? { uri: selectedProduto.image }
+                      : selectedProduto.image
+                  }
+                  style={styles.modalImage}
+                  resizeMode="contain"
+                />
+
+                {/* Infos */}
+                <ScrollView
+                  style={{ maxHeight: 260 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text
+                    style={[styles.modalProductName, { color: theme.text }]}
+                  >
+                    {selectedProduto.nome}
+                    {selectedProduto.kg ? ` - ${selectedProduto.kg}kg` : ""}
+                  </Text>
+
+                  {(selectedProduto.category ||
+                    (selectedProduto as any).categoria) && (
+                    <Text
+                      style={[
+                        styles.modalCategory,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {selectedProduto.category ||
+                        (selectedProduto as any).categoria}
+                    </Text>
+                  )}
+
+                  <Text style={[styles.modalPrice, { color: theme.primary }]}>
+                    R$ {selectedProduto.preco}
+                  </Text>
+
+                  {selectedProduto.descricao ? (
+                    <Text
+                      style={[
+                        styles.modalDescription,
+                        { color: theme.textSecondary },
+                      ]}
+                    >
+                      {selectedProduto.descricao}
+                    </Text>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.modalDescription,
+                        { color: theme.textSecondary, fontStyle: "italic" },
+                      ]}
+                    >
+                      Sem descrição disponível.
+                    </Text>
+                  )}
+                </ScrollView>
+
+                {/* Botão carrinho */}
+                <TouchableOpacity
+                  style={[
+                    styles.modalAddButton,
+                    { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => {
+                    addToCart(selectedProduto as any);
+                    setSelectedProduto(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="cart-outline" size={20} color="#FFF" />
+                  <Text style={styles.modalAddButtonText}>
+                    Adicionar ao Carrinho
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -584,4 +714,68 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   emptyStateText: { fontSize: 16, marginTop: 12, textAlign: "center" },
+
+  // Modal de detalhes
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingTop: 20,
+    minHeight: 480,
+  },
+  modalCloseBtn: {
+    alignSelf: "flex-end",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  modalImage: {
+    width: "100%",
+    height: 180,
+    marginBottom: 16,
+  },
+  modalProductName: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  modalCategory: {
+    fontSize: 12,
+    fontWeight: "500",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  modalPrice: {
+    fontSize: 22,
+    fontWeight: "800",
+    marginBottom: 12,
+  },
+  modalDescription: {
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  modalAddButton: {
+    flexDirection: "row",
+    height: 52,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  modalAddButtonText: {
+    color: "#FFF",
+    fontSize: 15,
+    fontWeight: "700",
+  },
 });

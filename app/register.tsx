@@ -1,9 +1,9 @@
+// app/register.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
+import { useNotification } from "../contexts/NotificationContext";
 import { auth, db } from "../firebaseConfig";
 import { useAppTheme } from "../hooks/use-app-theme";
 
@@ -26,6 +27,7 @@ const LOGO_IMAGE = require("../assets/img/logo.png");
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const { theme, toggleColorScheme, colorScheme } = useAppTheme();
+  const { showNotification } = useNotification();
   const router = useRouter();
 
   // Estados dos campos
@@ -164,14 +166,23 @@ export default function RegisterScreen() {
         criadoEm: new Date().toISOString(),
       });
 
-      // Redirecionamento após sucesso
-      Alert.alert("Sucesso", "Cadastro realizado! Por favor, faça login.", [
-        { text: "OK", onPress: () => router.replace("/login") },
-      ]);
+      // Redirecionamento após sucesso (com a nova notificação)
+      showNotification(
+        "Sucesso",
+        "Cadastro realizado! Por favor, faça login.",
+        "success",
+      );
+      router.replace("/login");
     } catch (error: any) {
-  console.error("Erro detalhado:", error);
-  Alert.alert("Erro", error.message || "Falha ao cadastrar.");
-}
+      console.error("Erro detalhado:", error);
+      showNotification(
+        "Erro no Registo",
+        error.message || "Falha ao cadastrar.",
+        "error",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -226,22 +237,12 @@ export default function RegisterScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
-          <Text
-            style={[
-              styles.title,
-              { color: theme.text },
-            ]}
-          >
+          <Text style={[styles.title, { color: theme.text }]}>
             Cadastro Golden Paw
           </Text>
 
           {/* ── DADOS PESSOAIS ── */}
-          <Text
-            style={[
-              styles.sectionTitle,
-              { color: theme.primary },
-            ]}
-          >
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
             Informações Pessoais
           </Text>
 
@@ -281,12 +282,7 @@ export default function RegisterScreen() {
 
           {/* ── ENDEREÇO ── */}
           <View style={styles.divider} />
-          <Text
-            style={[
-              styles.sectionTitle,
-              { color: theme.primary },
-            ]}
-          >
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
             Endereço
           </Text>
 
@@ -348,12 +344,7 @@ export default function RegisterScreen() {
 
           {/* ── SENHA ── */}
           <View style={styles.divider} />
-          <Text
-            style={[
-              styles.sectionTitle,
-              { color: theme.primary },
-            ]}
-          >
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
             Senha de Acesso
           </Text>
 
@@ -369,10 +360,7 @@ export default function RegisterScreen() {
               ]}
             >
               <TextInput
-                style={[
-                  styles.input,
-                  { color: theme.text },
-                ]}
+                style={[styles.input, { color: theme.text }]}
                 placeholder="Senha"
                 placeholderTextColor={theme.textSecondary}
                 secureTextEntry={!showPassword}
@@ -388,9 +376,7 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
             {errors.password && (
-              <Text style={[styles.errorText]}>
-                {errors.password}
-              </Text>
+              <Text style={[styles.errorText]}>{errors.password}</Text>
             )}
           </View>
 
@@ -408,10 +394,7 @@ export default function RegisterScreen() {
               ]}
             >
               <TextInput
-                style={[
-                  styles.input,
-                  { color: theme.text },
-                ]}
+                style={[styles.input, { color: theme.text }]}
                 placeholder="Confirmar Senha"
                 placeholderTextColor={theme.textSecondary}
                 secureTextEntry={!showConfirmPassword}
@@ -429,9 +412,7 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
             {errors.confirmPassword && (
-              <Text style={[styles.errorText]}>
-                {errors.confirmPassword}
-              </Text>
+              <Text style={[styles.errorText]}>{errors.confirmPassword}</Text>
             )}
           </View>
 
@@ -443,12 +424,7 @@ export default function RegisterScreen() {
             {loading ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text
-                style={[
-                  styles.submitButtonText,
-                  { fontWeight: "bold" },
-                ]}
-              >
+              <Text style={[styles.submitButtonText, { fontWeight: "bold" }]}>
                 Finalizar Cadastro
               </Text>
             )}
@@ -491,11 +467,7 @@ function FormInput({
         keyboardType={keyboard}
         autoCapitalize="none"
       />
-      {errorMessage && (
-        <Text style={[styles.errorText]}>
-          {errorMessage}
-        </Text>
-      )}
+      {errorMessage && <Text style={[styles.errorText]}>{errorMessage}</Text>}
     </View>
   );
 }

@@ -1,3 +1,5 @@
+// app/admin/AdminDashboard.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -14,7 +16,7 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -37,7 +39,9 @@ const LOW_STOCK_THRESHOLD = 5;
 
 export default function AdminDashboard() {
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification();
   const router = useRouter();
+
   const [currentTab, setCurrentTab] = useState<
     "dashboard" | "produtos" | "pets" | "pedidos" | "usuarios" | "funcionarios"
   >("dashboard");
@@ -50,6 +54,9 @@ export default function AdminDashboard() {
   const [pedidos, setPedidos] = useState<any[]>([]);
   const [requisicoes, setRequisicoes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal State para Confirmar o Logout
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // ── Contadores de alertas ────────────────────────────────────────────────
   const lowStockCount = produtos.filter(
@@ -111,18 +118,15 @@ export default function AdminDashboard() {
   };
 
   const handleLogoutAdmin = () => {
-    Alert.alert("Sair", "Desejas sair do painel administrativo?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Sair",
-        style: "destructive",
-        onPress: async () => {
-          await AsyncStorage.removeItem("isAdminLoggedIn");
-          await signOut(auth);
-          router.replace("/login" as any);
-        },
-      },
-    ]);
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    setShowLogoutModal(false);
+    await AsyncStorage.removeItem("isAdminLoggedIn");
+    await signOut(auth);
+    showNotification("Sucesso", "Sessão encerrada com sucesso.", "success");
+    router.replace("/login" as any);
   };
 
   // ── Definição das abas com badges de alerta ──────────────────────────────
@@ -133,7 +137,7 @@ export default function AdminDashboard() {
       label: "Produtos",
       icon: "cube",
       badge: lowStockCount,
-      badgeColor: "#F59E0B", // âmbar — aviso de estoque
+      badgeColor: "#F59E0B",
     },
     { id: "pets", label: "Adoção", icon: "paw", badge: 0 },
     {
@@ -141,7 +145,7 @@ export default function AdminDashboard() {
       label: "Pedidos",
       icon: "cart",
       badge: newOrdersCount,
-      badgeColor: theme.primary, // cor primária — novos pedidos
+      badgeColor: theme.primary,
     },
     { id: "usuarios", label: "Usuários", icon: "people", badge: 0 },
     { id: "funcionarios", label: "Equipe", icon: "briefcase", badge: 0 },
@@ -292,7 +296,6 @@ export default function AdminDashboard() {
                     size={16}
                     color={isActive ? theme.primary : theme.textSecondary}
                   />
-                  {/* Badge numérico na aba */}
                   {tab.badge > 0 && (
                     <View
                       style={[
@@ -331,9 +334,101 @@ export default function AdminDashboard() {
           renderTabContent()
         )}
       </View>
+
+      {/* ── Modal de Confirmação de Saída ── */}
+      <Modal visible={showLogoutModal} transparent animationType="fade">
+        <View style={modalConfirmStyles.overlay}>
+          <View
+            style={[
+              modalConfirmStyles.box,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={36}
+              color={theme.error || "#ef4444"}
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={[modalConfirmStyles.title, { color: theme.text }]}>
+              Sair
+            </Text>
+            <Text
+              style={[
+                modalConfirmStyles.subtitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Desejas sair do painel administrativo?
+            </Text>
+            <View style={modalConfirmStyles.btnRow}>
+              <TouchableOpacity
+                style={[modalConfirmStyles.btn, { borderColor: theme.border }]}
+                onPress={() => setShowLogoutModal(false)}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  modalConfirmStyles.btn,
+                  {
+                    backgroundColor: theme.error || "#ef4444",
+                    borderColor: theme.error || "#ef4444",
+                  },
+                ]}
+                onPress={confirmLogout}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "700" }}>Sair</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+// Estilos para o Modal de Confirmação
+const modalConfirmStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  box: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  btnRow: { flexDirection: "row", gap: 12, width: "100%" },
+  btn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },

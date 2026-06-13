@@ -115,6 +115,24 @@ export default function PaymentScreen() {
     return v;
   };
 
+  // Funções de Máscara para o Cartão de Crédito
+  const handleCardNumberChange = (text: string) => {
+    let v = text.replace(/\D/g, "");
+    v = v.replace(/(\d{4})(?=\d)/g, "$1.");
+    setCardNumber(v);
+  };
+
+  const handleCardExpiryChange = (text: string) => {
+    let v = text.replace(/\D/g, "");
+    v = v.replace(/(\d{2})(\d)/, "$1/$2");
+    setCardExpiry(v);
+  };
+
+  const handleCardCvvChange = (text: string) => {
+    let v = text.replace(/\D/g, "");
+    setCardCvv(v);
+  };
+
   const handleCepChange = async (text: string) => {
     const formatted = maskCep(text);
     setCep(formatted);
@@ -545,9 +563,9 @@ export default function PaymentScreen() {
               placeholder="Número do cartão"
               placeholderTextColor={theme.textSecondary}
               value={cardNumber}
-              onChangeText={setCardNumber}
+              onChangeText={handleCardNumberChange} // Máscara do número
               keyboardType="numeric"
-              maxLength={16}
+              maxLength={19} // Atualizado para 19
             />
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
               <TextInput
@@ -558,7 +576,7 @@ export default function PaymentScreen() {
                 placeholder="MM/AA"
                 placeholderTextColor={theme.textSecondary}
                 value={cardExpiry}
-                onChangeText={setCardExpiry}
+                onChangeText={handleCardExpiryChange} // Máscara de validade
                 keyboardType="numeric"
                 maxLength={5}
               />
@@ -570,7 +588,7 @@ export default function PaymentScreen() {
                 placeholder="CVV"
                 placeholderTextColor={theme.textSecondary}
                 value={cardCvv}
-                onChangeText={setCardCvv}
+                onChangeText={handleCardCvvChange} // Apenas números
                 keyboardType="numeric"
                 maxLength={3}
               />

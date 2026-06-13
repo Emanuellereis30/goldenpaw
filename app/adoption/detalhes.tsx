@@ -1,8 +1,12 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+// app/adoption/detalhes.tsx
+import { useNotification } from "@/contexts/NotificationContext";
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { Ionicons } from "@expo/vector-icons";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router"; // <-- Adicionado o Stack
 import { addDoc, collection } from "firebase/firestore";
-import React from "react";
-import { Alert } from "react-native";
-import { db } from "../../firebaseConfig"; // Ajuste o caminho se necessário
+import React, { useState } from "react";
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { db } from "../../firebaseConfig";
 import AdocaoFormulario from "./AdocaoFormulario";
 
 // Tipo Pet definido localmente
@@ -55,6 +59,11 @@ interface FormData {
 export default function DetalhesAdocaoScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { showNotification } = useNotification();
+  const { theme } = useAppTheme();
+
+  // Estado para o Modal de Cancelamento
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const petId = params.petId as string;
   const petJson = params.pet as string;
@@ -70,8 +79,7 @@ export default function DetalhesAdocaoScreen() {
 
   const handleSubmit = async (formData: FormData) => {
     try {
-      // Salva na coleção correta que o Admin está lendo
-      const docRef = await addDoc(collection(db, "requisicoes_adocao"), {
+      await addDoc(collection(db, "requisicoes_adocao"), {
         // Dados do pet
         petId: pet.id,
         petNome: pet.nome,
@@ -79,14 +87,13 @@ export default function DetalhesAdocaoScreen() {
         petPorte: pet.porte,
         petSexo: pet.sexo,
 
-        // Dados brutos do form (aqui já inclui email, endereco, etc)
+        // Dados brutos do form
         ...formData,
 
-        // Campos específicos formatados para o Admin (sobrescrevemos apenas o que precisamos)
+        // Campos específicos formatados para o Admin
         clienteNome: formData.nomeCompleto,
         usuarioNome: formData.nomeCompleto,
         telefone: formData.celular,
-        // O email e endereco já vieram no ...formData acima, então não precisamos repetir!
 
         motivo: formData.observacoes
           ? formData.observacoes
@@ -99,53 +106,134 @@ export default function DetalhesAdocaoScreen() {
         visualizado: false,
       });
 
-      console.log("Formulário salvo com ID:", docRef.id);
-
-      Alert.alert(
+      showNotification(
         "Sucesso! 🎉",
-        "Seu formulário para adotar " +
-          pet.nome +
-          " foi enviado! Entraremos em contato em breve.",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              router.back();
-            },
-          },
-        ],
+        `Seu formulário para adotar o/a ${pet.nome} foi enviado! Entraremos em contato em breve.`,
+        "success",
       );
+      router.back();
     } catch (error) {
       console.error("Erro ao salvar formulário:", error);
-      Alert.alert(
+      showNotification(
         "Erro",
-        "Não foi possível enviar o formulário. Tente novamente.",
+        "Não foi possível enviar o formulário. Verifique sua conexão e tente novamente.",
+        "error",
       );
     }
   };
 
   const handleCancel = () => {
-    Alert.alert("Cancelar", "Tem certeza que deseja cancelar o formulário?", [
-      {
-        text: "Não",
-        onPress: () => {},
-        style: "cancel",
-      },
-      {
-        text: "Sim",
-        onPress: () => {
-          router.back();
-        },
-        style: "destructive",
-      },
-    ]);
+    setShowCancelModal(true);
+  };
+
+  const confirmCancel = () => {
+    setShowCancelModal(false);
+    router.back();
   };
 
   return (
-    <AdocaoFormulario
-      pet={pet}
-      onSubmit={handleSubmit}
-      onCancel={handleCancel}
-    />
+    <>
+      {/* ── REMOVE O CABEÇALHO NATIVO DO EXPO ROUTER PARA EVITAR SOBREPOSIÇÃO ── */}
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <AdocaoFormulario
+        pet={pet}
+        onSubmit={handleSubmit}
+        onCancel={handleCancel}
+      />
+
+      {/* ── MODAL DE CONFIRMAÇÃO DE CANCELAMENTO ── */}
+      <Modal visible={showCancelModal} transparent animationType="fade">
+        <View style={modalConfirmStyles.overlay}>
+          <View
+            style={[
+              modalConfirmStyles.box,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="alert-circle-outline"
+              size={36}
+              color={theme.error || "#ef4444"}
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={[modalConfirmStyles.title, { color: theme.text }]}>
+              Cancelar Formulário
+            </Text>
+            <Text
+              style={[
+                modalConfirmStyles.subtitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Tem certeza que deseja sair? Os dados preenchidos até agora não
+              serão salvos.
+            </Text>
+            <View style={modalConfirmStyles.btnRow}>
+              <TouchableOpacity
+                style={[modalConfirmStyles.btn, { borderColor: theme.border }]}
+                onPress={() => setShowCancelModal(false)}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>
+                  Continuar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  modalConfirmStyles.btn,
+                  {
+                    backgroundColor: theme.error || "#ef4444",
+                    borderColor: theme.error || "#ef4444",
+                  },
+                ]}
+                onPress={confirmCancel}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "700" }}>Sair</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
+
+// Estilos do Modal
+const modalConfirmStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  box: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  btnRow: { flexDirection: "row", gap: 12, width: "100%" },
+  btn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});

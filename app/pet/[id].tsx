@@ -1,3 +1,4 @@
+// app/pet/[id].tsx
 import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
@@ -6,7 +7,6 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -15,12 +15,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useNotification } from "../../contexts/NotificationContext";
 import { auth, db } from "../../firebaseConfig";
 import { useAppTheme } from "../../hooks/use-app-theme";
 
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams();
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,7 +82,6 @@ export default function PetProfileScreen() {
             setObservacoes(data.observacoes || "");
             setImageUri(data.fotoUrl || null);
 
-            // Reconstrói a lógica da Espécie
             if (["Canino", "Felino"].includes(data.especie)) {
               setEspecie(data.especie);
             } else if (data.especie) {
@@ -88,7 +89,6 @@ export default function PetProfileScreen() {
               setEspecieOutro(data.especie);
             }
 
-            // Reconstrói as abas médicas condicionais
             setAlergias(data.alergias || "");
             setHasAlergias(
               data.alergias && data.alergias !== "Nenhuma" ? "Sim" : "Não",
@@ -112,7 +112,7 @@ export default function PetProfileScreen() {
             );
           }
         } catch (error) {
-          Alert.alert("Erro", "Falha ao carregar dados do pet.");
+          showNotification("Erro", "Falha ao carregar dados do pet.", "error");
         }
       }
       setLoading(false);
@@ -149,7 +149,6 @@ export default function PetProfileScreen() {
     const bucket = "petshop-2c06a.firebasestorage.app";
     const token = await user.getIdToken();
 
-    // Converte base64 para binário antes de enviar
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -244,9 +243,10 @@ export default function PetProfileScreen() {
       missingFields.push("Vacinas");
 
     if (missingFields.length > 0) {
-      Alert.alert(
+      showNotification(
         "Campos Obrigatórios",
-        `Por favor, preencha corretamente os seguintes campos:\n\n${missingFields.join("\n")}`,
+        "Por favor, preencha todos os campos corretamente.",
+        "error",
       );
       return;
     }
@@ -255,9 +255,8 @@ export default function PetProfileScreen() {
     try {
       const user = auth.currentUser;
       if (user && id) {
-        let fotoUrl = imageUri; // Mantém a URL existente por padrão
+        let fotoUrl = imageUri;
 
-        // Só faz upload se o utilizador escolheu uma nova foto
         if (newImageUri) {
           fotoUrl = await uploadImageAsync(newImageUri, id as string);
         }
@@ -284,19 +283,26 @@ export default function PetProfileScreen() {
         const docRef = doc(db, "usuarios", user.uid, "pets", id as string);
         await updateDoc(docRef, updatedPetData);
 
-        Alert.alert("Sucesso", "Perfil do pet atualizado com sucesso!");
+        showNotification(
+          "Sucesso",
+          "Perfil do pet atualizado com sucesso!",
+          "success",
+        );
         setEditing(false);
         setNewImageUri(null);
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Erro", "Falha ao atualizar dados no servidor.");
+      showNotification(
+        "Erro",
+        "Falha ao atualizar dados no servidor.",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  // Componente Seletor Visual para Edição
   const OptionSelector = ({ label, options, selected, onSelect }: any) => (
     <View style={{ marginBottom: 15 }}>
       <Text

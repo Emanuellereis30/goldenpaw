@@ -1,3 +1,5 @@
+// app/admin/components/FuncionariosTab.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -11,7 +13,6 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -33,6 +34,7 @@ const ORDENACOES_FUNC = [
 
 export default function FuncionariosTab() {
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification();
 
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +45,9 @@ export default function FuncionariosTab() {
   const [editingFuncionario, setEditingFuncionario] =
     useState<Funcionario | null>(null);
   const [selectedFuncionario, setSelectedFuncionario] = useState<any>(null);
+  const [funcionarioToDelete, setFuncionarioToDelete] = useState<string | null>(
+    null,
+  );
 
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [ordenacao, setOrdenacao] = useState("nome_asc");
@@ -154,9 +159,10 @@ export default function FuncionariosTab() {
       !form.dataAdmissao ||
       !form.salario
     ) {
-      Alert.alert(
-        "Erro",
+      showNotification(
+        "Atenção",
         "Preencha os campos obrigatórios (Nome, Email, Cargo, Admissão, Salário)",
+        "info",
       );
       return;
     }
@@ -187,16 +193,16 @@ export default function FuncionariosTab() {
           doc(db, "funcionarios", editingFuncionario.id),
           funcionarioData,
         );
-        Alert.alert("Sucesso", "Funcionário atualizado!");
+        showNotification("Sucesso", "Funcionário atualizado!", "success");
       } else {
         await addDoc(collection(db, "funcionarios"), funcionarioData);
-        Alert.alert("Sucesso", "Funcionário adicionado!");
+        showNotification("Sucesso", "Funcionário adicionado!", "success");
       }
 
       setShowModal(false);
       resetForm();
     } catch (error) {
-      Alert.alert("Erro", "Falha ao salvar funcionário");
+      showNotification("Erro", "Falha ao salvar funcionário", "error");
     }
   };
 
@@ -244,22 +250,21 @@ export default function FuncionariosTab() {
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert("Confirmar", "Deseja excluir este funcionário?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Excluir",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteDoc(doc(db, "funcionarios", id));
-            Alert.alert("Sucesso", "Funcionário removido!");
-            if (selectedFuncionario?.id === id) setShowDetailModal(false);
-          } catch (error) {
-            Alert.alert("Erro", "Falha ao excluir funcionário");
-          }
-        },
-      },
-    ]);
+    setFuncionarioToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!funcionarioToDelete) return;
+    try {
+      await deleteDoc(doc(db, "funcionarios", funcionarioToDelete));
+      showNotification("Sucesso", "Funcionário removido!", "success");
+      if (selectedFuncionario?.id === funcionarioToDelete)
+        setShowDetailModal(false);
+    } catch (error) {
+      showNotification("Erro", "Falha ao excluir funcionário", "error");
+    } finally {
+      setFuncionarioToDelete(null);
+    }
   };
 
   const handleSelectFuncionario = (funcionario: Funcionario) => {
@@ -638,7 +643,6 @@ export default function FuncionariosTab() {
             </TouchableOpacity>
           </View>
 
-          {/* Adicionado paddingHorizontal para não colar nas bordas e Wrapper centralizado */}
           <ScrollView
             style={adminStyles.modalContent}
             contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }}
@@ -910,7 +914,6 @@ export default function FuncionariosTab() {
             </TouchableOpacity>
           </View>
 
-          {/* Form modal também centralizado e com limite de largura */}
           <ScrollView
             style={adminStyles.modalContent}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
@@ -1270,11 +1273,106 @@ export default function FuncionariosTab() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* ── MODAL DE CONFIRMAÇÃO DE EXCLUSÃO ── */}
+      <Modal visible={!!funcionarioToDelete} transparent animationType="fade">
+        <View style={modalConfirmStyles.overlay}>
+          <View
+            style={[
+              modalConfirmStyles.box,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={36}
+              color={theme.error || "#ef4444"}
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={[modalConfirmStyles.title, { color: theme.text }]}>
+              Confirmar Exclusão
+            </Text>
+            <Text
+              style={[
+                modalConfirmStyles.subtitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Deseja realmente excluir este funcionário? Esta ação não pode ser
+              desfeita.
+            </Text>
+            <View style={modalConfirmStyles.btnRow}>
+              <TouchableOpacity
+                style={[modalConfirmStyles.btn, { borderColor: theme.border }]}
+                onPress={() => setFuncionarioToDelete(null)}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  modalConfirmStyles.btn,
+                  {
+                    backgroundColor: theme.error || "#ef4444",
+                    borderColor: theme.error || "#ef4444",
+                  },
+                ]}
+                onPress={confirmDelete}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "700" }}>
+                  Excluir
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
 
-// ── ESTILOS ATUALIZADOS (MAIS COMPACTOS) ──
+// Estilos do Modal de Confirmação
+const modalConfirmStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  box: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  btnRow: { flexDirection: "row", gap: 12, width: "100%" },
+  btn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});
+
+// ── ESTILOS ATUALIZADOS ──
 const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   badgeText: { fontSize: 11, fontWeight: "600" },

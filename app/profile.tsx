@@ -1,3 +1,4 @@
+// app/profile.tsx
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
@@ -20,7 +21,6 @@ import {
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   ScrollView,
@@ -31,8 +31,34 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNotification } from "../contexts/NotificationContext";
 import { auth, db } from "../firebaseConfig";
 import { useAppTheme } from "../hooks/use-app-theme";
+
+// ── Funções de Máscara ────────────────────────────────────────────────────────
+
+const maskCpf = (v: string) => {
+  v = v.replace(/\D/g, "");
+  if (v.length <= 11) {
+    v = v.replace(/(\d{3})(\d)/, "$1.$2");
+    v = v.replace(/(\d{3})(\d)/, "$1.$2");
+    v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  }
+  return v;
+};
+
+const maskPhone = (v: string) => {
+  v = v.replace(/\D/g, "");
+  v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+  v = v.replace(/(\d{5})(\d)/, "$1-$2");
+  return v;
+};
+
+const maskCep = (v: string) => {
+  v = v.replace(/\D/g, "");
+  v = v.replace(/(\d{5})(\d)/, "$1-$2");
+  return v;
+};
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -52,9 +78,9 @@ type StatusAdocao =
 
 interface ItemPedido {
   id?: string;
-  produtoNome: string; // campo real do Firestore
+  produtoNome: string;
   preco: string;
-  quantidade: number; // campo real do Firestore
+  quantidade: number;
 }
 
 interface Pedido {
@@ -62,12 +88,12 @@ interface Pedido {
   userId?: string;
   status: StatusPedido;
   total?: string;
-  createdAt?: any; // campo real do Firestore
-  data?: string; // campo real: "11/06/2026"
+  createdAt?: any;
+  data?: string;
   horario?: string;
   itens?: ItemPedido[];
-  endereco?: string; // campo real do Firestore
-  metodoPagamento?: string; // campo real do Firestore
+  endereco?: string;
+  metodoPagamento?: string;
   clienteNome?: string;
   clienteEmail?: string;
   clienteTelefone?: string;
@@ -77,13 +103,13 @@ interface Pedido {
 interface Adocao {
   id: string;
   status: StatusAdocao;
-  petNome?: string; // campo real do Firestore
+  petNome?: string;
   petRaca?: string;
   petPorte?: string;
   petSexo?: string;
-  criadoEm?: string; // campo real: ISO string
-  data?: string; // campo real: "11/06/2026"
-  clienteNome?: string; // campo real do Firestore
+  criadoEm?: string;
+  data?: string;
+  clienteNome?: string;
   nomeCompleto?: string;
   email?: string;
   telefone?: string;
@@ -349,13 +375,6 @@ function ModalPedido({
 }) {
   if (!pedido) return null;
 
-  const cfg = STATUS_PEDIDO_CONFIG[pedido.status] ?? {
-    label: pedido.status,
-    color: "#6B7280",
-    bg: "#F3F4F6",
-    icon: "ellipse-outline",
-  };
-
   return (
     <Modal
       visible={visible}
@@ -366,7 +385,6 @@ function ModalPedido({
       <View
         style={[modalStyles.container, { backgroundColor: theme.background }]}
       >
-        {/* Cabeçalho */}
         <View style={[modalStyles.header, { borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
             <Ionicons name="close" size={24} color={theme.text} />
@@ -381,7 +399,6 @@ function ModalPedido({
           contentContainerStyle={modalStyles.scroll}
           showsVerticalScrollIndicator={false}
         >
-          {/* ID e Status */}
           <View
             style={[
               modalStyles.card,
@@ -404,16 +421,12 @@ function ModalPedido({
               </View>
               <StatusBadge status={pedido.status} tipo="pedido" />
             </View>
-
             <View
               style={[modalStyles.divider, { backgroundColor: theme.border }]}
             />
-
-            {/* Progresso */}
             <ProgressoPedido status={pedido.status} theme={theme} />
           </View>
 
-          {/* Informações gerais */}
           <View
             style={[
               modalStyles.card,
@@ -423,7 +436,6 @@ function ModalPedido({
             <Text style={[modalStyles.cardTitle, { color: theme.primary }]}>
               Informações
             </Text>
-
             <InfoRow
               icon="calendar-outline"
               label="Data do Pedido"
@@ -468,7 +480,6 @@ function ModalPedido({
             )}
           </View>
 
-          {/* Itens do pedido */}
           {pedido.itens && pedido.itens.length > 0 && (
             <View
               style={[
@@ -524,7 +535,6 @@ function ModalPedido({
             </View>
           )}
 
-          {/* Total */}
           {pedido.total !== undefined && (
             <View
               style={[
@@ -565,7 +575,6 @@ function ModalAdocao({
   theme: any;
 }) {
   if (!adocao) return null;
-
   const nomePet = adocao.petNome || adocao.clienteNome || "Adoção";
 
   return (
@@ -578,7 +587,6 @@ function ModalAdocao({
       <View
         style={[modalStyles.container, { backgroundColor: theme.background }]}
       >
-        {/* Cabeçalho */}
         <View style={[modalStyles.header, { borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
             <Ionicons name="close" size={24} color={theme.text} />
@@ -593,7 +601,6 @@ function ModalAdocao({
           contentContainerStyle={modalStyles.scroll}
           showsVerticalScrollIndicator={false}
         >
-          {/* Status e pet */}
           <View
             style={[
               modalStyles.card,
@@ -625,16 +632,12 @@ function ModalAdocao({
                 </Text>
               </View>
             </View>
-
             <View
               style={[modalStyles.divider, { backgroundColor: theme.border }]}
             />
-
-            {/* Status com linha do tempo */}
             <AdocaoTimeline status={adocao.status} theme={theme} />
           </View>
 
-          {/* Informações */}
           <View
             style={[
               modalStyles.card,
@@ -699,7 +702,6 @@ function ModalAdocao({
             )}
           </View>
 
-          {/* Mensagem */}
           {(adocao.observacoes || adocao.motivo) && (
             <View
               style={[
@@ -715,8 +717,6 @@ function ModalAdocao({
               </Text>
             </View>
           )}
-
-          {/* Motivo de reprovação */}
           {adocao.status === "adoção reprovada" && adocao.motivoReprovacao && (
             <View
               style={[
@@ -783,7 +783,6 @@ function AdocaoTimeline({
     },
   ];
 
-  // Normaliza status para os valores conhecidos
   const statusNorm =
     status === "pendente"
       ? "em análise"
@@ -792,12 +791,10 @@ function AdocaoTimeline({
         : status === "reprovado"
           ? "adoção reprovada"
           : status;
-
   const etapasFiltradas =
     statusNorm === "adoção reprovada"
       ? [etapas[0], etapas[2]]
       : [etapas[0], etapas[1]];
-
   const indiceAtual = statusNorm === "em análise" ? 0 : 1;
 
   return (
@@ -810,7 +807,6 @@ function AdocaoTimeline({
 
         return (
           <View key={etapa.key} style={timelineStyles.etapa}>
-            {/* Linha vertical + círculo */}
             <View style={timelineStyles.trilho}>
               <View
                 style={[
@@ -838,8 +834,6 @@ function AdocaoTimeline({
                 />
               )}
             </View>
-
-            {/* Conteúdo */}
             <View
               style={[timelineStyles.conteudo, !isLast && { marginBottom: 0 }]}
             >
@@ -915,8 +909,6 @@ const timelineStyles = StyleSheet.create({
   activeBadgeText: { fontSize: 11, fontWeight: "600" },
 });
 
-// ── Componente InfoRow ────────────────────────────────────────────────────────
-
 function InfoRow({
   icon,
   label,
@@ -964,8 +956,6 @@ const infoStyles = StyleSheet.create({
   value: { fontSize: 14, fontWeight: "500" },
 });
 
-// ── Estilos do Modal ──────────────────────────────────────────────────────────
-
 const modalStyles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -979,12 +969,7 @@ const modalStyles = StyleSheet.create({
   closeBtn: { padding: 4 },
   title: { fontSize: 17, fontWeight: "700" },
   scroll: { padding: 16, paddingBottom: 40 },
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
-  },
+  card: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 12 },
   cardTitle: {
     fontSize: 12,
     fontWeight: "700",
@@ -1039,6 +1024,7 @@ const modalStyles = StyleSheet.create({
 
 export default function ProfileScreen() {
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
+  const { showNotification } = useNotification();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1048,11 +1034,9 @@ export default function ProfileScreen() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [adocoes, setAdocoes] = useState<Adocao[]>([]);
 
-  // Controle de expansão das seções
   const [pedidosAberto, setPedidosAberto] = useState(false);
   const [adocoesAberto, setAdocoesAberto] = useState(false);
 
-  // Modais de detalhe
   const [pedidoSelecionado, setPedidoSelecionado] = useState<Pedido | null>(
     null,
   );
@@ -1061,7 +1045,7 @@ export default function ProfileScreen() {
   );
   const [petSelecionado, setPetSelecionado] = useState<any | null>(null);
 
-  // Modal de confirmação para excluir conta
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deletePasswordVisible, setDeletePasswordVisible] = useState(false);
@@ -1081,7 +1065,6 @@ export default function ProfileScreen() {
         const user = auth.currentUser;
         if (user) {
           try {
-            // 1. Dados do Usuário
             const docRef = doc(db, "usuarios", user.uid);
             const docSnap = await getDoc(docRef);
             let emailAtual = "";
@@ -1106,14 +1089,12 @@ export default function ProfileScreen() {
               });
             }
 
-            // 2. Pets
             const petsRef = collection(db, "usuarios", user.uid, "pets");
             const petsSnap = await getDocs(petsRef);
             setPets(
               petsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
             );
 
-            // 3. Pedidos — campo real: userId == uid do usuário
             const pedidosRef = collection(db, "pedidos");
             const qPedidos = query(pedidosRef, where("userId", "==", user.uid));
             const pedidosSnap = await getDocs(qPedidos);
@@ -1123,7 +1104,6 @@ export default function ProfileScreen() {
               ),
             );
 
-            // 4. Adoções — campo real: email do usuário
             if (emailAtual) {
               const adocaoRef = collection(db, "requisicoes_adocao");
               const qAdocoes = query(
@@ -1139,7 +1119,7 @@ export default function ProfileScreen() {
             }
           } catch (e) {
             console.error("Erro fetchAllData:", e);
-            Alert.alert("Erro", "Falha ao carregar dados.");
+            showNotification("Erro", "Falha ao carregar dados.", "error");
           }
         }
         setLoading(false);
@@ -1148,18 +1128,74 @@ export default function ProfileScreen() {
     }, []),
   );
 
+  const handleCepChange = async (text: string) => {
+    const formatted = maskCep(text);
+    setEndereco("cep", formatted);
+    const cleanCep = formatted.replace(/\D/g, "");
+
+    if (cleanCep.length === 8) {
+      try {
+        const response = await fetch(
+          `https://viacep.com.br/ws/${cleanCep}/json/`,
+        );
+        const data = await response.json();
+        if (!data.erro) {
+          setFormData((prev) => ({
+            ...prev,
+            endereco: {
+              ...prev.endereco,
+              rua: data.logradouro || prev.endereco.rua,
+              bairro: data.bairro || prev.endereco.bairro,
+              cidade: data.localidade || prev.endereco.cidade,
+              uf: data.uf || prev.endereco.uf,
+            },
+          }));
+        }
+      } catch (e) {
+        console.error("Erro CEP", e);
+      }
+    }
+  };
+
   const handleUpdate = async () => {
+    // ── Validações do Formulário de Perfil ──
+    if (!formData.nome || formData.nome.trim().length < 5) {
+      showNotification(
+        "Atenção",
+        "O nome deve ter pelo menos 5 caracteres.",
+        "error",
+      );
+      return;
+    }
+    if (formData.cpf && formData.cpf.length < 14) {
+      showNotification("Atenção", "O CPF inserido é inválido.", "error");
+      return;
+    }
+    if (formData.telefone && formData.telefone.length < 14) {
+      showNotification("Atenção", "O telemóvel inserido é inválido.", "error");
+      return;
+    }
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(formData.email)) {
+      showNotification("Atenção", "O e-mail inserido é inválido.", "error");
+      return;
+    }
+
     setSaving(true);
     try {
       const user = auth.currentUser;
       if (user) {
         const docRef = doc(db, "usuarios", user.uid);
         await updateDoc(docRef, { userData: formData });
-        Alert.alert("Sucesso", "Perfil atualizado!");
+        showNotification(
+          "Sucesso",
+          "Alterações salvas com sucesso!",
+          "success",
+        );
         setEditing(false);
       }
     } catch {
-      Alert.alert("Erro", "Falha ao guardar.");
+      showNotification("Erro", "Falha ao guardar perfil.", "error");
     } finally {
       setSaving(false);
     }
@@ -1172,27 +1208,12 @@ export default function ProfileScreen() {
     }));
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      "Excluir Conta",
-      "Tem certeza que deseja excluir sua conta? Esta ação é permanente e não pode ser desfeita.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Excluir",
-          style: "destructive",
-          onPress: () => {
-            setDeletePassword("");
-            setDeletePasswordVisible(false);
-            setShowDeleteModal(true);
-          },
-        },
-      ],
-    );
+    setShowConfirmDeleteModal(true);
   };
 
   const confirmDeleteAccount = async () => {
     if (!deletePassword) {
-      Alert.alert("Erro", "Digite sua senha para confirmar.");
+      showNotification("Erro", "Digite sua senha para confirmar.", "error");
       return;
     }
     const user = auth.currentUser;
@@ -1207,16 +1228,20 @@ export default function ProfileScreen() {
       await deleteDoc(doc(db, "usuarios", user.uid));
       await deleteUser(user);
       setShowDeleteModal(false);
-      Alert.alert("Conta excluída", "Sua conta foi removida com sucesso.");
+      showNotification(
+        "Conta excluída",
+        "Sua conta foi removida com sucesso.",
+        "success",
+      );
       router.replace("/(tabs)" as any);
     } catch (error: any) {
       if (
         error.code === "auth/wrong-password" ||
         error.code === "auth/invalid-credential"
       ) {
-        Alert.alert("Erro", "Senha incorreta. Tente novamente.");
+        showNotification("Erro", "Senha incorreta. Tente novamente.", "error");
       } else {
-        Alert.alert("Erro", "Não foi possível excluir a conta.");
+        showNotification("Erro", "Não foi possível excluir a conta.", "error");
       }
     } finally {
       setDeletingAccount(false);
@@ -1230,7 +1255,6 @@ export default function ProfileScreen() {
 
   return (
     <>
-      {/* ── Botão de Voltar flutuante ── */}
       <TouchableOpacity
         style={[
           styles.backButton,
@@ -1249,7 +1273,6 @@ export default function ProfileScreen() {
         <Ionicons name="chevron-back" size={24} color={theme.primary} />
       </TouchableOpacity>
 
-      {/* ── Toggle de Tema ── */}
       <TouchableOpacity
         style={[
           styles.themeToggleButton,
@@ -1276,7 +1299,6 @@ export default function ProfileScreen() {
           { paddingTop: insets.top + 64 },
         ]}
       >
-        {/* ── Header ── */}
         <View style={styles.header}>
           <View>
             <Text style={[styles.title, { color: theme.text }]}>
@@ -1299,7 +1321,6 @@ export default function ProfileScreen() {
 
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-        {/* ── Dados Pessoais ── */}
         <Text style={[styles.sectionTitle, { color: theme.primary }]}>
           Dados Pessoais
         </Text>
@@ -1315,8 +1336,11 @@ export default function ProfileScreen() {
           icon="credit-card"
           value={formData.cpf}
           editable={editing}
-          onChangeText={(t: string) => setFormData({ ...formData, cpf: t })}
+          onChangeText={(t: string) =>
+            setFormData({ ...formData, cpf: maskCpf(t) })
+          }
           keyboardType="numeric"
+          maxLength={14}
           theme={theme}
         />
         <Field
@@ -1325,9 +1349,10 @@ export default function ProfileScreen() {
           value={formData.telefone}
           editable={editing}
           onChangeText={(t: string) =>
-            setFormData({ ...formData, telefone: t })
+            setFormData({ ...formData, telefone: maskPhone(t) })
           }
           keyboardType="phone-pad"
+          maxLength={15}
           theme={theme}
         />
         <Field
@@ -1342,17 +1367,17 @@ export default function ProfileScreen() {
 
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-        {/* ── Endereço ── */}
         <Text style={[styles.sectionTitle, { color: theme.primary }]}>
           Endereço
         </Text>
         <Field
-          label="Código Postal"
+          label="Código Postal (CEP)"
           icon="map-pin"
           value={formData.endereco.cep}
           editable={editing}
-          onChangeText={(t: string) => setEndereco("cep", t)}
+          onChangeText={handleCepChange}
           keyboardType="numeric"
+          maxLength={9}
           theme={theme}
         />
         <Field
@@ -1431,7 +1456,6 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* ════ HISTÓRICO ════ */}
         <View
           style={[
             styles.divider,
@@ -1442,14 +1466,12 @@ export default function ProfileScreen() {
           Meu Histórico
         </Text>
 
-        {/* ── Seção: Meus Pedidos ── */}
         <View
           style={[
             styles.historicoSection,
             { backgroundColor: theme.surface, borderColor: theme.border },
           ]}
         >
-          {/* Cabeçalho clicável */}
           <TouchableOpacity
             style={styles.historicoHeader}
             onPress={() => setPedidosAberto(!pedidosAberto)}
@@ -1485,7 +1507,6 @@ export default function ProfileScreen() {
             />
           </TouchableOpacity>
 
-          {/* Lista de pedidos expandida */}
           {pedidosAberto && (
             <View
               style={[styles.historicoLista, { borderTopColor: theme.border }]}
@@ -1571,7 +1592,6 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* ── Seção: Requisições de Adoção ── */}
         <View
           style={[
             styles.historicoSection,
@@ -1582,7 +1602,6 @@ export default function ProfileScreen() {
             },
           ]}
         >
-          {/* Cabeçalho clicável */}
           <TouchableOpacity
             style={styles.historicoHeader}
             onPress={() => setAdocoesAberto(!adocoesAberto)}
@@ -1618,7 +1637,6 @@ export default function ProfileScreen() {
             />
           </TouchableOpacity>
 
-          {/* Lista de adoções expandida */}
           {adocoesAberto && (
             <View
               style={[styles.historicoLista, { borderTopColor: theme.border }]}
@@ -1710,7 +1728,6 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* ── Meus Pets ── */}
         <View
           style={[
             styles.divider,
@@ -1805,7 +1822,6 @@ export default function ProfileScreen() {
           ))
         )}
 
-        {/* ── Excluir Conta ── */}
         <View
           style={[
             styles.divider,
@@ -1822,7 +1838,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* ── Modais ── */}
       <ModalPedido
         pedido={pedidoSelecionado}
         visible={!!pedidoSelecionado}
@@ -1848,7 +1863,69 @@ export default function ProfileScreen() {
         theme={theme}
       />
 
-      {/* ── Modal Excluir Conta ── */}
+      {/* ── Modal Confirmar Intenção de Excluir ── */}
+      <Modal
+        visible={showConfirmDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmDeleteModal(false)}
+      >
+        <View style={deleteModalStyles.overlay}>
+          <View
+            style={[
+              deleteModalStyles.box,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="alert-circle-outline"
+              size={36}
+              color="#EF4444"
+              style={{ alignSelf: "center", marginBottom: 8 }}
+            />
+            <Text style={[deleteModalStyles.title, { color: theme.text }]}>
+              Excluir Conta
+            </Text>
+            <Text
+              style={[
+                deleteModalStyles.subtitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Tem certeza que deseja excluir sua conta? Esta ação é permanente e
+              não pode ser desfeita.
+            </Text>
+            <View style={deleteModalStyles.btnRow}>
+              <TouchableOpacity
+                style={[
+                  deleteModalStyles.cancelBtn,
+                  { borderColor: theme.border },
+                ]}
+                onPress={() => setShowConfirmDeleteModal(false)}
+              >
+                <Text
+                  style={[deleteModalStyles.cancelText, { color: theme.text }]}
+                >
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[deleteModalStyles.deleteBtn]}
+                onPress={() => {
+                  setShowConfirmDeleteModal(false);
+                  setDeletePassword("");
+                  setDeletePasswordVisible(false);
+                  setShowDeleteModal(true);
+                }}
+              >
+                <Text style={deleteModalStyles.deleteText}>Excluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal Senha para Excluir ── */}
       <Modal
         visible={showDeleteModal}
         transparent
@@ -1879,7 +1956,6 @@ export default function ProfileScreen() {
             >
               Digite sua senha para confirmar a exclusão permanente da conta.
             </Text>
-
             <View
               style={[
                 deleteModalStyles.inputRow,
@@ -1905,7 +1981,6 @@ export default function ProfileScreen() {
                 />
               </TouchableOpacity>
             </View>
-
             <View style={deleteModalStyles.btnRow}>
               <TouchableOpacity
                 style={[
@@ -1943,8 +2018,6 @@ export default function ProfileScreen() {
   );
 }
 
-// ── Modal de Detalhes/Edição do Pet ──────────────────────────────────────────
-
 function ModalPet({
   pet,
   visible,
@@ -1960,8 +2033,8 @@ function ModalPet({
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { showNotification } = useNotification();
 
-  // Campos — espelham exatamente o add-pet
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [especie, setEspecie] = useState("");
@@ -1983,12 +2056,10 @@ function ModalPet({
   const [vacinas, setVacinas] = useState("");
   const [observacoes, setObservacoes] = useState("");
 
-  // Preenche o form quando o pet muda
   React.useEffect(() => {
     if (!pet) return;
     setImageUri(null);
     setNome(pet.nome ?? "");
-    // Espécie: se não for Canino/Felino, é "Outro"
     const especiesFixas = ["Canino", "Felino"];
     if (especiesFixas.includes(pet.especie)) {
       setEspecie(pet.especie);
@@ -2007,7 +2078,6 @@ function ModalPet({
     setPeso(pet.peso ?? "");
     setCor(pet.cor ?? "");
     setCastrado(pet.castrado ?? "");
-    // Alergias
     if (!pet.alergias || pet.alergias === "Nenhuma") {
       setHasAlergias("Não");
       setAlergias("");
@@ -2015,7 +2085,6 @@ function ModalPet({
       setHasAlergias("Sim");
       setAlergias(pet.alergias);
     }
-    // Doenças
     if (!pet.doencas || pet.doencas === "Nenhuma") {
       setHasDoencas("Não");
       setDoencas("");
@@ -2023,7 +2092,6 @@ function ModalPet({
       setHasDoencas("Sim");
       setDoencas(pet.doencas);
     }
-    // Medicamentos
     if (!pet.medicamentos || pet.medicamentos === "Nenhum") {
       setHasMedicamentos("Não");
       setMedicamentos("");
@@ -2031,7 +2099,6 @@ function ModalPet({
       setHasMedicamentos("Sim");
       setMedicamentos(pet.medicamentos);
     }
-    // Vacinas
     if (!pet.vacinas || pet.vacinas === "Não informado") {
       setHasVacinas("Não");
       setVacinas("");
@@ -2045,7 +2112,6 @@ function ModalPet({
 
   if (!pet) return null;
 
-  // ── Helpers de data/idade (igual ao add-pet) ────────────────────────────────
   const handleDateChange = (text: string) => {
     let v = text.replace(/\D/g, "").slice(0, 8);
     if (v.length >= 5) v = `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
@@ -2081,7 +2147,6 @@ function ModalPet({
     }
   };
 
-  // ── Picker de imagem ────────────────────────────────────────────────────────
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -2120,8 +2185,23 @@ function ModalPet({
     return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${storagePath}?alt=media&token=${data.downloadTokens}`;
   };
 
-  // ── Salvar edição ───────────────────────────────────────────────────────────
   const handleSave = async () => {
+    // ── Validações do Modal do Pet ──
+    if (
+      !nome.trim() ||
+      !raca.trim() ||
+      !peso.trim() ||
+      !cor.trim() ||
+      dataNascimento.length !== 10
+    ) {
+      showNotification(
+        "Atenção",
+        "Por favor, preencha os campos obrigatórios corretamente.",
+        "error",
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const user = auth.currentUser;
@@ -2154,16 +2234,20 @@ function ModalPet({
         updatedData.fotoUrl = fotoUrl;
       }
 
+      showNotification("Sucesso", "Alterações salvas com sucesso!", "success");
       onSave({ ...pet, ...updatedData, fotoUrl });
     } catch (error) {
       console.error(error);
-      Alert.alert("Erro", "Não foi possível guardar as alterações.");
+      showNotification(
+        "Erro",
+        "Não foi possível guardar as alterações.",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Sub-componente de pills (igual ao add-pet) ──────────────────────────────
   const OptionSelector = ({
     label,
     options,
@@ -2220,7 +2304,6 @@ function ModalPet({
       <View
         style={[modalStyles.container, { backgroundColor: theme.background }]}
       >
-        {/* Cabeçalho */}
         <View style={[modalStyles.header, { borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
             <Ionicons name="close" size={24} color={theme.text} />
@@ -2244,7 +2327,6 @@ function ModalPet({
           contentContainerStyle={{ padding: 20 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Foto ── */}
           <TouchableOpacity
             onPress={editing ? pickImage : undefined}
             style={[
@@ -2264,7 +2346,6 @@ function ModalPet({
             )}
           </TouchableOpacity>
 
-          {/* ── Nome ── */}
           <View style={{ marginBottom: 15 }}>
             <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
               Nome do Pet *
@@ -2286,7 +2367,6 @@ function ModalPet({
             />
           </View>
 
-          {/* ── Espécie ── */}
           <OptionSelector
             label="Espécie"
             options={["Canino", "Felino", "Outro"]}
@@ -2313,7 +2393,6 @@ function ModalPet({
             </View>
           )}
 
-          {/* ── Raça ── */}
           <View style={{ marginBottom: 15 }}>
             <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
               Raça *
@@ -2335,7 +2414,6 @@ function ModalPet({
             />
           </View>
 
-          {/* ── Sexo ── */}
           <OptionSelector
             label="Sexo"
             options={["Macho", "Fêmea"]}
@@ -2343,7 +2421,6 @@ function ModalPet({
             onSelect={setSexo}
           />
 
-          {/* ── Data de Nascimento + Idade ── */}
           <View style={{ flexDirection: "row", gap: 15, marginBottom: 15 }}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
@@ -2389,7 +2466,6 @@ function ModalPet({
             </View>
           </View>
 
-          {/* ── Peso + Cor ── */}
           <View style={{ flexDirection: "row", gap: 15, marginBottom: 15 }}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
@@ -2433,7 +2509,6 @@ function ModalPet({
             </View>
           </View>
 
-          {/* ── Castrado ── */}
           <OptionSelector
             label="Castrado?"
             options={["Sim", "Não"]}
@@ -2441,7 +2516,6 @@ function ModalPet({
             onSelect={setCastrado}
           />
 
-          {/* ── Saúde & Histórico ── */}
           <Text
             style={{
               fontSize: 18,
@@ -2558,7 +2632,6 @@ function ModalPet({
             />
           )}
 
-          {/* ── Observações ── */}
           <View style={{ marginBottom: 15 }}>
             <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
               Observações (Opcional)
@@ -2582,15 +2655,12 @@ function ModalPet({
             />
           </View>
 
-          {/* ── Botões ── */}
           {editing && (
             <View style={styles.actionRow}>
               <TouchableOpacity
                 style={[styles.cancelBtn, { borderColor: theme.border }]}
                 onPress={() => {
-                  // Re-trigger useEffect resetting form
                   setEditing(false);
-                  // Force re-populate by toggling pet ref
                   if (pet) {
                     const especiesFixas = ["Canino", "Felino"];
                     setNome(pet.nome ?? "");
@@ -2690,8 +2760,6 @@ const petModalStyles = StyleSheet.create({
   },
 });
 
-// ── Componente Field (mantido igual) ──────────────────────────────────────────
-
 function Field({
   label,
   value,
@@ -2699,6 +2767,7 @@ function Field({
   onChangeText,
   icon,
   keyboardType,
+  maxLength,
   theme,
 }: any) {
   return (
@@ -2729,6 +2798,7 @@ function Field({
           value={value}
           onChangeText={onChangeText}
           keyboardType={keyboardType || "default"}
+          maxLength={maxLength}
         />
       ) : (
         <Text style={[fieldStyles.value, { color: theme.text }]}>
@@ -2741,8 +2811,6 @@ function Field({
     </View>
   );
 }
-
-// ── StyleSheet Principal ──────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -2790,11 +2858,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
   },
-  deleteAccountText: {
-    color: "#EF4444",
-    fontSize: 15,
-    fontWeight: "600",
-  },
+  deleteAccountText: { color: "#EF4444", fontSize: 15, fontWeight: "600" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -2841,18 +2905,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveBtnText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
-
-  // ── Histórico ──
-  historicoSection: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  historicoHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-  },
+  historicoSection: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  historicoHeader: { flexDirection: "row", alignItems: "center", padding: 16 },
   historicoIconBox: {
     width: 40,
     height: 40,
@@ -2863,7 +2917,6 @@ const styles = StyleSheet.create({
   historicoTitulo: { fontSize: 15, fontWeight: "700" },
   historicoSubtitulo: { fontSize: 12, marginTop: 2 },
   historicoLista: { borderTopWidth: 1 },
-
   listaItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -2879,12 +2932,7 @@ const styles = StyleSheet.create({
   },
   listaItemTitulo: { fontSize: 14, fontWeight: "600" },
   listaItemData: { fontSize: 12, marginTop: 2 },
-
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 28,
-    gap: 10,
-  },
+  emptyState: { alignItems: "center", paddingVertical: 28, gap: 10 },
   emptyText: { fontSize: 13, textAlign: "center", paddingHorizontal: 20 },
 });
 

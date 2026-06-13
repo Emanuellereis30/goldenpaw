@@ -1,3 +1,4 @@
+// app/add-pet.tsx
 import { Feather } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
@@ -6,8 +7,9 @@ import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,11 +17,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useNotification } from "../contexts/NotificationContext";
 import { auth, db } from "../firebaseConfig";
 import { useAppTheme } from "../hooks/use-app-theme";
 
 export default function AddPetScreen() {
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification();
   const [saving, setSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
 
@@ -75,7 +79,6 @@ export default function AddPetScreen() {
     const bucket = "petshop-2c06a.firebasestorage.app";
     const token = await user.getIdToken();
 
-    // Converte base64 para binário antes de enviar
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -95,11 +98,8 @@ export default function AddPetScreen() {
     );
 
     const data = await response.json();
-    console.log("Firebase response:", JSON.stringify(data));
     return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${storagePath}?alt=media&token=${data.downloadTokens}`;
   };
-
-  // ── FUNÇÕES DE DATA E IDADE ───────────────────────────────────────────────
 
   const handleDateChange = (text: string) => {
     let v = text.replace(/\D/g, "").slice(0, 8);
@@ -152,8 +152,6 @@ export default function AddPetScreen() {
     }
   };
 
-  // ── SALVAR E VALIDAR ──────────────────────────────────────────────────────
-
   const handleSave = async () => {
     const missingFields = [];
     if (!nome) missingFields.push("Nome");
@@ -178,9 +176,10 @@ export default function AddPetScreen() {
       missingFields.push("Vacinas");
 
     if (missingFields.length > 0) {
-      Alert.alert(
+      showNotification(
         "Campos Obrigatórios",
-        `Por favor, preencha corretamente os seguintes campos:\n\n${missingFields.join("\n")}`,
+        `Por favor, preencha os campos em falta.`,
+        "error",
       );
       return;
     }
@@ -217,11 +216,11 @@ export default function AddPetScreen() {
         await updateDoc(petDocRef, { fotoUrl });
       }
 
-      Alert.alert("Sucesso", "Pet registado com sucesso!");
+      showNotification("Sucesso", "Pet registado com sucesso!", "success");
       router.back();
     } catch (error) {
       console.error(error);
-      Alert.alert("Erro", "Não foi possível guardar o pet.");
+      showNotification("Erro", "Não foi possível guardar o pet.", "error");
     } finally {
       setSaving(false);
     }
@@ -264,65 +263,228 @@ export default function AddPetScreen() {
   );
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={[{ flex: 1, backgroundColor: theme.background }]}
-      contentContainerStyle={{ padding: 20 }}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 100}
     >
-      <Text
-        style={{
-          fontSize: 24,
-          fontWeight: "bold",
-          color: theme.text,
-          marginBottom: 20,
-        }}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+        automaticallyAdjustKeyboardInsets={true}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        Registar Pet
-      </Text>
+        <Text
+          style={{
+            fontSize: 24,
+            fontWeight: "bold",
+            color: theme.text,
+            marginBottom: 20,
+          }}
+        >
+          Registar Pet
+        </Text>
 
-      <TouchableOpacity
-        onPress={pickImage}
-        style={[styles.imageContainer, { borderColor: theme.border }]}
-      >
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.image} />
-        ) : (
-          <View style={{ alignItems: "center" }}>
-            <Feather name="camera" size={32} color={theme.primary} />
-            <Text style={{ color: theme.textSecondary, marginTop: 8 }}>
-              Adicionar Foto
-            </Text>
+        <TouchableOpacity
+          onPress={pickImage}
+          style={[styles.imageContainer, { borderColor: theme.border }]}
+        >
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.image} />
+          ) : (
+            <View style={{ alignItems: "center" }}>
+              <Feather name="camera" size={32} color={theme.primary} />
+              <Text style={{ color: theme.textSecondary, marginTop: 8 }}>
+                Adicionar Foto
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <View style={{ marginBottom: 15 }}>
+          <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
+            Nome do Pet *
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+              },
+            ]}
+            value={nome}
+            onChangeText={setNome}
+            placeholder="Ex: Rex"
+            placeholderTextColor={theme.textSecondary}
+          />
+        </View>
+
+        <OptionSelector
+          label="Espécie"
+          options={["Canino", "Felino", "Outro"]}
+          selected={especie}
+          onSelect={setEspecie}
+        />
+        {especie === "Outro" && (
+          <View style={{ marginBottom: 15, marginTop: -5 }}>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.surface,
+                  color: theme.text,
+                  borderColor: theme.border,
+                },
+              ]}
+              value={especieOutro}
+              onChangeText={setEspecieOutro}
+              placeholder="Digite a espécie"
+              placeholderTextColor={theme.textSecondary}
+            />
           </View>
         )}
-      </TouchableOpacity>
 
-      <View style={{ marginBottom: 15 }}>
-        <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
-          Nome do Pet *
+        <View style={{ marginBottom: 15 }}>
+          <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
+            Raça *
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+              },
+            ]}
+            value={raca}
+            onChangeText={setRaca}
+            placeholder="Ex: Poodle, SRD"
+            placeholderTextColor={theme.textSecondary}
+          />
+        </View>
+
+        <OptionSelector
+          label="Sexo"
+          options={["Macho", "Fêmea"]}
+          selected={sexo}
+          onSelect={setSexo}
+        />
+
+        <View style={{ flexDirection: "row", gap: 15, marginBottom: 15 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
+              Nascimento *
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.surface,
+                  color: theme.text,
+                  borderColor: theme.border,
+                },
+              ]}
+              value={dataNascimento}
+              onChangeText={handleDateChange}
+              placeholder="DD/MM/AAAA"
+              keyboardType="numeric"
+              maxLength={10}
+              placeholderTextColor={theme.textSecondary}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
+              Idade Estimada
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.surface,
+                  color: theme.textSecondary,
+                  borderColor: theme.border,
+                  opacity: 0.7,
+                },
+              ]}
+              value={idade}
+              editable={false}
+              placeholder="Automático"
+              placeholderTextColor={theme.textSecondary}
+            />
+          </View>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 15, marginBottom: 15 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
+              Peso *
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.surface,
+                  color: theme.text,
+                  borderColor: theme.border,
+                },
+              ]}
+              value={peso}
+              onChangeText={setPeso}
+              placeholder="Ex: 5 kg"
+              placeholderTextColor={theme.textSecondary}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
+              Cor *
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.surface,
+                  color: theme.text,
+                  borderColor: theme.border,
+                },
+              ]}
+              value={cor}
+              onChangeText={setCor}
+              placeholder="Ex: Preto"
+              placeholderTextColor={theme.textSecondary}
+            />
+          </View>
+        </View>
+
+        <OptionSelector
+          label="Castrado?"
+          options={["Sim", "Não"]}
+          selected={castrado}
+          onSelect={setCastrado}
+        />
+
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: "bold",
+            color: theme.primary,
+            marginTop: 10,
+            marginBottom: 15,
+          }}
+        >
+          Saúde & Histórico
         </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border,
-            },
-          ]}
-          value={nome}
-          onChangeText={setNome}
-          placeholder="Ex: Rex"
-          placeholderTextColor={theme.textSecondary}
-        />
-      </View>
 
-      <OptionSelector
-        label="Espécie"
-        options={["Canino", "Felino", "Outro"]}
-        selected={especie}
-        onSelect={setEspecie}
-      />
-      {especie === "Outro" && (
-        <View style={{ marginBottom: 15, marginTop: -5 }}>
+        <OptionSelector
+          label="Possui alergias?"
+          options={["Sim", "Não"]}
+          selected={hasAlergias}
+          onSelect={setHasAlergias}
+        />
+        {hasAlergias === "Sim" && (
           <TextInput
             style={[
               styles.input,
@@ -330,284 +492,131 @@ export default function AddPetScreen() {
                 backgroundColor: theme.surface,
                 color: theme.text,
                 borderColor: theme.border,
+                marginBottom: 15,
+                marginTop: -5,
               },
             ]}
-            value={especieOutro}
-            onChangeText={setEspecieOutro}
-            placeholder="Digite a espécie"
+            value={alergias}
+            onChangeText={setAlergias}
+            placeholder="Quais alergias?"
             placeholderTextColor={theme.textSecondary}
           />
-        </View>
-      )}
-
-      <View style={{ marginBottom: 15 }}>
-        <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
-          Raça *
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border,
-            },
-          ]}
-          value={raca}
-          onChangeText={setRaca}
-          placeholder="Ex: Poodle, SRD"
-          placeholderTextColor={theme.textSecondary}
-        />
-      </View>
-
-      <OptionSelector
-        label="Sexo"
-        options={["Macho", "Fêmea"]}
-        selected={sexo}
-        onSelect={setSexo}
-      />
-
-      <View style={{ flexDirection: "row", gap: 15, marginBottom: 15 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
-            Nascimento *
-          </Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.surface,
-                color: theme.text,
-                borderColor: theme.border,
-              },
-            ]}
-            value={dataNascimento}
-            onChangeText={handleDateChange}
-            placeholder="DD/MM/AAAA"
-            keyboardType="numeric"
-            maxLength={10}
-            placeholderTextColor={theme.textSecondary}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
-            Idade Estimada
-          </Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.surface,
-                color: theme.textSecondary,
-                borderColor: theme.border,
-                opacity: 0.7,
-              },
-            ]}
-            value={idade}
-            editable={false}
-            placeholder="Automático"
-            placeholderTextColor={theme.textSecondary}
-          />
-        </View>
-      </View>
-
-      <View style={{ flexDirection: "row", gap: 15, marginBottom: 15 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
-            Peso *
-          </Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.surface,
-                color: theme.text,
-                borderColor: theme.border,
-              },
-            ]}
-            value={peso}
-            onChangeText={setPeso}
-            placeholder="Ex: 5 kg"
-            placeholderTextColor={theme.textSecondary}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
-            Cor *
-          </Text>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.surface,
-                color: theme.text,
-                borderColor: theme.border,
-              },
-            ]}
-            value={cor}
-            onChangeText={setCor}
-            placeholder="Ex: Preto"
-            placeholderTextColor={theme.textSecondary}
-          />
-        </View>
-      </View>
-
-      <OptionSelector
-        label="Castrado?"
-        options={["Sim", "Não"]}
-        selected={castrado}
-        onSelect={setCastrado}
-      />
-
-      <Text
-        style={{
-          fontSize: 18,
-          fontWeight: "bold",
-          color: theme.primary,
-          marginTop: 10,
-          marginBottom: 15,
-        }}
-      >
-        Saúde & Histórico
-      </Text>
-
-      <OptionSelector
-        label="Possui alergias?"
-        options={["Sim", "Não"]}
-        selected={hasAlergias}
-        onSelect={setHasAlergias}
-      />
-      {hasAlergias === "Sim" && (
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border,
-              marginBottom: 15,
-              marginTop: -5,
-            },
-          ]}
-          value={alergias}
-          onChangeText={setAlergias}
-          placeholder="Quais alergias?"
-          placeholderTextColor={theme.textSecondary}
-        />
-      )}
-
-      <OptionSelector
-        label="Possui doenças pré-existentes?"
-        options={["Sim", "Não"]}
-        selected={hasDoencas}
-        onSelect={setHasDoencas}
-      />
-      {hasDoencas === "Sim" && (
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border,
-              marginBottom: 15,
-              marginTop: -5,
-            },
-          ]}
-          value={doencas}
-          onChangeText={setDoencas}
-          placeholder="Quais doenças?"
-          placeholderTextColor={theme.textSecondary}
-        />
-      )}
-
-      <OptionSelector
-        label="Toma medicamentos contínuos?"
-        options={["Sim", "Não"]}
-        selected={hasMedicamentos}
-        onSelect={setHasMedicamentos}
-      />
-      {hasMedicamentos === "Sim" && (
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border,
-              marginBottom: 15,
-              marginTop: -5,
-            },
-          ]}
-          value={medicamentos}
-          onChangeText={setMedicamentos}
-          placeholder="Quais medicamentos?"
-          placeholderTextColor={theme.textSecondary}
-        />
-      )}
-
-      <OptionSelector
-        label="Vacinas em dia?"
-        options={["Sim", "Não"]}
-        selected={hasVacinas}
-        onSelect={setHasVacinas}
-      />
-      {hasVacinas === "Sim" && (
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border,
-              marginBottom: 15,
-              marginTop: -5,
-            },
-          ]}
-          value={vacinas}
-          onChangeText={setVacinas}
-          placeholder="Quais vacinas aplicadas?"
-          placeholderTextColor={theme.textSecondary}
-        />
-      )}
-
-      <View style={{ marginBottom: 15 }}>
-        <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
-          Observações (Opcional)
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.surface,
-              color: theme.text,
-              borderColor: theme.border,
-              minHeight: 80,
-            },
-          ]}
-          value={observacoes}
-          onChangeText={setObservacoes}
-          placeholder="Temperamento, dicas, etc..."
-          placeholderTextColor={theme.textSecondary}
-          multiline
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[
-          styles.saveBtn,
-          { backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 },
-        ]}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        {saving ? (
-          <ActivityIndicator color="#FFF" />
-        ) : (
-          <Text style={styles.saveBtnText}>Registar Pet</Text>
         )}
-      </TouchableOpacity>
-    </ScrollView>
+
+        <OptionSelector
+          label="Possui doenças pré-existentes?"
+          options={["Sim", "Não"]}
+          selected={hasDoencas}
+          onSelect={setHasDoencas}
+        />
+        {hasDoencas === "Sim" && (
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+                marginBottom: 15,
+                marginTop: -5,
+              },
+            ]}
+            value={doencas}
+            onChangeText={setDoencas}
+            placeholder="Quais doenças?"
+            placeholderTextColor={theme.textSecondary}
+          />
+        )}
+
+        <OptionSelector
+          label="Toma medicamentos contínuos?"
+          options={["Sim", "Não"]}
+          selected={hasMedicamentos}
+          onSelect={setHasMedicamentos}
+        />
+        {hasMedicamentos === "Sim" && (
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+                marginBottom: 15,
+                marginTop: -5,
+              },
+            ]}
+            value={medicamentos}
+            onChangeText={setMedicamentos}
+            placeholder="Quais medicamentos?"
+            placeholderTextColor={theme.textSecondary}
+          />
+        )}
+
+        <OptionSelector
+          label="Vacinas em dia?"
+          options={["Sim", "Não"]}
+          selected={hasVacinas}
+          onSelect={setHasVacinas}
+        />
+        {hasVacinas === "Sim" && (
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+                marginBottom: 15,
+                marginTop: -5,
+              },
+            ]}
+            value={vacinas}
+            onChangeText={setVacinas}
+            placeholder="Quais vacinas aplicadas?"
+            placeholderTextColor={theme.textSecondary}
+          />
+        )}
+
+        <View style={{ marginBottom: 15 }}>
+          <Text style={{ color: theme.textSecondary, marginBottom: 5 }}>
+            Observações (Opcional)
+          </Text>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.surface,
+                color: theme.text,
+                borderColor: theme.border,
+                minHeight: 80,
+                textAlignVertical: "top",
+              },
+            ]}
+            value={observacoes}
+            onChangeText={setObservacoes}
+            placeholder="Temperamento, dicas, etc..."
+            placeholderTextColor={theme.textSecondary}
+            multiline
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.saveBtn,
+            { backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 },
+          ]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.saveBtnText}>Registar Pet</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

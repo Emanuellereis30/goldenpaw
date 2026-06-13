@@ -1,3 +1,5 @@
+// app/(tabs)/index.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useCart } from "@/hooks/use-cart";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,10 +16,10 @@ import {
 } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Dimensions,
   Image,
   LayoutChangeEvent,
+  Modal,
   Pressable,
   ScrollView,
   StatusBar,
@@ -43,6 +45,8 @@ interface Produto {
   tag?: string;
   category?: string;
   estoque?: number;
+  kg?: string;
+  descricao?: string;
 }
 
 interface Categoria {
@@ -69,11 +73,13 @@ export default function HomeScreen() {
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
   const { addToCart } = useCart();
   const { fontSize, increaseFontSize, decreaseFontSize } = useFontSize();
+  const { showNotification } = useNotification();
 
   const [featuredProducts, setFeaturedProducts] = useState<Produto[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
   const [profileMenuPosition, setProfileMenuPosition] = useState({
     top: 0,
     right: 0,
@@ -88,7 +94,10 @@ export default function HomeScreen() {
           setIsAdmin(true);
         } else {
           try {
-            const q = query(collection(db, "admin"), where("uid", "==", user.uid));
+            const q = query(
+              collection(db, "admin"),
+              where("uid", "==", user.uid),
+            );
             const snapshot = await getDocs(q);
             if (!snapshot.empty) {
               setIsAdmin(true);
@@ -121,11 +130,11 @@ export default function HomeScreen() {
         ...doc.data(),
       })) as Produto[];
       const produtosEmEstoque = produtosFirestore.filter(
-        (p) => p.estoque && p.estoque > 0
+        (p) => p.estoque && p.estoque > 0,
       );
       const comTag = produtosEmEstoque.filter((p) => p.tag);
       setFeaturedProducts(
-        comTag.length > 0 ? comTag.slice(0, 5) : produtosEmEstoque.slice(0, 5)
+        comTag.length > 0 ? comTag.slice(0, 5) : produtosEmEstoque.slice(0, 5),
       );
     });
     return () => unsubscribe();
@@ -135,21 +144,35 @@ export default function HomeScreen() {
     try {
       await signOut(auth);
       setShowProfileMenu(false);
-      Alert.alert("Sucesso", "Sessão terminada com sucesso.");
+      showNotification("Sucesso", "Sessão terminada com sucesso.", "success");
     } catch (error) {
-      Alert.alert("Erro", "Não foi possível terminar a sessão.");
+      showNotification("Erro", "Não foi possível terminar a sessão.", "error");
     }
   };
 
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
       <View style={styles.headerLeft}>
-        <Image source={IMAGES.logo} style={styles.headerLogo} resizeMode="contain" />
+        <Image
+          source={IMAGES.logo}
+          style={styles.headerLogo}
+          resizeMode="contain"
+        />
         <View>
-          <Text style={[styles.welcomeText, { color: theme.textSecondary, fontSize: fontSize - 2 }]}>
+          <Text
+            style={[
+              styles.welcomeText,
+              { color: theme.textSecondary, fontSize: fontSize - 2 },
+            ]}
+          >
             Olá, Pet Lover!
           </Text>
-          <Text style={[styles.brandText, { color: theme.text, fontSize: fontSize + 4 }]}>
+          <Text
+            style={[
+              styles.brandText,
+              { color: theme.text, fontSize: fontSize + 4 },
+            ]}
+          >
             Golden Paw
           </Text>
         </View>
@@ -159,7 +182,11 @@ export default function HomeScreen() {
           onPress={toggleColorScheme}
           style={[styles.iconButton, { backgroundColor: theme.surface }]}
         >
-          <Ionicons name={colorScheme === "dark" ? "sunny" : "moon"} size={22} color={theme.primary} />
+          <Ionicons
+            name={colorScheme === "dark" ? "sunny" : "moon"}
+            size={22}
+            color={theme.primary}
+          />
         </TouchableOpacity>
         <TouchableOpacity
           ref={profileButtonRef}
@@ -173,44 +200,96 @@ export default function HomeScreen() {
           onPress={() => setShowProfileMenu(!showProfileMenu)}
           style={[styles.iconButton, { backgroundColor: theme.surface }]}
         >
-          <Ionicons name={isLoggedIn ? "person" : "person-outline"} size={22} color={theme.text} />
+          <Ionicons
+            name={isLoggedIn ? "person" : "person-outline"}
+            size={22}
+            color={theme.text}
+          />
         </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={colorScheme === "dark" ? "light-content" : "dark-content"} />
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
+      <StatusBar
+        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
+      />
       {renderHeader()}
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={[styles.heroBanner, { backgroundColor: theme.primary }]}>
-          <Image source={IMAGES.banner} style={styles.heroBackgroundImage} resizeMode="cover" />
+          <Image
+            source={IMAGES.banner}
+            style={styles.heroBackgroundImage}
+            resizeMode="cover"
+          />
           <View style={styles.heroOverlay} />
           <View style={styles.heroContent}>
-            <Text style={[styles.heroTitle, { fontSize: fontSize + 8 }]}>Tudo para o seu melhor amigo</Text>
+            <Text style={[styles.heroTitle, { fontSize: fontSize + 8 }]}>
+              Tudo para o seu melhor amigo
+            </Text>
             <Text style={[styles.heroSubtitle, { fontSize: fontSize }]}>
               Descontos especiais em produtos selecionados.
             </Text>
-            <TouchableOpacity style={styles.heroButton} onPress={() => router.push("/loja")}>
-              <Text style={[styles.heroButtonText, { fontSize: fontSize }]}>Comprar Agora</Text>
+            <TouchableOpacity
+              style={styles.heroButton}
+              onPress={() => router.push("/loja")}
+            >
+              <Text style={[styles.heroButtonText, { fontSize: fontSize }]}>
+                Comprar Agora
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: theme.text, fontSize: fontSize + 2 }]}>Categorias</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesScroll}>
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: theme.text, fontSize: fontSize + 2 },
+          ]}
+        >
+          Categorias
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesScroll}
+        >
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat.id}
               style={styles.categoryItem}
-              onPress={() => router.push({ pathname: "/loja", params: { categoria: cat.name } })}
+              onPress={() =>
+                router.push({
+                  pathname: "/loja",
+                  params: { categoria: cat.name },
+                })
+              }
             >
-              <View style={[styles.categoryIcon, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                <Ionicons name={cat.icon as any} size={28} color={theme.primary} />
+              <View
+                style={[
+                  styles.categoryIcon,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                <Ionicons
+                  name={cat.icon as any}
+                  size={28}
+                  color={theme.primary}
+                />
               </View>
-              <Text style={[styles.categoryName, { color: theme.textSecondary, fontSize: fontSize - 2 }]}>
+              <Text
+                style={[
+                  styles.categoryName,
+                  { color: theme.textSecondary, fontSize: fontSize - 2 },
+                ]}
+              >
                 {cat.name}
               </Text>
             </TouchableOpacity>
@@ -218,48 +297,230 @@ export default function HomeScreen() {
         </ScrollView>
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text, paddingHorizontal: 0, fontSize: fontSize + 2 }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              {
+                color: theme.text,
+                paddingHorizontal: 0,
+                fontSize: fontSize + 2,
+              },
+            ]}
+          >
             Destaques
           </Text>
           <TouchableOpacity onPress={() => router.push("/loja")}>
-            <Text style={{ color: theme.primary, fontWeight: "600", fontSize: fontSize - 2 }}>Ver tudo</Text>
+            <Text
+              style={{
+                color: theme.primary,
+                fontWeight: "600",
+                fontSize: fontSize - 2,
+              }}
+            >
+              Ver tudo
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalScroll}
+        >
           {featuredProducts.map((item) => {
-            const imageSource = typeof item.image === "string" ? { uri: item.image } : item.image;
+            const imageSource =
+              typeof item.image === "string" ? { uri: item.image } : item.image;
             return (
-              <View key={`feat-${item.id}`} style={[styles.featuredCard, { backgroundColor: theme.surface }]}>
+              <TouchableOpacity
+                key={`feat-${item.id}`}
+                style={[
+                  styles.featuredCard,
+                  { backgroundColor: theme.surface },
+                ]}
+                onPress={() => setSelectedProduto(item)}
+                activeOpacity={0.85}
+              >
                 {item.tag && (
                   <View style={styles.tagBadge}>
-                    <Text style={[styles.tagText, { fontSize: fontSize - 4 }]}>{item.tag}</Text>
+                    <Text style={[styles.tagText, { fontSize: fontSize - 4 }]}>
+                      {item.tag}
+                    </Text>
                   </View>
                 )}
-                <Image source={imageSource} style={styles.featuredImage} resizeMode="contain" />
-                <Text style={[styles.productName, { color: theme.text, fontSize: fontSize }]} numberOfLines={1}>
+                <Image
+                  source={imageSource}
+                  style={styles.featuredImage}
+                  resizeMode="contain"
+                />
+                <Text
+                  style={[
+                    styles.productName,
+                    { color: theme.text, fontSize: fontSize },
+                  ]}
+                  numberOfLines={1}
+                >
                   {item.nome}
                 </Text>
-                <Text style={[styles.productPrice, { color: theme.primary, fontSize: fontSize + 2 }]}>
+                <Text
+                  style={[
+                    styles.productPrice,
+                    { color: theme.primary, fontSize: fontSize + 2 },
+                  ]}
+                >
                   R$ {item.preco}
                 </Text>
                 <TouchableOpacity
                   style={[styles.addButton, { backgroundColor: theme.primary }]}
-                  onPress={() => addToCart(item as any)}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    addToCart(item as any);
+                  }}
                   activeOpacity={0.7}
                 >
                   <Ionicons name="add" size={20} color="#FFF" />
                 </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             );
           })}
         </ScrollView>
       </ScrollView>
 
+      {/* ── Modal de Detalhes do Produto ── */}
+      <Modal
+        visible={!!selectedProduto}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSelectedProduto(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedProduto(null)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.modalCard, { backgroundColor: theme.surface }]}
+          >
+            {selectedProduto && (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.modalCloseBtn,
+                    { backgroundColor: theme.border },
+                  ]}
+                  onPress={() => setSelectedProduto(null)}
+                >
+                  <Ionicons name="close" size={20} color={theme.text} />
+                </TouchableOpacity>
+
+                {selectedProduto.tag && (
+                  <View style={[styles.tagBadge, { top: 16, left: 16 }]}>
+                    <Text style={styles.tagText}>{selectedProduto.tag}</Text>
+                  </View>
+                )}
+
+                <Image
+                  source={
+                    typeof selectedProduto.image === "string"
+                      ? { uri: selectedProduto.image }
+                      : selectedProduto.image
+                  }
+                  style={styles.modalImage}
+                  resizeMode="contain"
+                />
+
+                <ScrollView
+                  style={{ maxHeight: 260 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text
+                    style={[
+                      styles.modalProductName,
+                      { color: theme.text, fontSize: fontSize + 4 },
+                    ]}
+                  >
+                    {selectedProduto.nome}
+                    {selectedProduto.kg ? ` - ${selectedProduto.kg}kg` : ""}
+                  </Text>
+
+                  {(selectedProduto.category ||
+                    (selectedProduto as any).categoria) && (
+                    <Text
+                      style={[
+                        styles.modalCategory,
+                        { color: theme.textSecondary, fontSize: fontSize - 2 },
+                      ]}
+                    >
+                      {selectedProduto.category ||
+                        (selectedProduto as any).categoria}
+                    </Text>
+                  )}
+
+                  <Text
+                    style={[
+                      styles.modalPrice,
+                      { color: theme.primary, fontSize: fontSize + 8 },
+                    ]}
+                  >
+                    R$ {selectedProduto.preco}
+                  </Text>
+
+                  {selectedProduto.descricao ? (
+                    <Text
+                      style={[
+                        styles.modalDescription,
+                        { color: theme.textSecondary, fontSize: fontSize },
+                      ]}
+                    >
+                      {selectedProduto.descricao}
+                    </Text>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.modalDescription,
+                        {
+                          color: theme.textSecondary,
+                          fontSize: fontSize,
+                          fontStyle: "italic",
+                        },
+                      ]}
+                    >
+                      Sem descrição disponível.
+                    </Text>
+                  )}
+                </ScrollView>
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalAddButton,
+                    { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => {
+                    addToCart(selectedProduto as any);
+                    setSelectedProduto(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="cart-outline" size={20} color="#FFF" />
+                  <Text
+                    style={[styles.modalAddButtonText, { fontSize: fontSize }]}
+                  >
+                    Adicionar ao Carrinho
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Menu dropdown de perfil – controles de fonte sempre visíveis */}
       {showProfileMenu && (
         <>
-          <Pressable style={styles.dropdownOverlay} onPress={() => setShowProfileMenu(false)} />
+          <Pressable
+            style={styles.dropdownOverlay}
+            onPress={() => setShowProfileMenu(false)}
+          />
           <View
             style={[
               styles.dropdownMenu,
@@ -272,35 +533,60 @@ export default function HomeScreen() {
           >
             {/* Controles de fonte – sempre disponíveis */}
             <TouchableOpacity
-              style={[styles.dropdownOption, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
+              style={[
+                styles.dropdownOption,
+                { borderBottomColor: theme.border, borderBottomWidth: 1 },
+              ]}
               onPress={() => {
                 decreaseFontSize();
                 setShowProfileMenu(false);
               }}
             >
-              <Text style={[styles.dropdownOptionText, { color: theme.text, fontSize: fontSize }]}>
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  { color: theme.text, fontSize: fontSize },
+                ]}
+              >
                 Diminuir fonte (A-)
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.dropdownOption, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
+              style={[
+                styles.dropdownOption,
+                { borderBottomColor: theme.border, borderBottomWidth: 1 },
+              ]}
               onPress={() => {
                 increaseFontSize();
                 setShowProfileMenu(false);
               }}
             >
-              <Text style={[styles.dropdownOptionText, { color: theme.text, fontSize: fontSize }]}>
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  { color: theme.text, fontSize: fontSize },
+                ]}
+              >
                 Aumentar fonte (A+)
               </Text>
             </TouchableOpacity>
 
-            <View style={{ height: 1, backgroundColor: theme.border, marginVertical: 4 }} />
+            <View
+              style={{
+                height: 1,
+                backgroundColor: theme.border,
+                marginVertical: 4,
+              }}
+            />
 
             {/* Opções de login / perfil conforme estado */}
             {isLoggedIn ? (
               <>
                 <TouchableOpacity
-                  style={[styles.dropdownOption, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
+                  style={[
+                    styles.dropdownOption,
+                    { borderBottomColor: theme.border, borderBottomWidth: 1 },
+                  ]}
                   onPress={() => {
                     setShowProfileMenu(false);
                     if (isAdmin) router.push("/admin/AdminDashboard");
@@ -320,20 +606,40 @@ export default function HomeScreen() {
                     {isAdmin ? "Admin" : "Perfil"}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.dropdownOption} onPress={handleLogout}>
-                  <Text style={[styles.dropdownOptionText, { color: "#EF4444", fontSize: fontSize }]}>Sair</Text>
+                <TouchableOpacity
+                  style={styles.dropdownOption}
+                  onPress={handleLogout}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownOptionText,
+                      { color: "#EF4444", fontSize: fontSize },
+                    ]}
+                  >
+                    Sair
+                  </Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
                 <TouchableOpacity
-                  style={[styles.dropdownOption, { borderBottomColor: theme.border, borderBottomWidth: 1 }]}
+                  style={[
+                    styles.dropdownOption,
+                    { borderBottomColor: theme.border, borderBottomWidth: 1 },
+                  ]}
                   onPress={() => {
                     setShowProfileMenu(false);
                     router.push("/login");
                   }}
                 >
-                  <Text style={[styles.dropdownOptionText, { color: theme.text, fontSize: fontSize }]}>Login</Text>
+                  <Text
+                    style={[
+                      styles.dropdownOptionText,
+                      { color: theme.text, fontSize: fontSize },
+                    ]}
+                  >
+                    Login
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.dropdownOption}
@@ -342,7 +648,14 @@ export default function HomeScreen() {
                     router.push("/register");
                   }}
                 >
-                  <Text style={[styles.dropdownOptionText, { color: theme.text, fontSize: fontSize }]}>Registrar</Text>
+                  <Text
+                    style={[
+                      styles.dropdownOptionText,
+                      { color: theme.text, fontSize: fontSize },
+                    ]}
+                  >
+                    Registrar
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
@@ -483,4 +796,63 @@ const styles = StyleSheet.create({
   },
   dropdownOption: { padding: 14, alignItems: "center" },
   dropdownOptionText: { fontWeight: "600" },
+
+  // Modal de detalhes
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingTop: 20,
+    minHeight: 480,
+  },
+  modalCloseBtn: {
+    alignSelf: "flex-end",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  modalImage: {
+    width: "100%",
+    height: 180,
+    marginBottom: 16,
+  },
+  modalProductName: {
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  modalCategory: {
+    fontWeight: "500",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  modalPrice: {
+    fontWeight: "800",
+    marginBottom: 12,
+  },
+  modalDescription: {
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  modalAddButton: {
+    flexDirection: "row",
+    height: 52,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  modalAddButtonText: {
+    color: "#FFF",
+    fontWeight: "700",
+  },
 });

@@ -1,3 +1,4 @@
+// app/adoption/AdocaoFormulario.tsx
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -714,6 +715,22 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+      {/* ── BOTÃO MOVIDO PARA AQUI (FORA DO SCROLLVIEW) ── */}
+      <TouchableOpacity
+        style={[
+          styles.closeButton,
+          {
+            top: insets.top > 0 ? insets.top + 10 : 20,
+            backgroundColor: theme.buttonBackground ?? theme.surface,
+            borderColor: theme.primary + "40",
+          },
+        ]}
+        onPress={onCancel}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="close" size={24} color={theme.primary} />
+      </TouchableOpacity>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -721,26 +738,11 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
-            { paddingTop: insets.top + 20, paddingBottom: 100 },
+            { paddingTop: 70, paddingBottom: 100 }, // Ajustado para dar espaço ao botão fixo
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <TouchableOpacity
-            style={[
-              styles.closeButton,
-              {
-                top: insets.top + 10,
-                backgroundColor: theme.buttonBackground ?? theme.surface,
-                borderColor: theme.primary + "40",
-              },
-            ]}
-            onPress={onCancel}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="close" size={24} color={theme.primary} />
-          </TouchableOpacity>
-
           <Text style={[styles.headerTitle, { color: theme.text }]}>
             Adotar {pet.nome}
           </Text>
@@ -968,7 +970,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "bold",
     textAlign: "center",
-    marginTop: 40,
     marginBottom: 20,
   },
   progressWrapper: { marginBottom: 20 },

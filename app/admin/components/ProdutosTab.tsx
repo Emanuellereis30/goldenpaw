@@ -1,3 +1,5 @@
+// app/admin/components/ProdutosTab.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -10,7 +12,6 @@ import {
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   ScrollView,
@@ -53,6 +54,7 @@ export default function ProdutosTab({
   onDeleteProduto,
 }: ProdutosTabProps) {
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification();
   const storage = getStorage();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,6 +67,10 @@ export default function ProdutosTab({
   const [showModal, setShowModal] = useState(false);
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
   const [imagePicked, setImagePicked] = useState(false);
+
+  // Estado para exclusão do produto
+  const [produtoToDelete, setProdutoToDelete] = useState<string | null>(null);
+
   const [form, setForm] = useState({
     nome: "",
     preco: "",
@@ -73,6 +79,7 @@ export default function ProdutosTab({
     tag: "",
     estoque: "0",
     categorias: [] as string[],
+    descricao: "",
   });
 
   const ehRacao = form.nome.toLowerCase().includes("ração");
@@ -126,11 +133,11 @@ export default function ProdutosTab({
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted")
-      return Alert.alert(
-        "Permissão necessária",
-        "Precisamos de acesso à galeria.",
-      );
+    if (status !== "granted") {
+      showNotification("Atenção", "Precisamos de acesso à galeria.", "info");
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -160,10 +167,12 @@ export default function ProdutosTab({
       form.categorias.length === 0 ||
       (ehRacao && !form.kg)
     ) {
-      return Alert.alert(
-        "Erro",
+      showNotification(
+        "Atenção",
         "Preencha os campos obrigatórios e categorias.",
+        "error",
       );
+      return;
     }
     try {
       let finalImageUrl = form.image;
@@ -177,15 +186,16 @@ export default function ProdutosTab({
         tag: form.tag,
         estoque: parseInt(form.estoque) || 0,
         category: form.categorias.join(", "),
+        descricao: form.descricao,
       };
       if (editingProduto)
         await onEditProduto(editingProduto.id, produtoData as any);
       else await onAddProduto(produtoData as any);
-      Alert.alert("Sucesso", "Produto guardado!");
+      showNotification("Sucesso", "Produto guardado!", "success");
       setShowModal(false);
       resetForm();
     } catch (error) {
-      Alert.alert("Erro", "Falha ao salvar produto");
+      showNotification("Erro", "Falha ao salvar produto.", "error");
     }
   };
 
@@ -198,6 +208,7 @@ export default function ProdutosTab({
       tag: "",
       estoque: "0",
       categorias: [],
+      descricao: "",
     });
     setEditingProduto(null);
     setImagePicked(false);
@@ -222,19 +233,21 @@ export default function ProdutosTab({
       tag: produto.tag || "",
       estoque: (produto.estoque || 0).toString(),
       categorias: categoriasAtuais,
+      descricao: (produto as any).descricao || "",
     });
     setShowModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    Alert.alert("Confirmar", "Deseja excluir este produto?", [
-      { text: "Cancelar" },
-      {
-        text: "Excluir",
-        style: "destructive",
-        onPress: async () => await onDeleteProduto(id),
-      },
-    ]);
+  const confirmDeleteProduto = async () => {
+    if (!produtoToDelete) return;
+    try {
+      await onDeleteProduto(produtoToDelete);
+      showNotification("Sucesso", "Produto excluído!", "success");
+    } catch (error) {
+      showNotification("Erro", "Falha ao excluir o produto.", "error");
+    } finally {
+      setProdutoToDelete(null);
+    }
   };
 
   // 1. Filtrar Produtos
@@ -654,7 +667,7 @@ export default function ProdutosTab({
                       adminStyles.actionButton,
                       { backgroundColor: theme.error },
                     ]}
-                    onPress={() => handleDelete(produto.id)}
+                    onPress={() => setProdutoToDelete(produto.id)}
                   >
                     <Ionicons name="trash" size={18} color="#FFF" />
                   </TouchableOpacity>
@@ -671,7 +684,6 @@ export default function ProdutosTab({
         </ScrollView>
       </View>
 
-      {/* Modal de Produto mantido como antes... (código resumido visualmente) */}
       <Modal visible={showModal} animationType="slide" transparent>
         <SafeAreaView
           style={[adminStyles.modal, { backgroundColor: theme.background }]}
@@ -871,6 +883,29 @@ export default function ProdutosTab({
               ) : null}
 
               <Text style={[adminStyles.label, { color: theme.text }]}>
+                Descrição (Opcional)
+              </Text>
+              <TextInput
+                style={[
+                  adminStyles.input,
+                  {
+                    backgroundColor: theme.surface,
+                    color: theme.text,
+                    borderColor: theme.border,
+                    height: 90,
+                    textAlignVertical: "top",
+                    paddingTop: 10,
+                  },
+                ]}
+                placeholder="Descreva o produto, ingredientes, benefícios..."
+                placeholderTextColor={theme.textSecondary}
+                value={form.descricao}
+                onChangeText={(t) => setForm({ ...form, descricao: t })}
+                multiline
+                numberOfLines={4}
+              />
+
+              <Text style={[adminStyles.label, { color: theme.text }]}>
                 Tag (Opcional)
               </Text>
               <TextInput
@@ -902,6 +937,61 @@ export default function ProdutosTab({
             </View>
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* ── MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE PRODUTO ── */}
+      <Modal visible={!!produtoToDelete} transparent animationType="fade">
+        <View style={modalConfirmStyles.overlay}>
+          <View
+            style={[
+              modalConfirmStyles.box,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={36}
+              color={theme.error || "#ef4444"}
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={[modalConfirmStyles.title, { color: theme.text }]}>
+              Excluir Produto
+            </Text>
+            <Text
+              style={[
+                modalConfirmStyles.subtitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Deseja realmente excluir este produto? Esta ação não pode ser
+              desfeita.
+            </Text>
+            <View style={modalConfirmStyles.btnRow}>
+              <TouchableOpacity
+                style={[modalConfirmStyles.btn, { borderColor: theme.border }]}
+                onPress={() => setProdutoToDelete(null)}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  modalConfirmStyles.btn,
+                  {
+                    backgroundColor: theme.error || "#ef4444",
+                    borderColor: theme.error || "#ef4444",
+                  },
+                ]}
+                onPress={confirmDeleteProduto}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "700" }}>
+                  Excluir
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -942,4 +1032,43 @@ const localStyles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   dropdownText: { fontSize: 14, fontWeight: "500" },
+});
+
+const modalConfirmStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  box: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  btnRow: { flexDirection: "row", gap: 12, width: "100%" },
+  btn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

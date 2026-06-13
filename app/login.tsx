@@ -1,3 +1,5 @@
+// app/login.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -5,7 +7,6 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -28,6 +29,7 @@ const IMAGES = {
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { theme, colorScheme, toggleColorScheme } = useAppTheme();
+  const { showNotification } = useNotification();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -45,13 +47,16 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Erro", "Preencha e-mail e senha.");
+      showNotification(
+        "Atenção",
+        "Por favor, preencha o e-mail e a senha.",
+        "info",
+      );
       return;
     }
 
     setLoading(true);
     try {
-      // Faz o login nativo no Firebase para persistir a sessão como usuário comum
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email.trim().toLowerCase(),
@@ -60,17 +65,25 @@ export default function LoginScreen() {
       const user = userCredential.user;
 
       if (user.email?.toLowerCase() === "admin@goldenpaw.com") {
+        showNotification(
+          "Bem-vindo!",
+          "Sessão iniciada como Administrador.",
+          "success",
+        );
         router.replace("/admin/AdminDashboard" as any);
       } else {
+        showNotification("Sucesso", "Sessão iniciada com sucesso!", "success");
         router.replace("/(tabs)" as any);
       }
     } catch (error: any) {
       console.error(error);
       let message = "E-mail ou senha incorretos.";
       if (error.code === "auth/user-not-found")
-        message = "Usuário não encontrado.";
-      if (error.code === "auth/wrong-password") message = "Senha incorreta.";
-      Alert.alert("Erro no Login", message);
+        message = "Usuário não encontrado no sistema.";
+      if (error.code === "auth/wrong-password")
+        message = "A senha introduzida está incorreta.";
+
+      showNotification("Erro no Login", message, "error");
     } finally {
       setLoading(false);
     }

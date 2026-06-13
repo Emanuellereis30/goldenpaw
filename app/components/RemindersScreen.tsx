@@ -1,3 +1,4 @@
+// app/components/RemindersScreen.tsx
 import {
   completeReminder,
   createReminder,
@@ -8,15 +9,15 @@ import {
   Reminder,
   requestNotificationPermissions,
   updateReminder,
-} from '@/app/services/ReminderService';
-import { useAppTheme } from '@/hooks/use-app-theme';
-import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Timestamp } from 'firebase/firestore';
-import React, { useCallback, useEffect, useState } from 'react';
+} from "@/app/services/ReminderService";
+import { useNotification } from "@/contexts/NotificationContext";
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { Timestamp } from "firebase/firestore";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Modal,
   Platform,
@@ -26,33 +27,33 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 interface RemindersScreenProps {
   isLoggedIn: boolean;
   onNavigateToLogin: () => void;
 }
 
-type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "yearly";
 
 const RECURRENCE_OPTIONS: { value: RecurrenceType; label: string }[] = [
-  { value: 'none', label: 'Nenhuma' },
-  { value: 'daily', label: 'Diariamente' },
-  { value: 'weekly', label: 'Semanalmente' },
-  { value: 'monthly', label: 'Mensalmente' },
-  { value: 'yearly', label: 'Anualmente' },
+  { value: "none", label: "Nenhuma" },
+  { value: "daily", label: "Diariamente" },
+  { value: "weekly", label: "Semanalmente" },
+  { value: "monthly", label: "Mensalmente" },
+  { value: "yearly", label: "Anualmente" },
 ];
 
 const REMINDER_TYPES = [
-  { value: 'appointment', label: 'Consulta' },
-  { value: 'vaccination', label: 'Vacinação' },
-  { value: 'medication', label: 'Medicamento' },
-  { value: 'grooming', label: 'Banho/Tosa' },
-  { value: 'feeding', label: 'Alimentação' },
-  { value: 'other', label: 'Outro' },
+  { value: "appointment", label: "Consulta" },
+  { value: "vaccination", label: "Vacinação" },
+  { value: "medication", label: "Medicamento" },
+  { value: "grooming", label: "Banho/Tosa" },
+  { value: "feeding", label: "Alimentação" },
+  { value: "other", label: "Outro" },
 ];
 
 export default function RemindersScreen({
@@ -61,26 +62,30 @@ export default function RemindersScreen({
 }: RemindersScreenProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
-  
+  const { showNotification } = useNotification();
+
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filterTab, setFilterTab] = useState<'future' | 'past'>('future');
+  const [filterTab, setFilterTab] = useState<"future" | "past">("future");
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showRecurrenceMenu, setShowRecurrenceMenu] = useState(false);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
-  
+
+  // Modal de Exclusão
+  const [reminderToDelete, setReminderToDelete] = useState<string | null>(null);
+
   // Form state
   const [formData, setFormData] = useState({
-    type: 'other',
-    title: '',
-    description: '',
+    type: "other",
+    title: "",
+    description: "",
     scheduledAt: new Date(),
-    recurrence: 'none' as RecurrenceType,
-    petId: '',
-    status: 'active' as 'active' | 'inactive',
+    recurrence: "none" as RecurrenceType,
+    petId: "",
+    status: "active" as "active" | "inactive",
   });
 
   // Load reminders on mount or when login status changes
@@ -97,44 +102,48 @@ export default function RemindersScreen({
       const data = await getUserReminders();
       setReminders(data);
     } catch (error) {
-      console.error('Erro ao carregar lembretes:', error);
-      Alert.alert('Erro', 'Não foi possível carregar seus lembretes.');
+      console.error("Erro ao carregar lembretes:", error);
+      showNotification(
+        "Erro",
+        "Não foi possível carregar seus lembretes.",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
   }, []);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
     if (selectedDate) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         scheduledAt: new Date(
           selectedDate.getFullYear(),
           selectedDate.getMonth(),
           selectedDate.getDate(),
           formData.scheduledAt.getHours(),
-          formData.scheduledAt.getMinutes()
+          formData.scheduledAt.getMinutes(),
         ),
       }));
     }
   };
 
   const handleTimeChange = (event: any, selectedTime?: Date) => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       setShowTimePicker(false);
     }
     if (selectedTime) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         scheduledAt: new Date(
           formData.scheduledAt.getFullYear(),
           formData.scheduledAt.getMonth(),
           formData.scheduledAt.getDate(),
           selectedTime.getHours(),
-          selectedTime.getMinutes()
+          selectedTime.getMinutes(),
         ),
       }));
     }
@@ -142,7 +151,11 @@ export default function RemindersScreen({
 
   const handleSaveReminder = async () => {
     if (!formData.title.trim()) {
-      Alert.alert('Erro', 'O título do lembrete é obrigatório.');
+      showNotification(
+        "Atenção",
+        "O título do lembrete é obrigatório.",
+        "error",
+      );
       return;
     }
 
@@ -153,27 +166,31 @@ export default function RemindersScreen({
           ...formData,
           scheduledAt: formData.scheduledAt,
         });
-        Alert.alert('Sucesso', 'Lembrete atualizado com sucesso!');
+        showNotification(
+          "Sucesso",
+          "Lembrete atualizado com sucesso!",
+          "success",
+        );
       } else {
         await createReminder(formData as CreateReminderInput);
-        Alert.alert('Sucesso', 'Lembrete criado com sucesso!');
+        showNotification("Sucesso", "Lembrete criado com sucesso!", "success");
       }
 
-      // Reload reminders
       await loadReminders();
       handleCloseModal();
     } catch (error) {
-      console.error('Erro ao salvar lembrete:', error);
-      Alert.alert('Erro', 'Não foi possível salvar o lembrete.');
+      console.error("Erro ao salvar lembrete:", error);
+      showNotification("Erro", "Não foi possível salvar o lembrete.", "error");
     } finally {
       setLoading(false);
     }
   };
 
   const handleEditReminder = (reminder: Reminder) => {
-    const scheduledAt = reminder.scheduledAt instanceof Timestamp
-      ? reminder.scheduledAt.toDate()
-      : reminder.scheduledAt;
+    const scheduledAt =
+      reminder.scheduledAt instanceof Timestamp
+        ? reminder.scheduledAt.toDate()
+        : reminder.scheduledAt;
 
     setFormData({
       type: reminder.type,
@@ -181,7 +198,7 @@ export default function RemindersScreen({
       description: reminder.description,
       scheduledAt,
       recurrence: reminder.recurrence,
-      petId: reminder.petId || '',
+      petId: reminder.petId || "",
       status: reminder.status,
     });
     setEditingReminder(reminder);
@@ -192,65 +209,67 @@ export default function RemindersScreen({
     setLoading(true);
     try {
       await completeReminder(reminderId);
-      Alert.alert('Sucesso', 'Lembrete marcado como concluído!');
+      showNotification(
+        "Sucesso",
+        "Lembrete marcado como concluído!",
+        "success",
+      );
       await loadReminders();
     } catch (error) {
-      console.error('Erro ao completar lembrete:', error);
-      Alert.alert('Erro', 'Não foi possível completar o lembrete.');
+      console.error("Erro ao completar lembrete:", error);
+      showNotification(
+        "Erro",
+        "Não foi possível completar o lembrete.",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteReminder = (reminderId: string) => {
-    Alert.alert(
-      'Excluir lembrete',
-      'Tem certeza que deseja excluir este lembrete?',
-      [
-        { text: 'Cancelar', onPress: () => {} },
-        {
-          text: 'Excluir',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await deleteReminder(reminderId);
-              Alert.alert('Sucesso', 'Lembrete excluído!');
-              await loadReminders();
-            } catch (error) {
-              console.error('Erro ao deletar lembrete:', error);
-              Alert.alert('Erro', 'Não foi possível excluir o lembrete.');
-            } finally {
-              setLoading(false);
-            }
-          },
-          style: 'destructive',
-        },
-      ]
-    );
+  const confirmDeleteReminder = async () => {
+    if (!reminderToDelete) return;
+    setLoading(true);
+    try {
+      await deleteReminder(reminderToDelete);
+      showNotification("Sucesso", "Lembrete excluído!", "success");
+      await loadReminders();
+    } catch (error) {
+      console.error("Erro ao deletar lembrete:", error);
+      showNotification("Erro", "Não foi possível excluir o lembrete.", "error");
+    } finally {
+      setLoading(false);
+      setReminderToDelete(null);
+    }
   };
 
   const handleCloseModal = () => {
     setShowFormModal(false);
     setEditingReminder(null);
     setFormData({
-      type: 'other',
-      title: '',
-      description: '',
+      type: "other",
+      title: "",
+      description: "",
       scheduledAt: new Date(),
-      recurrence: 'none',
-      petId: '',
-      status: 'active',
+      recurrence: "none",
+      petId: "",
+      status: "active",
     });
   };
 
   const filteredReminders = filterRemindersByStatus(reminders, filterTab);
 
   const getReminderTypeLabel = (typeValue: string) => {
-    return REMINDER_TYPES.find(t => t.value === typeValue)?.label || typeValue;
+    return (
+      REMINDER_TYPES.find((t) => t.value === typeValue)?.label || typeValue
+    );
   };
 
   const getRecurrenceLabel = (recurrence: string) => {
-    return RECURRENCE_OPTIONS.find(r => r.value === recurrence)?.label || recurrence;
+    return (
+      RECURRENCE_OPTIONS.find((r) => r.value === recurrence)?.label ||
+      recurrence
+    );
   };
 
   if (!isLoggedIn) {
@@ -271,7 +290,9 @@ export default function RemindersScreen({
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
             Faça login para ver seus lembretes
           </Text>
-          <Text style={[styles.emptyDescription, { color: theme.textSecondary }]}>
+          <Text
+            style={[styles.emptyDescription, { color: theme.textSecondary }]}
+          >
             Crie lembretes para nunca esquecer dos compromissos com seus pets.
           </Text>
           <TouchableOpacity
@@ -294,7 +315,9 @@ export default function RemindersScreen({
     >
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Lembretes</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          Lembretes
+        </Text>
         <TouchableOpacity
           style={[styles.newButton, { backgroundColor: theme.primary }]}
           onPress={() => setShowFormModal(true)}
@@ -306,14 +329,14 @@ export default function RemindersScreen({
 
       {/* Tabs */}
       <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
-        {(['future', 'past'] as const).map((tab) => (
+        {(["future", "past"] as const).map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[
               styles.tab,
               {
                 borderBottomColor:
-                  filterTab === tab ? theme.primary : 'transparent',
+                  filterTab === tab ? theme.primary : "transparent",
                 borderBottomWidth: filterTab === tab ? 3 : 0,
               },
             ]}
@@ -323,19 +346,20 @@ export default function RemindersScreen({
               style={[
                 styles.tabText,
                 {
-                  color: filterTab === tab ? theme.primary : theme.textSecondary,
-                  fontWeight: filterTab === tab ? '700' : '500',
+                  color:
+                    filterTab === tab ? theme.primary : theme.textSecondary,
+                  fontWeight: filterTab === tab ? "700" : "500",
                 },
               ]}
             >
-              {tab === 'future' ? 'Futuros' : 'Passados'}
+              {tab === "future" ? "Futuros" : "Passados"}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {/* Content */}
-      {loading && filterTab === 'future' && reminders.length === 0 ? (
+      {loading && filterTab === "future" && reminders.length === 0 ? (
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={theme.primary} />
         </View>
@@ -348,12 +372,14 @@ export default function RemindersScreen({
             style={{ marginBottom: 12 }}
           />
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
-            {filterTab === 'future' ? 'Nenhum lembrete' : 'Sem histórico'}
+            {filterTab === "future" ? "Nenhum lembrete" : "Sem histórico"}
           </Text>
-          <Text style={[styles.emptyDescription, { color: theme.textSecondary }]}>
-            {filterTab === 'future'
+          <Text
+            style={[styles.emptyDescription, { color: theme.textSecondary }]}
+          >
+            {filterTab === "future"
               ? 'Crie um novo lembrete pressionando "Novo"'
-              : 'Lembretes passados aparecerão aqui'}
+              : "Lembretes passados aparecerão aqui"}
           </Text>
         </View>
       ) : (
@@ -363,19 +389,20 @@ export default function RemindersScreen({
           showsVerticalScrollIndicator={false}
         >
           {filteredReminders.map((reminder) => {
-            const scheduledAt = reminder.scheduledAt instanceof Timestamp
-              ? reminder.scheduledAt.toDate()
-              : reminder.scheduledAt;
+            const scheduledAt =
+              reminder.scheduledAt instanceof Timestamp
+                ? reminder.scheduledAt.toDate()
+                : reminder.scheduledAt;
 
-            const formattedDate = scheduledAt.toLocaleDateString('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
+            const formattedDate = scheduledAt.toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
             });
 
-            const formattedTime = scheduledAt.toLocaleTimeString('pt-BR', {
-              hour: '2-digit',
-              minute: '2-digit',
+            const formattedTime = scheduledAt.toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
             });
 
             return (
@@ -399,8 +426,8 @@ export default function RemindersScreen({
                           {
                             color: theme.text,
                             textDecorationLine: reminder.completed
-                              ? 'line-through'
-                              : 'none',
+                              ? "line-through"
+                              : "none",
                           },
                         ]}
                       >
@@ -417,9 +444,9 @@ export default function RemindersScreen({
                         styles.statusBadge,
                         {
                           backgroundColor:
-                            reminder.status === 'active'
-                              ? theme.primary + '20'
-                              : theme.textSecondary + '20',
+                            reminder.status === "active"
+                              ? theme.primary + "20"
+                              : theme.textSecondary + "20",
                         },
                       ]}
                     >
@@ -428,20 +455,23 @@ export default function RemindersScreen({
                           styles.statusBadgeText,
                           {
                             color:
-                              reminder.status === 'active'
+                              reminder.status === "active"
                                 ? theme.primary
                                 : theme.textSecondary,
                           },
                         ]}
                       >
-                        {reminder.status === 'active' ? 'Ativo' : 'Inativo'}
+                        {reminder.status === "active" ? "Ativo" : "Inativo"}
                       </Text>
                     </View>
                   </View>
 
                   {reminder.description && (
                     <Text
-                      style={[styles.reminderDescription, { color: theme.textSecondary }]}
+                      style={[
+                        styles.reminderDescription,
+                        { color: theme.textSecondary },
+                      ]}
                       numberOfLines={2}
                     >
                       {reminder.description}
@@ -460,16 +490,12 @@ export default function RemindersScreen({
                       </Text>
                     </View>
                     <View style={styles.metaItem}>
-                      <Ionicons
-                        name="time"
-                        size={14}
-                        color={theme.primary}
-                      />
+                      <Ionicons name="time" size={14} color={theme.primary} />
                       <Text style={[styles.metaText, { color: theme.text }]}>
                         {formattedTime}
                       </Text>
                     </View>
-                    {reminder.recurrence !== 'none' && (
+                    {reminder.recurrence !== "none" && (
                       <View style={styles.metaItem}>
                         <Ionicons
                           name="repeat"
@@ -486,11 +512,11 @@ export default function RemindersScreen({
 
                 {/* Actions */}
                 <View style={styles.cardActions}>
-                  {!reminder.completed && filterTab === 'future' && (
+                  {!reminder.completed && filterTab === "future" && (
                     <TouchableOpacity
                       style={[
                         styles.actionButton,
-                        { backgroundColor: theme.primary + '20' },
+                        { backgroundColor: theme.primary + "20" },
                       ]}
                       onPress={() => handleCompleteReminder(reminder.id)}
                     >
@@ -499,7 +525,12 @@ export default function RemindersScreen({
                         size={18}
                         color={theme.primary}
                       />
-                      <Text style={[styles.actionButtonText, { color: theme.primary }]}>
+                      <Text
+                        style={[
+                          styles.actionButtonText,
+                          { color: theme.primary },
+                        ]}
+                      >
                         Concluir
                       </Text>
                     </TouchableOpacity>
@@ -508,7 +539,7 @@ export default function RemindersScreen({
                   <TouchableOpacity
                     style={[
                       styles.actionButton,
-                      { backgroundColor: theme.primary + '20' },
+                      { backgroundColor: theme.primary + "20" },
                     ]}
                     onPress={() => handleEditReminder(reminder)}
                   >
@@ -517,7 +548,12 @@ export default function RemindersScreen({
                       size={18}
                       color={theme.primary}
                     />
-                    <Text style={[styles.actionButtonText, { color: theme.primary }]}>
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        { color: theme.primary },
+                      ]}
+                    >
                       Editar
                     </Text>
                   </TouchableOpacity>
@@ -525,16 +561,14 @@ export default function RemindersScreen({
                   <TouchableOpacity
                     style={[
                       styles.actionButton,
-                      { backgroundColor: '#EF4444' + '20' },
+                      { backgroundColor: "#EF4444" + "20" },
                     ]}
-                    onPress={() => handleDeleteReminder(reminder.id)}
+                    onPress={() => setReminderToDelete(reminder.id)}
                   >
-                    <Ionicons
-                      name="trash-outline"
-                      size={18}
-                      color="#EF4444"
-                    />
-                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>
+                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    <Text
+                      style={[styles.actionButtonText, { color: "#EF4444" }]}
+                    >
                       Excluir
                     </Text>
                   </TouchableOpacity>
@@ -560,16 +594,13 @@ export default function RemindersScreen({
         >
           {/* Modal Header */}
           <View
-            style={[
-              styles.modalHeader,
-              { borderBottomColor: theme.border },
-            ]}
+            style={[styles.modalHeader, { borderBottomColor: theme.border }]}
           >
             <TouchableOpacity onPress={handleCloseModal}>
               <Ionicons name="close" size={24} color={theme.primary} />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
-              {editingReminder ? 'Editar Lembrete' : 'Novo Lembrete'}
+              {editingReminder ? "Editar Lembrete" : "Novo Lembrete"}
             </Text>
             <TouchableOpacity
               style={[styles.saveButton, { backgroundColor: theme.primary }]}
@@ -592,7 +623,9 @@ export default function RemindersScreen({
           >
             {/* Type Field */}
             <View style={styles.formGroup}>
-              <Text style={[styles.formLabel, { color: theme.text }]}>Tipo</Text>
+              <Text style={[styles.formLabel, { color: theme.text }]}>
+                Tipo
+              </Text>
               <TouchableOpacity
                 style={[
                   styles.formSelect,
@@ -604,7 +637,7 @@ export default function RemindersScreen({
                   {getReminderTypeLabel(formData.type)}
                 </Text>
                 <Ionicons
-                  name={showTypeMenu ? 'chevron-up' : 'chevron-down'}
+                  name={showTypeMenu ? "chevron-up" : "chevron-down"}
                   size={20}
                   color={theme.primary}
                 />
@@ -613,7 +646,10 @@ export default function RemindersScreen({
                 <View
                   style={[
                     styles.dropdownMenu,
-                    { backgroundColor: theme.surface, borderColor: theme.border },
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
                   ]}
                 >
                   {REMINDER_TYPES.map((type) => (
@@ -624,7 +660,7 @@ export default function RemindersScreen({
                         { borderBottomColor: theme.border },
                       ]}
                       onPress={() => {
-                        setFormData(prev => ({ ...prev, type: type.value }));
+                        setFormData((prev) => ({ ...prev, type: type.value }));
                         setShowTypeMenu(false);
                       }}
                     >
@@ -643,13 +679,17 @@ export default function RemindersScreen({
               <TextInput
                 style={[
                   styles.formInput,
-                  { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
                 ]}
                 placeholder="Ex: Consulta do Veterinário"
                 placeholderTextColor={theme.textSecondary}
                 value={formData.title}
                 onChangeText={(text) =>
-                  setFormData(prev => ({ ...prev, title: text }))
+                  setFormData((prev) => ({ ...prev, title: text }))
                 }
               />
             </View>
@@ -662,13 +702,17 @@ export default function RemindersScreen({
               <TextInput
                 style={[
                   styles.formTextarea,
-                  { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    color: theme.text,
+                  },
                 ]}
                 placeholder="Adicione detalhes sobre o lembrete..."
                 placeholderTextColor={theme.textSecondary}
                 value={formData.description}
                 onChangeText={(text) =>
-                  setFormData(prev => ({ ...prev, description: text }))
+                  setFormData((prev) => ({ ...prev, description: text }))
                 }
                 multiline
                 numberOfLines={4}
@@ -680,24 +724,28 @@ export default function RemindersScreen({
               <Text style={[styles.formLabel, { color: theme.text }]}>
                 Data *
               </Text>
-              {Platform.OS === 'web' ? (
+              {Platform.OS === "web" ? (
                 <TextInput
                   style={[
                     styles.formInput,
-                    { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                      color: theme.text,
+                    },
                   ]}
                   inputMode="numeric"
-                  value={formData.scheduledAt.toISOString().split('T')[0]}
+                  value={formData.scheduledAt.toISOString().split("T")[0]}
                   onChange={(e) => {
                     const date = new Date(e.nativeEvent.text);
-                    setFormData(prev => ({
+                    setFormData((prev) => ({
                       ...prev,
                       scheduledAt: new Date(
                         date.getFullYear(),
                         date.getMonth(),
                         date.getDate(),
                         prev.scheduledAt.getHours(),
-                        prev.scheduledAt.getMinutes()
+                        prev.scheduledAt.getMinutes(),
                       ),
                     }));
                   }}
@@ -707,12 +755,15 @@ export default function RemindersScreen({
                   <TouchableOpacity
                     style={[
                       styles.formInput,
-                      { backgroundColor: theme.surface, borderColor: theme.border },
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
                     ]}
                     onPress={() => setShowDatePicker(true)}
                   >
                     <Text style={{ color: theme.text }}>
-                      {formData.scheduledAt.toLocaleDateString('pt-BR')}
+                      {formData.scheduledAt.toLocaleDateString("pt-BR")}
                     </Text>
                   </TouchableOpacity>
                   {showDatePicker && (
@@ -732,24 +783,28 @@ export default function RemindersScreen({
               <Text style={[styles.formLabel, { color: theme.text }]}>
                 Hora *
               </Text>
-              {Platform.OS === 'web' ? (
+              {Platform.OS === "web" ? (
                 <TextInput
                   style={[
                     styles.formInput,
-                    { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                      color: theme.text,
+                    },
                   ]}
                   inputMode="numeric"
                   value={formData.scheduledAt.toTimeString().substring(0, 5)}
                   onChange={(e) => {
-                    const [hours, minutes] = e.nativeEvent.text.split(':');
-                    setFormData(prev => ({
+                    const [hours, minutes] = e.nativeEvent.text.split(":");
+                    setFormData((prev) => ({
                       ...prev,
                       scheduledAt: new Date(
                         prev.scheduledAt.getFullYear(),
                         prev.scheduledAt.getMonth(),
                         prev.scheduledAt.getDate(),
                         parseInt(hours),
-                        parseInt(minutes)
+                        parseInt(minutes),
                       ),
                     }));
                   }}
@@ -759,14 +814,17 @@ export default function RemindersScreen({
                   <TouchableOpacity
                     style={[
                       styles.formInput,
-                      { backgroundColor: theme.surface, borderColor: theme.border },
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
                     ]}
                     onPress={() => setShowTimePicker(true)}
                   >
                     <Text style={{ color: theme.text }}>
-                      {formData.scheduledAt.toLocaleTimeString('pt-BR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
+                      {formData.scheduledAt.toLocaleTimeString("pt-BR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
                       })}
                     </Text>
                   </TouchableOpacity>
@@ -798,7 +856,7 @@ export default function RemindersScreen({
                   {getRecurrenceLabel(formData.recurrence)}
                 </Text>
                 <Ionicons
-                  name={showRecurrenceMenu ? 'chevron-up' : 'chevron-down'}
+                  name={showRecurrenceMenu ? "chevron-up" : "chevron-down"}
                   size={20}
                   color={theme.primary}
                 />
@@ -807,7 +865,10 @@ export default function RemindersScreen({
                 <View
                   style={[
                     styles.dropdownMenu,
-                    { backgroundColor: theme.surface, borderColor: theme.border },
+                    {
+                      backgroundColor: theme.surface,
+                      borderColor: theme.border,
+                    },
                   ]}
                 >
                   {RECURRENCE_OPTIONS.map((option) => (
@@ -818,7 +879,10 @@ export default function RemindersScreen({
                         { borderBottomColor: theme.border },
                       ]}
                       onPress={() => {
-                        setFormData(prev => ({ ...prev, recurrence: option.value }));
+                        setFormData((prev) => ({
+                          ...prev,
+                          recurrence: option.value,
+                        }));
                         setShowRecurrenceMenu(false);
                       }}
                     >
@@ -840,14 +904,14 @@ export default function RemindersScreen({
                     styles.statusToggleButton,
                     {
                       backgroundColor:
-                        formData.status === 'active'
+                        formData.status === "active"
                           ? theme.primary
                           : theme.surface,
                       borderColor: theme.border,
                     },
                   ]}
                   onPress={() =>
-                    setFormData(prev => ({ ...prev, status: 'active' }))
+                    setFormData((prev) => ({ ...prev, status: "active" }))
                   }
                 >
                   <Text
@@ -855,7 +919,7 @@ export default function RemindersScreen({
                       styles.statusToggleText,
                       {
                         color:
-                          formData.status === 'active' ? '#FFF' : theme.text,
+                          formData.status === "active" ? "#FFF" : theme.text,
                       },
                     ]}
                   >
@@ -867,14 +931,14 @@ export default function RemindersScreen({
                     styles.statusToggleButton,
                     {
                       backgroundColor:
-                        formData.status === 'inactive'
-                          ? '#EF4444'
+                        formData.status === "inactive"
+                          ? "#EF4444"
                           : theme.surface,
                       borderColor: theme.border,
                     },
                   ]}
                   onPress={() =>
-                    setFormData(prev => ({ ...prev, status: 'inactive' }))
+                    setFormData((prev) => ({ ...prev, status: "inactive" }))
                   }
                 >
                   <Text
@@ -882,7 +946,7 @@ export default function RemindersScreen({
                       styles.statusToggleText,
                       {
                         color:
-                          formData.status === 'inactive' ? '#FFF' : theme.text,
+                          formData.status === "inactive" ? "#FFF" : theme.text,
                       },
                     ]}
                   >
@@ -892,6 +956,60 @@ export default function RemindersScreen({
               </View>
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ── MODAL DE CONFIRMAÇÃO DE EXCLUSÃO ── */}
+      <Modal visible={!!reminderToDelete} transparent animationType="fade">
+        <View style={modalConfirmStyles.overlay}>
+          <View
+            style={[
+              modalConfirmStyles.box,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={36}
+              color={theme.error || "#ef4444"}
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={[modalConfirmStyles.title, { color: theme.text }]}>
+              Excluir Lembrete
+            </Text>
+            <Text
+              style={[
+                modalConfirmStyles.subtitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Deseja realmente excluir este lembrete?
+            </Text>
+            <View style={modalConfirmStyles.btnRow}>
+              <TouchableOpacity
+                style={[modalConfirmStyles.btn, { borderColor: theme.border }]}
+                onPress={() => setReminderToDelete(null)}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  modalConfirmStyles.btn,
+                  {
+                    backgroundColor: theme.error || "#ef4444",
+                    borderColor: theme.error || "#ef4444",
+                  },
+                ]}
+                onPress={confirmDeleteReminder}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "700" }}>
+                  Excluir
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
     </View>
@@ -904,44 +1022,44 @@ const styles = StyleSheet.create({
   },
   centerContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 20,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   newButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
     gap: 6,
   },
   newButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
+    color: "#FFF",
+    fontWeight: "600",
     fontSize: 14,
   },
   tabsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     borderBottomWidth: 1,
     paddingHorizontal: 20,
   },
   tab: {
     flex: 1,
     paddingVertical: 15,
-    alignItems: 'center',
+    alignItems: "center",
     borderBottomWidth: 3,
   },
   tabText: {
@@ -958,7 +1076,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -967,9 +1085,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 8,
     gap: 12,
   },
@@ -979,19 +1097,19 @@ const styles = StyleSheet.create({
   },
   reminderTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   typeBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#3B82F6' + '20',
+    alignSelf: "flex-start",
+    backgroundColor: "#3B82F6" + "20",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
   typeBadgeText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#3B82F6',
+    fontWeight: "600",
+    color: "#3B82F6",
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -1000,7 +1118,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   reminderDescription: {
     fontSize: 14,
@@ -1008,27 +1126,27 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   metaInfo: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
   metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   metaText: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   cardActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -1036,16 +1154,16 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 8,
   },
   emptyDescription: {
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 20,
   },
   loginButton: {
@@ -1055,27 +1173,27 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   loginButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
+    color: "#FFF",
+    fontWeight: "600",
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalContainer: {
     flex: 1,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   saveButton: {
     paddingHorizontal: 16,
@@ -1083,8 +1201,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   saveButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
+    color: "#FFF",
+    fontWeight: "600",
     fontSize: 14,
   },
   modalContent: {
@@ -1097,7 +1215,7 @@ const styles = StyleSheet.create({
   },
   formLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 8,
   },
   formInput: {
@@ -1107,12 +1225,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     minHeight: 44,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   formSelect: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
@@ -1125,13 +1243,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   dropdownMenu: {
     borderWidth: 1,
     borderRadius: 8,
     marginTop: 4,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   menuItem: {
     paddingHorizontal: 12,
@@ -1139,7 +1257,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   statusToggle: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   statusToggleButton: {
@@ -1147,10 +1265,49 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statusToggleText: {
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 14,
+  },
+});
+
+const modalConfirmStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  box: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  btnRow: { flexDirection: "row", gap: 12, width: "100%" },
+  btn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

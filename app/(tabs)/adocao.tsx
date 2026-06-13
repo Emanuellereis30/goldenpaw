@@ -1,3 +1,5 @@
+// app/(tabs)/adocao.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -17,7 +19,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { db } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 
 // ── Interface de Tipo ─────────────────────────────────────────────────────────
 
@@ -43,6 +45,7 @@ const SEXOS = ["Sexo", "macho", "fêmea"];
 
 export default function AdocaoScreen() {
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -287,13 +290,11 @@ export default function AdocaoScreen() {
 
         {/* ── Lista de Cards ── */}
         {filtered.map((pet) => {
-          // 1. Normalização de Idade (Aceita string antiga e number novo)
           const idadeExibida =
             pet.idade !== undefined
               ? `${pet.idade}`
               : pet.age || "Não informada";
 
-          // 2. Normalização de Tags (Aceita Array e String por vírgula)
           const tagsArray = Array.isArray(pet.tags)
             ? pet.tags
             : typeof pet.tags === "string"
@@ -303,7 +304,6 @@ export default function AdocaoScreen() {
                   .filter(Boolean)
               : [];
 
-          // 3. Normalização de Imagens (Aceita URL de nuvem e require de asset)
           const imagemSource = pet.fotoUrl
             ? { uri: pet.fotoUrl }
             : typeof pet.image === "string"
@@ -432,6 +432,18 @@ export default function AdocaoScreen() {
                   style={[styles.adoptBtn, { backgroundColor: theme.primary }]}
                   activeOpacity={0.8}
                   onPress={() => {
+                    // Verifica se o usuário está logado antes de prosseguir
+                    if (!auth.currentUser) {
+                      showNotification(
+                        "Acesso Restrito",
+                        "Você precisa fazer login no aplicativo para adotar um pet.",
+                        "info",
+                      );
+                      router.push("/login" as any);
+                      return;
+                    }
+
+                    // Se estiver logado, segue para os detalhes da adoção
                     router.push({
                       pathname: "/adoption/detalhes",
                       params: {

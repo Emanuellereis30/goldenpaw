@@ -1,3 +1,5 @@
+// app/admin/components/PedidosTab.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -10,7 +12,6 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -56,6 +57,7 @@ const ORDENACOES = [
 
 export default function PedidosTab() {
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification();
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,9 @@ export default function PedidosTab() {
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+
+  // Estado para o Modal de Exclusão
+  const [pedidoToDelete, setPedidoToDelete] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [ordenacao, setOrdenacao] = useState("data_desc");
@@ -104,7 +109,6 @@ export default function PedidosTab() {
   filteredPedidos.sort((a, b) => {
     if (ordenacao === "nome_asc")
       return (a.clienteNome || "").localeCompare(b.clienteNome || "");
-    // Parse "DD/MM/YYYY" + "HH:MM" into comparable timestamps
     const parseDate = (p: any) => {
       try {
         const [d, m, y] = (p.data || "01/01/2000").split("/");
@@ -127,31 +131,25 @@ export default function PedidosTab() {
     if (!selectedPedido) return;
     try {
       await onUpdateStatus(selectedPedido.id, newStatus);
-      Alert.alert("Sucesso", "Status atualizado!");
+      showNotification("Sucesso", "Status atualizado!", "success");
       setShowStatusModal(false);
       setShowDetailModal(false);
     } catch (error) {
-      Alert.alert("Erro", "Falha ao atualizar status");
+      showNotification("Erro", "Falha ao atualizar status", "error");
     }
   };
 
-  const handleDeletePedido = (id: string) => {
-    Alert.alert("Confirmar", "Deseja excluir este pedido?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Excluir",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await onDeletePedido(id);
-            Alert.alert("Sucesso", "Pedido removido!");
-            setShowDetailModal(false);
-          } catch (error) {
-            Alert.alert("Erro", "Falha ao excluir pedido");
-          }
-        },
-      },
-    ]);
+  const confirmDeletePedido = async () => {
+    if (!pedidoToDelete) return;
+    try {
+      await onDeletePedido(pedidoToDelete);
+      showNotification("Sucesso", "Pedido removido!", "success");
+      setShowDetailModal(false);
+    } catch (error) {
+      showNotification("Erro", "Falha ao excluir pedido", "error");
+    } finally {
+      setPedidoToDelete(null);
+    }
   };
 
   const formatarMetodoPagamento = (pedido: Pedido) => {
@@ -468,13 +466,11 @@ export default function PedidosTab() {
             </TouchableOpacity>
           </View>
 
-          {/* ── Padding horizontal e alinhamento adicionados aqui ── */}
           <ScrollView
             style={adminStyles.modalContent}
             contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 16 }}
           >
             {selectedPedido && (
-              // ── Limite de largura adicionado aqui (maxWidth: 480) ──
               <View
                 style={{ width: "100%", maxWidth: 480, alignSelf: "center" }}
               >
@@ -788,6 +784,19 @@ export default function PedidosTab() {
                       Alterar Status
                     </Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      adminStyles.submitButton,
+                      { backgroundColor: theme.error, flex: 1 },
+                    ]}
+                    onPress={() => setPedidoToDelete(selectedPedido.id)}
+                  >
+                    <Text
+                      style={[adminStyles.submitButtonText, { fontSize: 14 }]}
+                    >
+                      Excluir Pedido
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -890,6 +899,61 @@ export default function PedidosTab() {
           </View>
         </View>
       </Modal>
+
+      {/* ── MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE PEDIDO ── */}
+      <Modal visible={!!pedidoToDelete} transparent animationType="fade">
+        <View style={modalConfirmStyles.overlay}>
+          <View
+            style={[
+              modalConfirmStyles.box,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={36}
+              color={theme.error || "#ef4444"}
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={[modalConfirmStyles.title, { color: theme.text }]}>
+              Confirmar Exclusão
+            </Text>
+            <Text
+              style={[
+                modalConfirmStyles.subtitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Deseja realmente excluir este pedido? Esta ação não pode ser
+              desfeita.
+            </Text>
+            <View style={modalConfirmStyles.btnRow}>
+              <TouchableOpacity
+                style={[modalConfirmStyles.btn, { borderColor: theme.border }]}
+                onPress={() => setPedidoToDelete(null)}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  modalConfirmStyles.btn,
+                  {
+                    backgroundColor: theme.error || "#ef4444",
+                    borderColor: theme.error || "#ef4444",
+                  },
+                ]}
+                onPress={confirmDeletePedido}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "700" }}>
+                  Excluir
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -973,4 +1037,43 @@ const localStyles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   dropdownText: { fontSize: 14, fontWeight: "500" },
+});
+
+const modalConfirmStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  box: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  btnRow: { flexDirection: "row", gap: 12, width: "100%" },
+  btn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

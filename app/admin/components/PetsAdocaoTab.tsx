@@ -1,3 +1,5 @@
+// app/admin/components/PetsAdocaoTab.tsx
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -18,7 +20,6 @@ import {
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   ScrollView,
@@ -72,6 +73,7 @@ export default function PetsAdocaoTab({
   initialView?: "pets" | "requisicoes";
 }) {
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification();
   const storage = getStorage();
 
   const [pets, setPets] = useState<any[]>([]);
@@ -101,6 +103,9 @@ export default function PetsAdocaoTab({
   const [showPetModal, setShowPetModal] = useState(false);
   const [editingPet, setEditingPet] = useState<any | null>(null);
   const [imagePicked, setImagePicked] = useState(false);
+
+  // Estado para exclusão de pet
+  const [petToDelete, setPetToDelete] = useState<string | null>(null);
 
   const [form, setForm] = useState<any>({
     nome: "",
@@ -147,9 +152,10 @@ export default function PetsAdocaoTab({
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
-        "Permissão",
+      showNotification(
+        "Atenção",
         "Precisamos de acesso à galeria para a foto do pet.",
+        "info",
       );
       return;
     }
@@ -189,9 +195,10 @@ export default function PetsAdocaoTab({
 
   const handleSavePet = async () => {
     if (!form.nome || !form.raca || !form.image) {
-      Alert.alert(
-        "Erro",
+      showNotification(
+        "Atenção",
         "Preencha todos os campos obrigatórios e adicione uma foto.",
+        "error",
       );
       return;
     }
@@ -215,10 +222,10 @@ export default function PetsAdocaoTab({
 
       if (editingPet) {
         await updateDoc(doc(db, "pets", editingPet.id), petData);
-        Alert.alert("Sucesso", "Pet atualizado!");
+        showNotification("Sucesso", "Pet atualizado!", "success");
       } else {
         await addDoc(collection(db, "pets"), petData);
-        Alert.alert("Sucesso", "Pet cadastrado!");
+        showNotification("Sucesso", "Pet cadastrado!", "success");
       }
       setShowPetModal(false);
       setEditingPet(null);
@@ -235,7 +242,11 @@ export default function PetsAdocaoTab({
         tags: "",
       });
     } catch (error) {
-      Alert.alert("Erro", "Falha ao salvar o pet. Verifique a sua ligação.");
+      showNotification(
+        "Erro",
+        "Falha ao salvar o pet. Verifique a sua ligação.",
+        "error",
+      );
     } finally {
       setLoadingSave(false);
     }
@@ -261,15 +272,16 @@ export default function PetsAdocaoTab({
     setShowPetModal(true);
   };
 
-  const handleDeletePet = (id: string) => {
-    Alert.alert("Confirmar", "Deseja remover este pet da lista de adoção?", [
-      { text: "Cancelar" },
-      {
-        text: "Remover",
-        style: "destructive",
-        onPress: async () => await deleteDoc(doc(db, "pets", id)),
-      },
-    ]);
+  const confirmDeletePet = async () => {
+    if (!petToDelete) return;
+    try {
+      await deleteDoc(doc(db, "pets", petToDelete));
+      showNotification("Sucesso", "Pet removido da lista!", "success");
+    } catch (error) {
+      showNotification("Erro", "Falha ao excluir o pet.", "error");
+    } finally {
+      setPetToDelete(null);
+    }
   };
 
   const handleUpdateRequisicao = async (status: "aprovado" | "rejeitado") => {
@@ -279,10 +291,14 @@ export default function PetsAdocaoTab({
         status,
         visualizado: true,
       });
-      Alert.alert("Sucesso", `Requisição ${status} com sucesso!`);
+      showNotification(
+        "Sucesso",
+        `Requisição ${status} com sucesso!`,
+        "success",
+      );
       setShowReqModal(false);
     } catch (error) {
-      Alert.alert("Erro", "Falha ao atualizar o status.");
+      showNotification("Erro", "Falha ao atualizar o status.", "error");
     }
   };
 
@@ -310,7 +326,6 @@ export default function PetsAdocaoTab({
   });
 
   filteredReqs.sort((a, b) => {
-    // Usa timestamp de criação ou compara pelo ID (Firestore gera os IDs em ordem cronológica)
     const dateA = a.criadoEm ? new Date(a.criadoEm).getTime() : a.id;
     const dateB = b.criadoEm ? new Date(b.criadoEm).getTime() : b.id;
 
@@ -693,7 +708,7 @@ export default function PetsAdocaoTab({
                           adminStyles.actionButton,
                           { backgroundColor: theme.error },
                         ]}
-                        onPress={() => handleDeletePet(pet.id)}
+                        onPress={() => setPetToDelete(pet.id)}
                       >
                         <Ionicons name="trash" size={18} color="#FFF" />
                       </TouchableOpacity>
@@ -1759,6 +1774,61 @@ export default function PetsAdocaoTab({
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* ── MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE PET ── */}
+      <Modal visible={!!petToDelete} transparent animationType="fade">
+        <View style={modalConfirmStyles.overlay}>
+          <View
+            style={[
+              modalConfirmStyles.box,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={36}
+              color={theme.error || "#ef4444"}
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={[modalConfirmStyles.title, { color: theme.text }]}>
+              Remover Pet
+            </Text>
+            <Text
+              style={[
+                modalConfirmStyles.subtitle,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Deseja realmente remover este pet da lista de adoção? Esta ação
+              não pode ser desfeita.
+            </Text>
+            <View style={modalConfirmStyles.btnRow}>
+              <TouchableOpacity
+                style={[modalConfirmStyles.btn, { borderColor: theme.border }]}
+                onPress={() => setPetToDelete(null)}
+              >
+                <Text style={{ color: theme.text, fontWeight: "600" }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  modalConfirmStyles.btn,
+                  {
+                    backgroundColor: theme.error || "#ef4444",
+                    borderColor: theme.error || "#ef4444",
+                  },
+                ]}
+                onPress={confirmDeletePet}
+              >
+                <Text style={{ color: "#FFF", fontWeight: "700" }}>
+                  Remover
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -1884,4 +1954,43 @@ const localStyles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   dropdownText: { fontSize: 14, fontWeight: "500" },
+});
+
+const modalConfirmStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  box: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  btnRow: { flexDirection: "row", gap: 12, width: "100%" },
+  btn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });
