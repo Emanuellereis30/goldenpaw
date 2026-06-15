@@ -9,25 +9,25 @@ export default function TabLayout() {
   const { theme } = useAppTheme();
   const { totalItems } = useCart();
 
- return (
-  <Tabs
-    screenOptions={{
-      headerShown: false,
-      tabBarStyle: {
-        backgroundColor: theme.surface,
-        borderTopColor: theme.border,
-        height: 85,
-        paddingBottom: 18,
-        paddingTop: 10,
-      },
-      tabBarActiveTintColor: theme.primary,
-      tabBarInactiveTintColor: theme.textSecondary,
-      tabBarLabelStyle: {
-        fontSize: 12,
-        fontWeight: "700",
-      },
-    }}
-  >
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: theme.surface,
+          borderTopColor: theme.border,
+          height: 70,
+          paddingBottom: 2,
+          paddingTop: 6,
+        },
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.textSecondary,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "700",
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
@@ -67,6 +67,7 @@ export default function TabLayout() {
                 size={22}
                 color={color}
               />
+
               {totalItems > 0 && (
                 <View
                   style={[styles.cartBadge, { backgroundColor: theme.primary }]}
@@ -159,5 +160,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 2,
   },
-  cartBadgeText: { color: "#FFF", fontSize: 9, fontWeight: "700" },
+  cartBadgeText: {
+    color: "#FFF",
+    fontSize: 9,
+    fontWeight: "700",
+  },
 });
+
