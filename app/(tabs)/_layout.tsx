@@ -9,25 +9,25 @@ export default function TabLayout() {
   const { theme } = useAppTheme();
   const { totalItems } = useCart();
 
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: theme.surface,
-          borderTopColor: theme.border,
-          height: 65,
-          paddingBottom: 10,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: theme.textSecondary,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "600",
-        },
-      }}
-    >
+ return (
+  <Tabs
+    screenOptions={{
+      headerShown: false,
+      tabBarStyle: {
+        backgroundColor: theme.surface,
+        borderTopColor: theme.border,
+        height: 85,
+        paddingBottom: 18,
+        paddingTop: 10,
+      },
+      tabBarActiveTintColor: theme.primary,
+      tabBarInactiveTintColor: theme.textSecondary,
+      tabBarLabelStyle: {
+        fontSize: 12,
+        fontWeight: "700",
+      },
+    }}
+  >
       <Tabs.Screen
         name="index"
         options={{
