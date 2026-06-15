@@ -3,7 +3,7 @@ import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot, runTransaction } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,8 +21,7 @@ import {
 } from "react-native-safe-area-context";
 import { auth, db } from "../../firebaseConfig";
 
-// ── Interface de Tipo ─────────────────────────────────────────────────────────
-
+// ── Interface de Tipo (adicionado campo interessados) ──
 interface Pet {
   id: string;
   petId?: string;
@@ -38,6 +37,7 @@ interface Pet {
   tags: string | string[];
   fotoUrl?: string;
   image?: any;
+  interessados?: number; // ← NOVO: contador de interesses
 }
 
 const PORTES = ["Porte", "pequeno", "médio", "grande"];
@@ -75,7 +75,6 @@ export default function AdocaoScreen() {
         setLoading(false);
       },
     );
-
     return () => unsubscribe();
   }, []);
 
@@ -83,6 +82,59 @@ export default function AdocaoScreen() {
     setFavorites((prev) =>
       prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id],
     );
+  };
+
+  // ── NOVA FUNÇÃO: Adicionar/remover interesse com controle de usuário único ──
+  const toggleInteresse = async (petId: string) => {
+    const user = auth.currentUser;
+    if (!user) {
+      showNotification(
+        "Acesso Restrito",
+        "Faça login para registrar seu interesse.",
+        "info"
+      );
+      router.push("/login");
+      return;
+    }
+
+    const userId = user.uid;
+    const petRef = doc(db, "pets", petId);
+    const interesseRef = doc(db, "pets", petId, "interesses", userId);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const interesseDoc = await transaction.get(interesseRef);
+        const petDoc = await transaction.get(petRef);
+        const currentInteressados = petDoc.data()?.interessados || 0;
+
+        if (interesseDoc.exists()) {
+          // Remove interesse
+          transaction.delete(interesseRef);
+          transaction.update(petRef, { interessados: currentInteressados - 1 });
+          showNotification(
+            "Interesse removido",
+            "Você não está mais interessado neste pet.",
+            "info"
+          );
+        } else {
+          // Adiciona interesse
+          transaction.set(interesseRef, {
+            usuarioId: userId,
+            data: new Date().toISOString(),
+            nome: user.displayName || user.email?.split('@')[0] || "Anônimo"
+          });
+          transaction.update(petRef, { interessados: currentInteressados + 1 });
+          showNotification(
+            "Interesse registrado!",
+            "Obrigado! 🐾 Entraremos em contato em breve.",
+            "success"
+          );
+        }
+      });
+    } catch (error) {
+      console.error("Erro ao registrar interesse:", error);
+      showNotification("Erro", "Não foi possível registrar. Tente novamente.", "error");
+    }
   };
 
   const filtered = pets.filter((pet) => {
@@ -427,23 +479,36 @@ export default function AdocaoScreen() {
                   ))}
                 </View>
 
-                {/* Botão de Ação */}
+                {/* ── NOVO: Contador de interesses e botão "Tenho interesse" ── */}
+                <View style={styles.interestRow}>
+                  <Ionicons name="heart-outline" size={16} color={theme.primary} />
+                  <Text style={[styles.interestText, { color: theme.textSecondary }]}>
+                    {pet.interessados ?? 0} pessoa(s) interessada(s)
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => toggleInteresse(pet.id)}
+                    style={styles.interestBtn}
+                  >
+                    <Text style={[styles.interestBtnText, { color: theme.primary }]}>
+                      🐾 Tenho interesse
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Botão de Ação (Adotar) - mantido original */}
                 <TouchableOpacity
                   style={[styles.adoptBtn, { backgroundColor: theme.primary }]}
                   activeOpacity={0.8}
                   onPress={() => {
-                    // Verifica se o usuário está logado antes de prosseguir
                     if (!auth.currentUser) {
                       showNotification(
                         "Acesso Restrito",
                         "Você precisa fazer login no aplicativo para adotar um pet.",
                         "info",
                       );
-                      router.push("/login" as any);
+                      router.push("/login");
                       return;
                     }
-
-                    // Se estiver logado, segue para os detalhes da adoção
                     router.push({
                       pathname: "/adoption/detalhes",
                       params: {
@@ -478,8 +543,7 @@ export default function AdocaoScreen() {
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
-
+// ── Estilos (adicionados os novos) ──
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { paddingHorizontal: 20, paddingTop: 24 },
@@ -590,6 +654,30 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   tagText: { fontSize: 12 },
+
+  // NOVOS ESTILOS PARA INTERESSES
+  interestRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
+  interestText: {
+    fontSize: 12,
+    fontWeight: "500",
+    flex: 1,
+  },
+  interestBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  interestBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
 
   adoptBtn: {
     height: 48,
