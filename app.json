@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Golden Paw",
-    "slug": "goldenpaw",
+    "slug": "meuApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -52,6 +52,7 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "owner": "gabiizy7"
   }
 }

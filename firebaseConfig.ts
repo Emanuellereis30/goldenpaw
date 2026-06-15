@@ -1,8 +1,10 @@
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getReactNativePersistence, initializeAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+// Sua configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAhxzuxoasUlzXk0otfQzD2cSZDHfN7ZhY",
   authDomain: "petshop-2c06a.firebaseapp.com",
@@ -13,10 +15,15 @@ const firebaseConfig = {
   measurementId: "G-LDW3TR86V7",
 };
 
-// Inicializa o Firebase apenas uma vez
+// Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 
-// Exporta os serviços para usar no restante do app
-export const auth = getAuth(app);
+// Inicializa o Auth com persistência usando AsyncStorage
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
+
+// Exporta os serviços
+export { auth };
 export const db = getFirestore(app);
 export const storage = getStorage(app);
