@@ -78,6 +78,7 @@ export async function requestNotificationPermissions() {
 
 /**
  * Agendar notificação local (corrigido para Android e com logs)
+ * 🔔 ALTERAÇÃO: recorrência 'none' agora usa 'seconds' em vez de 'date' para maior precisão
  */
 async function scheduleNotification(reminder: Reminder): Promise<string | null> {
   if (Platform.OS === 'web') return null;
@@ -146,12 +147,17 @@ async function scheduleNotification(reminder: Reminder): Promise<string | null> 
           channelId: 'goldenpaw_lembretes',
         };
         break;
-      default: // 'none'
+      default: // 'none' – ALTERADO: usa seconds para maior precisão
+        const secondsUntilTrigger = Math.floor((scheduledAtDate.getTime() - now.getTime()) / 1000);
+        if (secondsUntilTrigger <= 0) {
+          console.warn('Tempo até o disparo é zero ou negativo');
+          return null;
+        }
         trigger = {
-          date: scheduledAtDate,
+          seconds: secondsUntilTrigger,
           channelId: 'goldenpaw_lembretes',
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
         };
+        break;
     }
 
     const notificationId = await Notifications.scheduleNotificationAsync({
