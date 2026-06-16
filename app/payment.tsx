@@ -1,3 +1,4 @@
+import { useNotification } from "@/contexts/NotificationContext"; // ← importação adicionada
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useCart } from "@/hooks/use-cart";
 import { Ionicons } from "@expo/vector-icons";
@@ -6,7 +7,6 @@ import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Clipboard,
   Image,
   ScrollView,
@@ -40,6 +40,7 @@ const simulateDistanceFromCep = (cep: string): number => {
 export default function PaymentScreen() {
   const { cart, calculateTotal, createOrder, clearCart } = useCart();
   const { theme } = useAppTheme();
+  const { showNotification } = useNotification(); // ← adicionado
   const router = useRouter();
   const user = auth.currentUser;
 
@@ -115,7 +116,6 @@ export default function PaymentScreen() {
     return v;
   };
 
-  // Funções de Máscara para o Cartão de Crédito
   const handleCardNumberChange = (text: string) => {
     let v = text.replace(/\D/g, "");
     v = v.replace(/(\d{4})(?=\d)/g, "$1.");
@@ -158,7 +158,11 @@ export default function PaymentScreen() {
         setDeliveryInfo({ distance, fee });
         setPixData(generatePixKey());
       } catch (e) {
-        Alert.alert("Erro", "Não foi possível buscar o endereço pelo CEP.");
+        showNotification(
+          "Erro",
+          "Não foi possível buscar o endereço pelo CEP.",
+          "error"
+        );
       } finally {
         setLoadingDelivery(false);
       }
@@ -175,38 +179,41 @@ export default function PaymentScreen() {
 
   const handlePay = async () => {
     if (!user) {
-      Alert.alert("Login necessário", "Faça login para continuar.");
+      showNotification("Login necessário", "Faça login para continuar.", "info");
       router.replace("/login");
       return;
     }
 
     if (cart.length === 0) {
-      Alert.alert("Carrinho vazio", "Adicione produtos antes de pagar.");
+      showNotification("Carrinho vazio", "Adicione produtos antes de pagar.", "info");
       return;
     }
 
     // Validação de Dados Pessoais
     if (!checkoutName || !checkoutEmail || !checkoutPhone) {
-      Alert.alert(
+      showNotification(
         "Dados incompletos",
         "Por favor, preencha seus dados de contato.",
+        "error"
       );
       return;
     }
 
     // Validação de Endereço
     if (!cep || !street || !addressNumber || !neighborhood || !city || !state) {
-      Alert.alert(
+      showNotification(
         "Endereço incompleto",
         "Por favor, preencha todos os campos de entrega.",
+        "error"
       );
       return;
     }
 
     if (!deliveryInfo) {
-      Alert.alert(
+      showNotification(
         "Entrega não calculada",
         "Por favor, aguarde o cálculo da entrega.",
+        "error"
       );
       return;
     }
@@ -215,9 +222,10 @@ export default function PaymentScreen() {
       paymentMethod === "card" &&
       (!cardName || !cardNumber || !cardExpiry || !cardCvv)
     ) {
-      Alert.alert(
+      showNotification(
         "Dados incompletos",
         "Por favor, preencha todos os dados do cartão.",
+        "error"
       );
       return;
     }
@@ -232,7 +240,6 @@ export default function PaymentScreen() {
       try {
         const fullAddress = `${street}, ${addressNumber} - ${neighborhood}, ${city}/${state} - CEP: ${cep}`;
 
-        // Passando todos os parâmetros na ordem correta
         await createOrder(
           "confirmado",
           paymentMethod,
@@ -245,13 +252,18 @@ export default function PaymentScreen() {
 
         const parcelamentoMsg =
           paymentMethod === "card" ? ` em ${installments}x` : "";
-        Alert.alert(
-          "Pagamento confirmado",
+        showNotification(
+          "Pagamento confirmado ✅",
           `Pedido processado com sucesso${parcelamentoMsg}! Entrega em ${deliveryInfo.distance.toFixed(1)}km.`,
+          "success"
         );
         router.replace("/");
       } catch (error) {
-        Alert.alert("Erro", "Falha ao processar o pedido. Tente novamente.");
+        showNotification(
+          "Erro",
+          "Falha ao processar o pedido. Tente novamente.",
+          "error"
+        );
       } finally {
         setProcessing(false);
       }
@@ -563,9 +575,9 @@ export default function PaymentScreen() {
               placeholder="Número do cartão"
               placeholderTextColor={theme.textSecondary}
               value={cardNumber}
-              onChangeText={handleCardNumberChange} // Máscara do número
+              onChangeText={handleCardNumberChange}
               keyboardType="numeric"
-              maxLength={19} // Atualizado para 19
+              maxLength={19}
             />
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
               <TextInput
@@ -576,7 +588,7 @@ export default function PaymentScreen() {
                 placeholder="MM/AA"
                 placeholderTextColor={theme.textSecondary}
                 value={cardExpiry}
-                onChangeText={handleCardExpiryChange} // Máscara de validade
+                onChangeText={handleCardExpiryChange}
                 keyboardType="numeric"
                 maxLength={5}
               />
@@ -588,7 +600,7 @@ export default function PaymentScreen() {
                 placeholder="CVV"
                 placeholderTextColor={theme.textSecondary}
                 value={cardCvv}
-                onChangeText={handleCardCvvChange} // Apenas números
+                onChangeText={handleCardCvvChange}
                 keyboardType="numeric"
                 maxLength={3}
               />
@@ -735,10 +747,7 @@ export default function PaymentScreen() {
               style={[styles.copyButton, { backgroundColor: theme.primary }]}
               onPress={() => {
                 Clipboard.setString(pixData);
-                Alert.alert(
-                  "Copiado",
-                  "Chave PIX copiada para a área de transferência!",
-                );
+                showNotification("Copiado", "Chave PIX copiada!", "success");
               }}
             >
               <Ionicons
@@ -783,10 +792,7 @@ export default function PaymentScreen() {
             <TouchableOpacity
               style={[styles.copyButton, { backgroundColor: theme.primary }]}
               onPress={() => {
-                Alert.alert(
-                  "Copiado",
-                  "Código do boleto copiado para a área de transferência!",
-                );
+                showNotification("Copiado", "Código do boleto copiado!", "success");
               }}
             >
               <Ionicons
@@ -855,6 +861,7 @@ export default function PaymentScreen() {
 }
 
 const styles = StyleSheet.create({
+  // … estilos mantidos exatamente como antes …
   container: { flex: 1, padding: 16 },
   title: { fontSize: 24, fontWeight: "800", marginBottom: 16 },
   section: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 16 },

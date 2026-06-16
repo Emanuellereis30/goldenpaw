@@ -247,17 +247,21 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const validarEtapa5 = (): boolean => {
-    let newErrors: Record<string, string> = {};
-    if (form.cienteFinanceiro === null)
-      newErrors.cienteFinanceiro = "Obrigatório.";
-    if (!form.planosViagem.trim())
-      newErrors.planosViagem = "Descreva seus planos.";
-    if (form.concordaAcompanhamento === null)
-      newErrors.concordaAcompanhamento = "Obrigatório.";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+const validarEtapa5 = (): boolean => {
+  let newErrors: Record<string, string> = {};
+  if (form.cienteFinanceiro === null)
+    newErrors.cienteFinanceiro = "Obrigatório.";
+  if (!form.planosViagem.trim())
+    newErrors.planosViagem = "Descreva seus planos.";
+  if (form.concordaAcompanhamento === null)
+    newErrors.concordaAcompanhamento = "Obrigatório.";
+  // NOVO: validação de observações
+  if (!form.observacoes.trim()) {
+    newErrors.observacoes = "Por favor, adicione observações relevantes.";
+  }
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
   const validarEtapaAtual = (): boolean => {
     switch (etapaAtual) {
@@ -686,8 +690,8 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
 
       <CustomInput
         theme={theme}
-        label="Observações"
-        placeholder="Adicione qualquer informação relevante..."
+        label="Observações *"
+        placeholder= "Descreva o ambiente, rotina, experiência com pets, ou qualquer informação que ajude na avaliação."
         value={form.observacoes}
         onChange={(t: string) => setForm({ ...form, observacoes: t })}
         multiline={true}
