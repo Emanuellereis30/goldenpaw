@@ -40,7 +40,6 @@ export interface CreateReminderInput {
   status: 'active' | 'inactive';
 }
 
-// Configurar comportamento de notificação (mobile) - com supressão de tipo para compatibilidade
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -50,8 +49,6 @@ if (Platform.OS !== 'web') {
     }) as any,
   });
 }
-
-// ========== FUNÇÕES AUXILIARES PARA NOTIFICAÇÕES ==========
 
 async function ensureAndroidChannel() {
   if (Platform.OS === 'android') {
@@ -76,17 +73,12 @@ export async function requestNotificationPermissions() {
   }
 }
 
-/**
- * Agendar notificação local (corrigido para Android e com logs)
- * 🔔 ALTERAÇÃO: recorrência 'none' agora usa 'seconds' em vez de 'date' para maior precisão
- */
 async function scheduleNotification(reminder: Reminder): Promise<string | null> {
   if (Platform.OS === 'web') return null;
 
   await ensureAndroidChannel();
 
   try {
-    // Garantir que scheduledAt seja um objeto Date válido
     let scheduledAtDate: Date;
     if (reminder.scheduledAt instanceof Timestamp) {
       scheduledAtDate = reminder.scheduledAt.toDate();
@@ -97,14 +89,43 @@ async function scheduleNotification(reminder: Reminder): Promise<string | null> 
     }
 
     const now = new Date();
-    if (scheduledAtDate <= now) {
-      console.warn('Data de agendamento já passou');
-      return null;
+
+    // 🔥 CORREÇÃO: se for recorrência 'none', ajusta o fuso horário
+    if (reminder.recurrence === 'none') {
+      // Converte scheduledAt para horário local (subtract offset)
+      const localScheduledAt = new Date(scheduledAtDate.getTime() - (scheduledAtDate.getTimezoneOffset() * 60000));
+      const secondsUntilTrigger = Math.floor((localScheduledAt.getTime() - now.getTime()) / 1000);
+      console.log(`🕒 Segundos até o disparo: ${secondsUntilTrigger}`);
+
+      if (secondsUntilTrigger <= 0) {
+        console.warn('Tempo até o disparo é zero ou negativo');
+        return null;
+      }
+
+      const trigger: Notifications.NotificationTriggerInput = {
+        seconds: secondsUntilTrigger,
+        channelId: 'goldenpaw_lembretes',
+      };
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: reminder.title,
+          body: reminder.description,
+          data: { reminderId: reminder.id, petId: reminder.petId || '' },
+          sound: 'default',
+          badge: 1,
+        },
+        trigger,
+      });
+
+      console.log(`✅ Notificação agendada com ID: ${notificationId}`);
+      return notificationId as string;
     }
 
+    // Para recorrências (daily, weekly, etc.) – manter lógica original
     const hour = scheduledAtDate.getHours();
     const minute = scheduledAtDate.getMinutes();
-    console.log(`🔔 Agendando notificação para ${hour}:${minute} (recurrence: ${reminder.recurrence})`);
+    console.log(`🔔 Agendando notificação recorrente para ${hour}:${minute} (recurrence: ${reminder.recurrence})`);
 
     let trigger: Notifications.NotificationTriggerInput;
 
@@ -147,17 +168,9 @@ async function scheduleNotification(reminder: Reminder): Promise<string | null> 
           channelId: 'goldenpaw_lembretes',
         };
         break;
-      default: // 'none' – ALTERADO: usa seconds para maior precisão
-        const secondsUntilTrigger = Math.floor((scheduledAtDate.getTime() - now.getTime()) / 1000);
-        if (secondsUntilTrigger <= 0) {
-          console.warn('Tempo até o disparo é zero ou negativo');
-          return null;
-        }
-        trigger = {
-          seconds: secondsUntilTrigger,
-          channelId: 'goldenpaw_lembretes',
-        };
-        break;
+      default:
+        // Fallback (não deve acontecer para 'none' pois já tratamos acima)
+        return null;
     }
 
     const notificationId = await Notifications.scheduleNotificationAsync({
