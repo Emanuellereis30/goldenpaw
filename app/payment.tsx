@@ -483,26 +483,37 @@ export default function PaymentScreen() {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Meu Carrinho
         </Text>
-        {cart.map((item) => (
-          <View key={item.cartId} style={styles.cartItem}>
-            <Image
-              source={item.image}
-              style={styles.itemImage}
-              resizeMode="contain"
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemName, { color: theme.text }]}>
-                {item.nome}
-              </Text>
-              <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-                {item.quantity}x
+        {cart.map((item) => {
+          const imageSource =
+            typeof item.image === "string" ? { uri: item.image } : item.image;
+
+          console.log(
+            "payment.tsx cart item image:",
+            item.image,
+            typeof item.image,
+          );
+
+          return (
+            <View key={item.cartId} style={styles.cartItem}>
+              <Image
+                source={imageSource}
+                style={styles.itemImage}
+                resizeMode="contain"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemName, { color: theme.text }]}> 
+                  {item.nome}
+                </Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+                  {item.quantity}x
+                </Text>
+              </View>
+              <Text style={[styles.itemPrice, { color: theme.primary }]}> 
+                {item.preco}
               </Text>
             </View>
-            <Text style={[styles.itemPrice, { color: theme.primary }]}>
-              {item.preco}
-            </Text>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       {/* Formas de Pagamento */}
@@ -512,7 +523,7 @@ export default function PaymentScreen() {
           { backgroundColor: theme.surface, borderColor: theme.border },
         ]}
       >
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}> 
           Forma de Pagamento
         </Text>
 
