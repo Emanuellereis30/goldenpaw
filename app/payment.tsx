@@ -1,9 +1,9 @@
-import { useNotification } from "@/contexts/NotificationContext"; // ← importação adicionada
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useCart } from "@/hooks/use-cart";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, increment, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -40,7 +40,7 @@ const simulateDistanceFromCep = (cep: string): number => {
 export default function PaymentScreen() {
   const { cart, calculateTotal, createOrder, clearCart } = useCart();
   const { theme } = useAppTheme();
-  const { showNotification } = useNotification(); // ← adicionado
+  const { showNotification } = useNotification();
   const router = useRouter();
   const user = auth.currentUser;
 
@@ -238,8 +238,34 @@ export default function PaymentScreen() {
     setProcessing(true);
     setTimeout(async () => {
       try {
+        // 🔍 VERIFICAÇÃO DE ESTOQUE (antes de salvar o pedido)
+        for (const item of cart) {
+          const productRef = doc(db, "produtos", item.id);
+          const productSnap = await getDoc(productRef);
+          if (!productSnap.exists()) {
+            showNotification(
+              "Erro",
+              `Produto ${item.nome} não encontrado.`,
+              "error"
+            );
+            setProcessing(false);
+            return;
+          }
+          const estoqueAtual = productSnap.data().estoque || 0;
+          if (estoqueAtual < item.quantity) {
+            showNotification(
+              "Estoque insuficiente",
+              `O produto "${item.nome}" tem apenas ${estoqueAtual} unidades disponíveis.`,
+              "error"
+            );
+            setProcessing(false);
+            return;
+          }
+        }
+
         const fullAddress = `${street}, ${addressNumber} - ${neighborhood}, ${city}/${state} - CEP: ${cep}`;
 
+        // 1. Salva o pedido
         await createOrder(
           "confirmado",
           paymentMethod,
@@ -250,6 +276,14 @@ export default function PaymentScreen() {
           checkoutPhone,
         );
 
+        // 2. Atualiza o estoque (decrementa)
+        for (const item of cart) {
+          const productRef = doc(db, "produtos", item.id);
+          await updateDoc(productRef, {
+            estoque: increment(-item.quantity)
+          });
+        }
+
         const parcelamentoMsg =
           paymentMethod === "card" ? ` em ${installments}x` : "";
         showNotification(
@@ -259,6 +293,7 @@ export default function PaymentScreen() {
         );
         router.replace("/");
       } catch (error) {
+        console.error("Erro ao finalizar pedido:", error);
         showNotification(
           "Erro",
           "Falha ao processar o pedido. Tente novamente.",
@@ -501,14 +536,14 @@ export default function PaymentScreen() {
                 resizeMode="contain"
               />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.itemName, { color: theme.text }]}> 
+                <Text style={[styles.itemName, { color: theme.text }]}>
                   {item.nome}
                 </Text>
                 <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
                   {item.quantity}x
                 </Text>
               </View>
-              <Text style={[styles.itemPrice, { color: theme.primary }]}> 
+              <Text style={[styles.itemPrice, { color: theme.primary }]}>
                 {item.preco}
               </Text>
             </View>
@@ -523,7 +558,7 @@ export default function PaymentScreen() {
           { backgroundColor: theme.surface, borderColor: theme.border },
         ]}
       >
-        <Text style={[styles.sectionTitle, { color: theme.text }]}> 
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Forma de Pagamento
         </Text>
 
@@ -872,7 +907,6 @@ export default function PaymentScreen() {
 }
 
 const styles = StyleSheet.create({
-  // … estilos mantidos exatamente como antes …
   container: { flex: 1, padding: 16 },
   title: { fontSize: 24, fontWeight: "800", marginBottom: 16 },
   section: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 16 },
