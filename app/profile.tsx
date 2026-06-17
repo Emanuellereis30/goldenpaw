@@ -1023,7 +1023,7 @@ const modalStyles = StyleSheet.create({
 // ── Tela Principal ────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const { theme, colorScheme, toggleColorScheme } = useAppTheme();
+  const { theme } = useAppTheme();
   const { showNotification } = useNotification();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -1271,25 +1271,6 @@ export default function ProfileScreen() {
         activeOpacity={0.7}
       >
         <Ionicons name="chevron-back" size={24} color={theme.primary} />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.themeToggleButton,
-          {
-            top: insets.top + 10,
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
-          },
-        ]}
-        onPress={toggleColorScheme}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name={colorScheme === "dark" ? "sunny" : "moon"}
-          size={22}
-          color={theme.primary}
-        />
       </TouchableOpacity>
 
       <ScrollView
@@ -2818,22 +2799,6 @@ const styles = StyleSheet.create({
   backButton: {
     position: "absolute",
     left: 20,
-    zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  themeToggleButton: {
-    position: "absolute",
-    right: 20,
     zIndex: 10,
     width: 44,
     height: 44,

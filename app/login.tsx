@@ -8,10 +8,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -20,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import KeyboardAvoidingScreen from "../components/KeyboardAvoidingScreen";
 import { auth } from "../firebaseConfig";
 
 const IMAGES = {
@@ -28,7 +26,7 @@ const IMAGES = {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, colorScheme, toggleColorScheme } = useAppTheme();
+  const { theme, colorScheme } = useAppTheme();
   const { showNotification } = useNotification();
   const router = useRouter();
 
@@ -112,116 +110,93 @@ export default function LoginScreen() {
         <Ionicons name="chevron-back" size={24} color={theme.primary} />
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[
-          styles.themeToggleButton,
-          {
-            top: insets.top + 10,
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
-          },
+      <KeyboardAvoidingScreen
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + 80 },
         ]}
-        onPress={toggleColorScheme}
-        activeOpacity={0.7}
+        extraOffset={insets.top}
       >
-        <Ionicons
-          name={colorScheme === "dark" ? "sunny" : "moon"}
-          size={22}
-          color={theme.primary}
-        />
-      </TouchableOpacity>
+        <View style={styles.content}>
+          <Image
+            source={IMAGES.logo}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={[styles.title, { color: theme.text }]}>
+            Bem-vindo de volta!
+          </Text>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: insets.top + 80 },
-          ]}
-        >
-          <View style={styles.content}>
-            <Image
-              source={IMAGES.logo}
-              style={styles.logo}
-              resizeMode="contain"
+          <View
+            style={[
+              styles.inputContainer,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <TextInput
+              style={[styles.input, { color: theme.text }]}
+              placeholder="Email"
+              placeholderTextColor={theme.textSecondary}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
             />
-            <Text style={[styles.title, { color: theme.text }]}>
-              Bem-vindo de volta!
-            </Text>
+          </View>
 
-            <View
+          <View
+            style={[
+              styles.inputContainer,
+              styles.passwordContainer,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+          >
+            <TextInput
               style={[
-                styles.inputContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
+                styles.input,
+                styles.passwordInput,
+                { color: theme.text },
               ]}
-            >
-              <TextInput
-                style={[styles.input, { color: theme.text }]}
-                placeholder="Email"
-                placeholderTextColor={theme.textSecondary}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-              />
-            </View>
-
-            <View
-              style={[
-                styles.inputContainer,
-                styles.passwordContainer,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.passwordInput,
-                  { color: theme.text },
-                ]}
-                placeholder="Senha"
-                placeholderTextColor={theme.textSecondary}
-                secureTextEntry={!showPassword}
-                value={password}
-                onChangeText={setPassword}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeButton}
-              >
-                <Ionicons
-                  name={showPassword ? "eye-off" : "eye"}
-                  size={22}
-                  color={theme.primary}
-                />
-              </TouchableOpacity>
-            </View>
-
+              placeholder="Senha"
+              placeholderTextColor={theme.textSecondary}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+            />
             <TouchableOpacity
-              style={[
-                styles.loginButton,
-                { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 },
-              ]}
-              onPress={handleLogin}
-              disabled={loading}
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeButton}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.loginButtonText}>Entrar</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => router.push("/register" as any)}>
-              <Text style={[styles.linkText, { color: theme.primary }]}>
-                Não tem uma conta? Cadastre-se
-              </Text>
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={22}
+                color={theme.primary}
+              />
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+
+          <TouchableOpacity
+            style={[
+              styles.loginButton,
+              { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 },
+            ]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.loginButtonText}>Entrar</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => router.push("/register" as any)}>
+            <Text style={[styles.linkText, { color: theme.primary }]}>
+              Não tem uma conta? Cadastre-se
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
 }
@@ -268,15 +243,4 @@ const styles = StyleSheet.create({
   },
   loginButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
   linkText: { marginTop: 20, fontWeight: "bold" },
-  themeToggleButton: {
-    position: "absolute",
-    right: 20,
-    zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

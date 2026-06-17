@@ -5,9 +5,6 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
+import KeyboardAvoidingScreen from "../components/KeyboardAvoidingScreen";
 import { useNotification } from "../contexts/NotificationContext";
 import { auth, db } from "../firebaseConfig";
 import { useAppTheme } from "../hooks/use-app-theme";
@@ -26,7 +24,7 @@ const LOGO_IMAGE = require("../assets/img/logo.png");
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, toggleColorScheme, colorScheme } = useAppTheme();
+  const { theme } = useAppTheme();
   const { showNotification } = useNotification();
   const router = useRouter();
 
@@ -203,234 +201,205 @@ export default function RegisterScreen() {
         <Ionicons name="chevron-back" size={24} color={theme.primary} />
       </TouchableOpacity>
 
-      {/* Toggle de tema */}
-      <TouchableOpacity
-        style={[
-          styles.themeToggleButton,
-          {
-            top: insets.top + 10,
-            backgroundColor: theme.surface,
-            borderColor: theme.border,
-          },
+      <KeyboardAvoidingScreen
+        contentContainerStyle={[
+          styles.scrollContent,
+          { flexGrow: 1, paddingTop: insets.top + 80, paddingBottom: 150 },
         ]}
-        onPress={toggleColorScheme}
-        activeOpacity={0.7}
+        extraOffset={insets.top}
       >
-        <Ionicons
-          name={colorScheme === "dark" ? "sunny" : "moon"}
-          size={24}
-          color={theme.primary}
+        <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
+        <Text style={[styles.title, { color: theme.text }]}>
+          Cadastro Golden Paw
+        </Text>
+
+        {/* ── DADOS PESSOAIS ── */}
+        <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+          Informações Pessoais
+        </Text>
+
+        <FormInput
+          theme={theme}
+          placeholder="Nome Completo"
+          value={fullName}
+          onChange={setFullName}
+          errorMessage={errors.fullName}
         />
-      </TouchableOpacity>
+        <FormInput
+          theme={theme}
+          placeholder="CPF"
+          value={cpf}
+          onChange={(t: string) => setCpf(maskCpf(t))}
+          maxLength={14}
+          keyboard="numeric"
+          errorMessage={errors.cpf}
+        />
+        <FormInput
+          theme={theme}
+          placeholder="Celular"
+          value={phone}
+          onChange={(t: string) => setPhone(maskPhone(t))}
+          maxLength={15}
+          keyboard="phone-pad"
+          errorMessage={errors.phone}
+        />
+        <FormInput
+          theme={theme}
+          placeholder="E-mail"
+          value={email}
+          onChange={setEmail}
+          keyboard="email-address"
+          errorMessage={errors.email}
+        />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 100}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: insets.top + 64 },
-          ]}
-          automaticallyAdjustKeyboardInsets={true}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
-          <Text style={[styles.title, { color: theme.text }]}>
-            Cadastro Golden Paw
-          </Text>
+        {/* ── ENDEREÇO ── */}
+        <View style={styles.divider} />
+        <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+          Endereço
+        </Text>
 
-          {/* ── DADOS PESSOAIS ── */}
-          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
-            Informações Pessoais
-          </Text>
+        <FormInput
+          theme={theme}
+          placeholder="CEP"
+          value={zipCode}
+          onChange={handleCepChange}
+          maxLength={9}
+          keyboard="numeric"
+          errorMessage={errors.zipCode}
+        />
+        <FormInput
+          theme={theme}
+          placeholder="Rua"
+          value={street}
+          onChange={setStreet}
+        />
 
-          <FormInput
-            theme={theme}
-            placeholder="Nome Completo"
-            value={fullName}
-            onChange={setFullName}
-            errorMessage={errors.fullName}
-          />
-          <FormInput
-            theme={theme}
-            placeholder="CPF"
-            value={cpf}
-            onChange={(t: string) => setCpf(maskCpf(t))}
-            maxLength={14}
-            keyboard="numeric"
-            errorMessage={errors.cpf}
-          />
-          <FormInput
-            theme={theme}
-            placeholder="Celular"
-            value={phone}
-            onChange={(t: string) => setPhone(maskPhone(t))}
-            maxLength={15}
-            keyboard="phone-pad"
-            errorMessage={errors.phone}
-          />
-          <FormInput
-            theme={theme}
-            placeholder="E-mail"
-            value={email}
-            onChange={setEmail}
-            keyboard="email-address"
-            errorMessage={errors.email}
-          />
-
-          {/* ── ENDEREÇO ── */}
-          <View style={styles.divider} />
-          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
-            Endereço
-          </Text>
-
-          <FormInput
-            theme={theme}
-            placeholder="CEP"
-            value={zipCode}
-            onChange={handleCepChange}
-            maxLength={9}
-            keyboard="numeric"
-            errorMessage={errors.zipCode}
-          />
-          <FormInput
-            theme={theme}
-            placeholder="Rua"
-            value={street}
-            onChange={setStreet}
-          />
-
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <FormInput
-                theme={theme}
-                placeholder="Número"
-                value={number}
-                onChange={setNumber}
-                keyboard="numeric"
-              />
-            </View>
-            <View style={{ flex: 2 }}>
-              <FormInput
-                theme={theme}
-                placeholder="Bairro"
-                value={neighborhood}
-                onChange={setNeighborhood}
-              />
-            </View>
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <FormInput
+              theme={theme}
+              placeholder="Número"
+              value={number}
+              onChange={setNumber}
+              keyboard="numeric"
+            />
           </View>
-
-          <View style={styles.row}>
-            <View style={{ flex: 3 }}>
-              <FormInput
-                theme={theme}
-                placeholder="Cidade"
-                value={city}
-                onChange={setCity}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <FormInput
-                theme={theme}
-                placeholder="UF"
-                value={state}
-                onChange={setState}
-                maxLength={2}
-              />
-            </View>
+          <View style={{ flex: 2 }}>
+            <FormInput
+              theme={theme}
+              placeholder="Bairro"
+              value={neighborhood}
+              onChange={setNeighborhood}
+            />
           </View>
+        </View>
 
-          {/* ── SENHA ── */}
-          <View style={styles.divider} />
-          <Text style={[styles.sectionTitle, { color: theme.primary }]}>
-            Senha de Acesso
-          </Text>
-
-          {/* Senha */}
-          <View style={styles.inputWrapper}>
-            <View
-              style={[
-                styles.passwordContainer,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: errors.password ? "#FF4D4D" : theme.border,
-                },
-              ]}
-            >
-              <TextInput
-                style={[styles.input, { color: theme.text }]}
-                placeholder="Senha"
-                placeholderTextColor={theme.textSecondary}
-                secureTextEntry={!showPassword}
-                value={password}
-                onChangeText={setPassword}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                <Ionicons
-                  name={showPassword ? "eye-off" : "eye"}
-                  size={22}
-                  color={theme.primary}
-                />
-              </TouchableOpacity>
-            </View>
-            {errors.password && (
-              <Text style={[styles.errorText]}>{errors.password}</Text>
-            )}
+        <View style={styles.row}>
+          <View style={{ flex: 3 }}>
+            <FormInput
+              theme={theme}
+              placeholder="Cidade"
+              value={city}
+              onChange={setCity}
+            />
           </View>
-
-          {/* Confirmar Senha */}
-          <View style={styles.inputWrapper}>
-            <View
-              style={[
-                styles.passwordContainer,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: errors.confirmPassword
-                    ? "#FF4D4D"
-                    : theme.border,
-                },
-              ]}
-            >
-              <TextInput
-                style={[styles.input, { color: theme.text }]}
-                placeholder="Confirmar Senha"
-                placeholderTextColor={theme.textSecondary}
-                secureTextEntry={!showConfirmPassword}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-              />
-              <TouchableOpacity
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                <Ionicons
-                  name={showConfirmPassword ? "eye-off" : "eye"}
-                  size={22}
-                  color={theme.primary}
-                />
-              </TouchableOpacity>
-            </View>
-            {errors.confirmPassword && (
-              <Text style={[styles.errorText]}>{errors.confirmPassword}</Text>
-            )}
+          <View style={{ flex: 1 }}>
+            <FormInput
+              theme={theme}
+              placeholder="UF"
+              value={state}
+              onChange={setState}
+              maxLength={2}
+            />
           </View>
+        </View>
 
-          <TouchableOpacity
-            style={[styles.submitButton, { backgroundColor: theme.primary }]}
-            onPress={handleRegister}
-            disabled={loading}
+        {/* ── SENHA ── */}
+        <View style={styles.divider} />
+        <Text style={[styles.sectionTitle, { color: theme.primary }]}>
+          Senha de Acesso
+        </Text>
+
+        {/* Senha */}
+        <View style={styles.inputWrapper}>
+          <View
+            style={[
+              styles.passwordContainer,
+              {
+                backgroundColor: theme.surface,
+                borderColor: errors.password ? "#FF4D4D" : theme.border,
+              },
+            ]}
           >
-            {loading ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={[styles.submitButtonText, { fontWeight: "bold" }]}>
-                Finalizar Cadastro
-              </Text>
-            )}
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <TextInput
+              style={[styles.input, { color: theme.text }]}
+              placeholder="Senha"
+              placeholderTextColor={theme.textSecondary}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={22}
+                color={theme.primary}
+              />
+            </TouchableOpacity>
+          </View>
+          {errors.password && (
+            <Text style={[styles.errorText]}>{errors.password}</Text>
+          )}
+        </View>
+
+        {/* Confirmar Senha */}
+        <View style={styles.inputWrapper}>
+          <View
+            style={[
+              styles.passwordContainer,
+              {
+                backgroundColor: theme.surface,
+                borderColor: errors.confirmPassword ? "#FF4D4D" : theme.border,
+              },
+            ]}
+          >
+            <TextInput
+              style={[styles.input, { color: theme.text }]}
+              placeholder="Confirmar Senha"
+              placeholderTextColor={theme.textSecondary}
+              secureTextEntry={!showConfirmPassword}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+            />
+            <TouchableOpacity
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <Ionicons
+                name={showConfirmPassword ? "eye-off" : "eye"}
+                size={22}
+                color={theme.primary}
+              />
+            </TouchableOpacity>
+          </View>
+          {errors.confirmPassword && (
+            <Text style={[styles.errorText]}>{errors.confirmPassword}</Text>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.submitButton, { backgroundColor: theme.primary }]}
+          onPress={handleRegister}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={[styles.submitButtonText, { fontWeight: "bold" }]}>
+              Finalizar Cadastro
+            </Text>
+          )}
+        </TouchableOpacity>
+      </KeyboardAvoidingScreen>
     </View>
   );
 }
@@ -476,28 +445,11 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 100,
   },
   backButton: {
     position: "absolute",
     left: 20,
     zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  themeToggleButton: {
-    position: "absolute",
-    right: 20,
-    top: 0,
     width: 44,
     height: 44,
     borderRadius: 22,

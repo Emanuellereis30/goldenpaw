@@ -1,5 +1,5 @@
 // app/add-pet.tsx
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -8,24 +8,35 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import KeyboardAvoidingScreen from "../components/KeyboardAvoidingScreen";
 import { useNotification } from "../contexts/NotificationContext";
 import { auth, db } from "../firebaseConfig";
 import { useAppTheme } from "../hooks/use-app-theme";
 
 export default function AddPetScreen() {
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { showNotification } = useNotification();
   const [saving, setSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)" as any);
+    }
+  };
 
   // Estados dos Campos
   const [nome, setNome] = useState("");
@@ -263,17 +274,29 @@ export default function AddPetScreen() {
   );
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={[{ flex: 1, backgroundColor: theme.background }]}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 100}
-    >
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
-        automaticallyAdjustKeyboardInsets={true}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+      <TouchableOpacity
+        style={[
+          styles.backButton,
+          {
+            top: insets.top + 10,
+            backgroundColor: theme.surface,
+            borderColor: theme.primary + "40",
+          },
+        ]}
+        onPress={handleBack}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="chevron-back" size={24} color={theme.primary} />
+      </TouchableOpacity>
+
+      <KeyboardAvoidingScreen
+        contentContainerStyle={{
+          padding: 20,
+          paddingTop: 70,
+          paddingBottom: 60,
+        }}
+        extraOffset={insets.top}
       >
         <Text
           style={{
@@ -615,12 +638,29 @@ export default function AddPetScreen() {
             <Text style={styles.saveBtnText}>Registar Pet</Text>
           )}
         </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingScreen>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1 },
+  backButton: {
+    position: "absolute",
+    left: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   imageContainer: {
     height: 120,
     width: 120,

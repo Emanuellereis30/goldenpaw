@@ -3,9 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +13,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import KeyboardAvoidingScreen from "../../components/KeyboardAvoidingScreen";
 import { useAppTheme } from "../../hooks/use-app-theme";
 
 // ── Props & Interfaces ────────────────────────────────────────────────────────
@@ -735,94 +733,88 @@ export default function AdocaoFormulario({ pet, onSubmit, onCancel }: Props) {
         <Ionicons name="close" size={24} color={theme.primary} />
       </TouchableOpacity>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
+      <KeyboardAvoidingScreen
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: 70, paddingBottom: 100 }, // Ajustado para dar espaço ao botão fixo
+        ]}
+        extraOffset={insets.top}
       >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scroll,
-            { paddingTop: 70, paddingBottom: 100 }, // Ajustado para dar espaço ao botão fixo
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={[styles.headerTitle, { color: theme.text }]}>
-            Adotar {pet.nome}
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          Adotar {pet.nome}
+        </Text>
+
+        <View style={styles.progressWrapper}>
+          <View style={styles.progressContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                {
+                  backgroundColor: theme.primary,
+                  width: `${(etapaAtual / 5) * 100}%`,
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.stepCounter, { color: theme.textSecondary }]}>
+            Etapa {etapaAtual} de 5
           </Text>
+        </View>
 
-          <View style={styles.progressWrapper}>
-            <View style={styles.progressContainer}>
-              <View
-                style={[
-                  styles.progressBar,
-                  {
-                    backgroundColor: theme.primary,
-                    width: `${(etapaAtual / 5) * 100}%`,
-                  },
-                ]}
-              />
-            </View>
-            <Text style={[styles.stepCounter, { color: theme.textSecondary }]}>
-              Etapa {etapaAtual} de 5
-            </Text>
-          </View>
+        <View style={styles.content}>{renderContent()}</View>
 
-          <View style={styles.content}>{renderContent()}</View>
+        <View style={styles.buttonsContainer}>
+          {etapaAtual > 1 && (
+            <TouchableOpacity
+              style={[
+                styles.btn,
+                {
+                  backgroundColor: theme.surface,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                },
+              ]}
+              onPress={handleAnterior}
+              disabled={loading}
+            >
+              <Text style={[styles.btnText, { color: theme.text }]}>
+                Anterior
+              </Text>
+            </TouchableOpacity>
+          )}
 
-          <View style={styles.buttonsContainer}>
-            {etapaAtual > 1 && (
-              <TouchableOpacity
-                style={[
-                  styles.btn,
-                  {
-                    backgroundColor: theme.surface,
-                    borderWidth: 1,
-                    borderColor: theme.border,
-                  },
-                ]}
-                onPress={handleAnterior}
-                disabled={loading}
-              >
-                <Text style={[styles.btnText, { color: theme.text }]}>
-                  Anterior
+          {etapaAtual < 5 ? (
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: theme.primary }]}
+              onPress={handleProxima}
+              disabled={loading}
+            >
+              <Text style={[styles.btnText, { color: "#fff" }]}>Próxima</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.btn,
+                {
+                  backgroundColor: loading
+                    ? theme.textSecondary
+                    : theme.primary,
+                },
+              ]}
+              onPress={handleEnviar}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={[styles.btnText, { color: "#fff" }]}>
+                  Enviar Formulário
                 </Text>
-              </TouchableOpacity>
-            )}
-
-            {etapaAtual < 5 ? (
-              <TouchableOpacity
-                style={[styles.btn, { backgroundColor: theme.primary }]}
-                onPress={handleProxima}
-                disabled={loading}
-              >
-                <Text style={[styles.btnText, { color: "#fff" }]}>Próxima</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.btn,
-                  {
-                    backgroundColor: loading
-                      ? theme.textSecondary
-                      : theme.primary,
-                  },
-                ]}
-                onPress={handleEnviar}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={[styles.btnText, { color: "#fff" }]}>
-                    Enviar Formulário
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </KeyboardAvoidingScreen>
     </SafeAreaView>
   );
 }
