@@ -352,7 +352,7 @@ export default function HomeScreen() {
                 marginBottom: 12,
               }}
             >
-              Mais de 50 pets aguardam uma família cheia de amor.
+              Mais de 10 pets aguardam uma família cheia de amor.
             </Text>
             <View
               style={{
