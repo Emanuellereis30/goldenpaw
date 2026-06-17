@@ -1,10 +1,5 @@
-import {
-  addDoc,
-  collection,
-  serverTimestamp
-} from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { Alert } from "react-native";
 import { auth, db } from "../firebaseConfig";
 
 export type CartItem = {
@@ -44,14 +39,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
 
   const addToCart = (product: Omit<CartItem, "cartId" | "quantity">) => {
-    if (!auth.currentUser) {
-      Alert.alert(
-        "Login necessário",
-        "Faça login para adicionar produtos ao carrinho.",
-      );
-      return;
-    }
-
+    // A verificação de login agora é feita nos componentes (index.tsx, loja.tsx)
+    // para permitir o uso do hook useNotification e do router.
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -124,18 +113,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     email = "",
     telefone = "",
   ) => {
-    if (!auth.currentUser) {
-      Alert.alert("Login necessário", "Faça login para finalizar a compra.");
-      return;
-    }
+    if (!auth.currentUser) return;
 
-    if (cart.length === 0) {
-      Alert.alert(
-        "Carrinho vazio",
-        "Adicione produtos antes de finalizar a compra.",
-      );
-      return;
-    }
+    if (cart.length === 0) return;
 
     try {
       const now = new Date();
@@ -179,7 +159,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       clearCart();
     } catch (error) {
       console.error("Erro ao salvar pedido:", error);
-      throw error; // Repassa o erro para ser tratado no botão de pagar
+      throw error;
     }
   };
 

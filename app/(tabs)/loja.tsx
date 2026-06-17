@@ -1,7 +1,8 @@
+import { useNotification } from "@/contexts/NotificationContext";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { useCart } from "@/hooks/use-cart";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
@@ -19,7 +20,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { db } from "../../firebaseConfig";
+import { auth, db } from "../../firebaseConfig";
 
 // ── Interface de Tipo ─────────────────────────────────────────────────────────
 
@@ -45,7 +46,9 @@ const ORDENACOES = [
 export default function LojaScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { addToCart } = useCart();
+  const { showNotification } = useNotification();
 
   // ── Captura o parâmetro enviado pela tela inicial (Home) ──
   const { categoria } = useLocalSearchParams<{ categoria?: string }>();
@@ -181,6 +184,21 @@ export default function LojaScreen() {
 
   const rotuloOrdenacaoAtual =
     ORDENACOES.find((o) => o.value === ordenacao)?.label || "Ordenar";
+
+  // ── Função auxiliar para adicionar ao carrinho com verificação de login ──
+  const handleAddToCart = (product: Produto) => {
+    if (!auth.currentUser) {
+      showNotification(
+        "Acesso Restrito",
+        "Faça login para adicionar produtos ao carrinho.",
+        "info",
+      );
+      router.push("/login");
+      return;
+    }
+    addToCart(product as any);
+    showNotification("Sucesso", "Produto adicionado ao carrinho!", "success");
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -441,37 +459,16 @@ export default function LojaScreen() {
                       ]}
                       onPress={(e) => {
                         e.stopPropagation();
-                        addToCart(item as any);
+                        handleAddToCart(item);
                       }}
                       activeOpacity={0.8}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                      <Ionicons name="cart-outline" size={18} color="#FFF" />
-                      <Text style={styles.gridAddButtonText}>Adicionar</Text>
+                      <Ionicons name="add" size={20} color="#FFF" />
                     </TouchableOpacity>
                   </TouchableOpacity>
                 );
               })}
             </View>
-
-            {/* Empty State */}
-            {!loading && produtosFiltrados.length === 0 && (
-              <View style={styles.emptyState}>
-                <Ionicons
-                  name="cube-outline"
-                  size={60}
-                  color={theme.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.emptyStateText,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  Nenhum produto encontrado.
-                </Text>
-              </View>
-            )}
           </View>
         )}
       </ScrollView>
@@ -494,7 +491,6 @@ export default function LojaScreen() {
           >
             {selectedProduto && (
               <>
-                {/* Botão fechar */}
                 <TouchableOpacity
                   style={[
                     styles.modalCloseBtn,
@@ -505,14 +501,12 @@ export default function LojaScreen() {
                   <Ionicons name="close" size={20} color={theme.text} />
                 </TouchableOpacity>
 
-                {/* Tag */}
                 {selectedProduto.tag && (
                   <View style={[styles.tagBadge, { top: 16, left: 16 }]}>
                     <Text style={styles.tagText}>{selectedProduto.tag}</Text>
                   </View>
                 )}
 
-                {/* Imagem */}
                 <Image
                   source={
                     typeof selectedProduto.image === "string"
@@ -523,13 +517,15 @@ export default function LojaScreen() {
                   resizeMode="contain"
                 />
 
-                {/* Infos */}
                 <ScrollView
                   style={{ maxHeight: 260 }}
                   showsVerticalScrollIndicator={false}
                 >
                   <Text
-                    style={[styles.modalProductName, { color: theme.text }]}
+                    style={[
+                      styles.modalProductName,
+                      { color: theme.text, fontSize: 20 },
+                    ]}
                   >
                     {selectedProduto.nome}
                     {selectedProduto.kg ? ` - ${selectedProduto.kg}kg` : ""}
@@ -540,7 +536,7 @@ export default function LojaScreen() {
                     <Text
                       style={[
                         styles.modalCategory,
-                        { color: theme.textSecondary },
+                        { color: theme.textSecondary, fontSize: 12 },
                       ]}
                     >
                       {selectedProduto.category ||
@@ -548,7 +544,12 @@ export default function LojaScreen() {
                     </Text>
                   )}
 
-                  <Text style={[styles.modalPrice, { color: theme.primary }]}>
+                  <Text
+                    style={[
+                      styles.modalPrice,
+                      { color: theme.primary, fontSize: 24 },
+                    ]}
+                  >
                     R$ {selectedProduto.preco}
                   </Text>
 
@@ -556,7 +557,7 @@ export default function LojaScreen() {
                     <Text
                       style={[
                         styles.modalDescription,
-                        { color: theme.textSecondary },
+                        { color: theme.textSecondary, fontSize: 14 },
                       ]}
                     >
                       {selectedProduto.descricao}
@@ -565,7 +566,11 @@ export default function LojaScreen() {
                     <Text
                       style={[
                         styles.modalDescription,
-                        { color: theme.textSecondary, fontStyle: "italic" },
+                        {
+                          color: theme.textSecondary,
+                          fontSize: 14,
+                          fontStyle: "italic",
+                        },
                       ]}
                     >
                       Sem descrição disponível.
@@ -573,14 +578,13 @@ export default function LojaScreen() {
                   )}
                 </ScrollView>
 
-                {/* Botão carrinho */}
                 <TouchableOpacity
                   style={[
                     styles.modalAddButton,
                     { backgroundColor: theme.primary },
                   ]}
                   onPress={() => {
-                    addToCart(selectedProduto as any);
+                    handleAddToCart(selectedProduto);
                     setSelectedProduto(null);
                   }}
                   activeOpacity={0.8}
@@ -599,83 +603,88 @@ export default function LojaScreen() {
   );
 }
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 24 },
-  header: { marginBottom: 20 },
-  sectionTitle: { fontSize: 26, fontWeight: "800", marginBottom: 4 },
-  subtitle: { fontSize: 14 },
-  searchContainer: { marginBottom: 12 },
+  scrollContent: { paddingBottom: 40 },
+  header: { paddingHorizontal: 20, paddingTop: 20, marginBottom: 20 },
+  sectionTitle: { fontSize: 28, fontWeight: "800", marginBottom: 4 },
+  subtitle: { fontSize: 14, fontWeight: "500" },
+
+  // Busca
+  searchContainer: { paddingHorizontal: 20, marginBottom: 15 },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
     height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 15,
   },
-  searchInput: { flex: 1, fontSize: 15 },
-  filtersRow: { flexDirection: "row", gap: 12, marginBottom: 20, zIndex: 10 },
-  filterWrap: { flex: 1, zIndex: 10 },
+  searchInput: { flex: 1, fontSize: 15, fontWeight: "500" },
+
+  // Filtros (Dropdowns)
+  filtersRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 12,
+    zIndex: 10,
+  },
+  filterWrap: { flex: 1, position: "relative" },
   filterBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderWidth: 1,
+    height: 42,
     borderRadius: 12,
+    borderWidth: 1,
     paddingHorizontal: 12,
-    height: 46,
-    gap: 6,
   },
-  filterText: { flex: 1, fontSize: 14, fontWeight: "500" },
+  filterText: { fontSize: 13, fontWeight: "600", marginHorizontal: 6, flex: 1 },
   dropdown: {
     position: "absolute",
-    top: 50,
+    top: 48,
     left: 0,
     right: 0,
-    borderWidth: 1,
     borderRadius: 12,
-    overflow: "hidden",
-    zIndex: 99,
+    borderWidth: 1,
+    paddingVertical: 6,
+    zIndex: 20,
     elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
   },
   dropdownText: { fontSize: 14, fontWeight: "500" },
-  count: { fontSize: 13, marginBottom: 16 },
+
+  // Grid de Produtos
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 60,
+    marginTop: 100,
   },
   loadingText: { marginTop: 12, fontSize: 15, fontWeight: "500" },
-  gridContainer: { flex: 1 },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
+  gridContainer: { paddingHorizontal: 12 },
+  count: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 15,
+    paddingHorizontal: 8,
   },
+  grid: { flexDirection: "row", flexWrap: "wrap" },
   gridCard: {
-    width: "48%",
+    width: "46%",
+    margin: "2%",
     borderRadius: 20,
-    borderWidth: 1,
     padding: 12,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    borderWidth: 1,
     position: "relative",
   },
   tagBadge: {
@@ -688,34 +697,28 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     zIndex: 1,
   },
-  tagText: { color: "#D4AF37", fontSize: 10, fontWeight: "700" },
-  gridImage: { width: "100%", height: 140, marginBottom: 12 },
-  gridInfo: { paddingHorizontal: 2, flex: 1, justifyContent: "flex-end" },
+  tagText: { color: "#D4AF37", fontSize: 10, fontWeight: "800" },
+  gridImage: { width: "100%", height: 120, marginBottom: 10 },
+  gridInfo: { marginBottom: 35 },
   productName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
-    marginBottom: 6,
-    minHeight: 36,
+    marginBottom: 4,
+    lineHeight: 18,
   },
-  productPrice: { fontSize: 16, fontWeight: "800", marginBottom: 10 },
+  productPrice: { fontSize: 16, fontWeight: "800" },
   gridAddButton: {
-    flexDirection: "row",
-    height: 40,
-    borderRadius: 12,
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    gap: 6,
   },
-  gridAddButtonText: { color: "#FFF", fontSize: 13, fontWeight: "700" },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-    width: "100%",
-  },
-  emptyStateText: { fontSize: 16, marginTop: 12, textAlign: "center" },
 
-  // Modal de detalhes
+  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -725,7 +728,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 24,
-    paddingTop: 20,
     minHeight: 480,
   },
   modalCloseBtn: {
@@ -737,33 +739,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  modalImage: {
-    width: "100%",
-    height: 180,
-    marginBottom: 16,
-  },
-  modalProductName: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
+  modalImage: { width: "100%", height: 200, marginBottom: 16 },
+  modalProductName: { fontWeight: "800", marginBottom: 4 },
   modalCategory: {
-    fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  modalPrice: {
-    fontSize: 22,
-    fontWeight: "800",
-    marginBottom: 12,
-  },
-  modalDescription: {
-    fontSize: 14,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
+  modalPrice: { fontWeight: "800", marginBottom: 12 },
+  modalDescription: { lineHeight: 22, marginBottom: 20 },
   modalAddButton: {
     flexDirection: "row",
     height: 52,
@@ -773,9 +758,5 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  modalAddButtonText: {
-    color: "#FFF",
-    fontSize: 15,
-    fontWeight: "700",
-  },
+  modalAddButtonText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });

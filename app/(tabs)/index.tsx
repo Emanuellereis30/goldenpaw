@@ -67,10 +67,19 @@ const CATEGORIES: Categoria[] = [
   { id: "c4", name: "Peixes", icon: "fish" },
 ];
 
+/** Gera as iniciais a partir do nome completo (máx. 2 letras) */
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0 || !parts[0]) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { theme, colorScheme, toggleColorScheme } = useAppTheme();
+  const { theme, colorScheme, toggleColorScheme, setColorScheme } =
+    useAppTheme();
   const { addToCart } = useCart();
   const { fontSize, increaseFontSize, decreaseFontSize } = useFontSize();
   const { showNotification } = useNotification();
@@ -78,7 +87,11 @@ export default function HomeScreen() {
   const [featuredProducts, setFeaturedProducts] = useState<Produto[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState<string>("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showAppearanceSubmenu, setShowAppearanceSubmenu] = useState(false);
+  const [showAccessibilitySubmenu, setShowAccessibilitySubmenu] =
+    useState(false);
   const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
   const [profileMenuPosition, setProfileMenuPosition] = useState({
     top: 0,
@@ -86,10 +99,31 @@ export default function HomeScreen() {
   });
   const profileButtonRef = useRef<View>(null);
 
+  // ── Autenticação e dados do usuário ──────────────────────────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsLoggedIn(!!user);
       if (user) {
+        // Buscar nome no Firestore (suporta schema raiz e aninhado em userData)
+        try {
+          const userDoc = await getDoc(doc(db, "usuarios", user.uid));
+          if (userDoc.exists()) {
+            const docData = userDoc.data();
+            const actualData = docData.userData || docData;
+            const nome =
+              actualData.nome ||
+              user.displayName ||
+              user.email?.split("@")[0] ||
+              "";
+            setUserName(nome);
+          } else {
+            setUserName(user.displayName || user.email?.split("@")[0] || "");
+          }
+        } catch {
+          setUserName(user.displayName || user.email?.split("@")[0] || "");
+        }
+
+        // Verificar permissões de admin
         if (user.email?.toLowerCase() === "admin@goldenpaw.com") {
           setIsAdmin(true);
         } else {
@@ -105,7 +139,8 @@ export default function HomeScreen() {
               const userDoc = await getDoc(doc(db, "usuarios", user.uid));
               if (userDoc.exists()) {
                 const userData = userDoc.data();
-                setIsAdmin(userData.tipo === "admin");
+                const actualData = userData.userData || userData;
+                setIsAdmin(actualData.tipo === "admin");
               } else {
                 setIsAdmin(false);
               }
@@ -117,11 +152,13 @@ export default function HomeScreen() {
         }
       } else {
         setIsAdmin(false);
+        setUserName("");
       }
     });
     return () => unsubscribe();
   }, []);
 
+  // ── Produtos em destaque ─────────────────────────────────────────────────
   useEffect(() => {
     const q = query(collection(db, "produtos"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -150,8 +187,29 @@ export default function HomeScreen() {
     }
   };
 
+  // ── Função auxiliar para adicionar ao carrinho com verificação de login ──
+  const handleAddToCart = (product: Produto) => {
+    if (!isLoggedIn) {
+      showNotification(
+        "Acesso Restrito",
+        "Faça login para adicionar produtos ao carrinho.",
+        "info",
+      );
+      router.push("/login");
+      return;
+    }
+    addToCart(product as any);
+    showNotification("Sucesso", "Produto adicionado ao carrinho!", "success");
+  };
+
+  // ── Texto de saudação ────────────────────────────────────────────────────
+  const greetingName =
+    isLoggedIn && userName ? userName.split(" ")[0] : "Pet Lover";
+
+  // ── Cabeçalho ────────────────────────────────────────────────────────────
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      {/* Esquerda: logo + saudação */}
       <View style={styles.headerLeft}>
         <Image
           source={IMAGES.logo}
@@ -165,7 +223,7 @@ export default function HomeScreen() {
               { color: theme.textSecondary, fontSize: fontSize - 2 },
             ]}
           >
-            Olá, Pet Lover!
+            Olá, {greetingName}!
           </Text>
           <Text
             style={[
@@ -177,33 +235,54 @@ export default function HomeScreen() {
           </Text>
         </View>
       </View>
-      <View style={styles.headerActions}>
+
+      {/* Direita: botão avatar + seta */}
+      <View
+        ref={profileButtonRef}
+        onLayout={(event: LayoutChangeEvent) => {
+          const layout = event.nativeEvent.layout;
+          setProfileMenuPosition({
+            top: layout.y + layout.height + insets.top + 18,
+            right: 20,
+          });
+        }}
+      >
         <TouchableOpacity
-          onPress={toggleColorScheme}
-          style={[styles.iconButton, { backgroundColor: theme.surface }]}
-        >
-          <Ionicons
-            name={colorScheme === "dark" ? "sunny" : "moon"}
-            size={22}
-            color={theme.primary}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          ref={profileButtonRef}
-          onLayout={(event: LayoutChangeEvent) => {
-            const layout = event.nativeEvent.layout;
-            setProfileMenuPosition({
-              top: layout.y + layout.height + 5,
-              right: 20,
-            });
+          onPress={() => {
+            setShowAppearanceSubmenu(false);
+            setShowAccessibilitySubmenu(false);
+            setShowProfileMenu(!showProfileMenu);
           }}
-          onPress={() => setShowProfileMenu(!showProfileMenu)}
-          style={[styles.iconButton, { backgroundColor: theme.surface }]}
+          style={[styles.avatarButton, { borderColor: theme.primary }]}
+          activeOpacity={0.8}
         >
+          <View
+            style={[styles.avatarCircle, { backgroundColor: theme.primary }]}
+          >
+            {isLoggedIn ? (
+              <Text style={styles.avatarText} numberOfLines={1}>
+                {getInitials(userName)}
+              </Text>
+            ) : (
+              <Ionicons name="person" size={16} color="#FFFFFF" />
+            )}
+          </View>
+
+          {/* Texto dinâmico: mostra iniciais logado ou "Entrar" deslogado */}
+          <Text
+            style={[
+              styles.loginText,
+              { color: theme.primary, fontSize: fontSize - 2 },
+            ]}
+          >
+            {!isLoggedIn && "Entrar"}
+          </Text>
+
           <Ionicons
-            name={isLoggedIn ? "person" : "person-outline"}
-            size={22}
-            color={theme.text}
+            name="chevron-down"
+            size={14}
+            color={theme.primary}
+            style={{ marginLeft: isLoggedIn ? 0 : 4 }}
           />
         </TouchableOpacity>
       </View>
@@ -223,6 +302,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* ── Banner Hero ── */}
         <View style={[styles.heroBanner, { backgroundColor: theme.primary }]}>
           <Image
             source={IMAGES.banner}
@@ -248,37 +328,32 @@ export default function HomeScreen() {
           </View>
         </View>
 
-  {/* Card de Adoção */}
-   <TouchableOpacity
-      style={[
-       styles.adoptionCard,
-       { backgroundColor: theme.surface },
-      ]}
-     activeOpacity={0.8}
-     onPress={() => router.push("/adocao")}
-     >
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            color: theme.text,
-            fontWeight: "800",
-            fontSize: fontSize + 2,
-            marginBottom: 6,
-          }}
+        {/* ── Card de Adoção ── */}
+        <TouchableOpacity
+          style={[styles.adoptionCard, { backgroundColor: theme.surface }]}
+          activeOpacity={0.8}
+          onPress={() => router.push("/adocao")}
         >
-        Adote um amigo
-        </Text>
-
-        <Text
-          style={{
-            color: theme.textSecondary,
-            fontSize: fontSize - 1,
-            marginBottom: 12,
-          }}
-        >
-          Mais de 50 pets aguardam uma família cheia de amor.
-        </Text>
-
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: theme.text,
+                fontWeight: "800",
+                fontSize: fontSize + 2,
+                marginBottom: 6,
+              }}
+            >
+              Adote um amigo
+            </Text>
+            <Text
+              style={{
+                color: theme.textSecondary,
+                fontSize: fontSize - 1,
+                marginBottom: 12,
+              }}
+            >
+              Mais de 50 pets aguardam uma família cheia de amor.
+            </Text>
             <View
               style={{
                 alignSelf: "flex-start",
@@ -288,33 +363,26 @@ export default function HomeScreen() {
                 borderRadius: 10,
               }}
             >
-              <Text
-                style={{
-                  color: "#FFF",
-                  fontWeight: "700",
-                }}
-              >
+              <Text style={{ color: "#FFF", fontWeight: "700" }}>
                 Ver Pets para Adoção
               </Text>
             </View>
-      </View>
+          </View>
+          <Ionicons
+            name="heart"
+            size={60}
+            color={theme.primary}
+            style={{ opacity: 0.7 }}
+          />
+        </TouchableOpacity>
 
-      <Ionicons
-        name="heart"
-        size={60}
-        color={theme.primary}
-        style={{ opacity: 0.7 }}
-      />
-    </TouchableOpacity>
-
+        {/* ── Categorias ── */}
         <Text
           style={[
             styles.sectionTitle,
-            
             { color: theme.text, fontSize: fontSize + 2 },
           ]}
         >
-           
           Categorias
         </Text>
         <ScrollView
@@ -357,6 +425,7 @@ export default function HomeScreen() {
           ))}
         </ScrollView>
 
+        {/* ── Destaques ── */}
         <View style={styles.sectionHeader}>
           <Text
             style={[
@@ -434,7 +503,7 @@ export default function HomeScreen() {
                   style={[styles.addButton, { backgroundColor: theme.primary }]}
                   onPress={(e) => {
                     e.stopPropagation();
-                    addToCart(item as any);
+                    handleAddToCart(item);
                   }}
                   activeOpacity={0.7}
                 >
@@ -445,26 +514,16 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
-        {/* 💡 Dica do Dia */}
+        {/* ── Dica do Dia ── */}
         <Text
           style={[
             styles.sectionTitle,
-            {
-              color: theme.text,
-              fontSize: fontSize + 2,
-              marginTop: 15,
-            },
+            { color: theme.text, fontSize: fontSize + 2, marginTop: 15 },
           ]}
         >
           💡 Dica do Dia
         </Text>
-
-        <View
-          style={[
-            styles.adoptionCard,
-            { backgroundColor: theme.surface },
-          ]}
-        >
+        <View style={[styles.adoptionCard, { backgroundColor: theme.surface }]}>
           <View style={{ flex: 1 }}>
             <Text
               style={{
@@ -476,25 +535,17 @@ export default function HomeScreen() {
             >
               Água fresca sempre disponível
             </Text>
-
             <Text
-              style={{
-                color: theme.textSecondary,
-                fontSize: fontSize - 1,
-              }}
+              style={{ color: theme.textSecondary, fontSize: fontSize - 1 }}
             >
-              Troque a água diariamente para manter seu pet saudável e hidratado.
+              Troque a água diariamente para manter seu pet saudável e
+              hidratado.
             </Text>
           </View>
-
-          <Ionicons
-            name="water"
-            size={40}
-            color={theme.primary}
-          />
+          <Ionicons name="water" size={40} color={theme.primary} />
         </View>
       </ScrollView>
-    
+
       {/* ── Modal de Detalhes do Produto ── */}
       <Modal
         visible={!!selectedProduto}
@@ -606,7 +657,7 @@ export default function HomeScreen() {
                     { backgroundColor: theme.primary },
                   ]}
                   onPress={() => {
-                    addToCart(selectedProduto as any);
+                    handleAddToCart(selectedProduto);
                     setSelectedProduto(null);
                   }}
                   activeOpacity={0.8}
@@ -624,13 +675,19 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Menu dropdown de perfil – controles de fonte sempre visíveis */}
+      {/* ── Dropdown de perfil ── */}
       {showProfileMenu && (
         <>
+          {/* Overlay para fechar ao clicar fora */}
           <Pressable
             style={styles.dropdownOverlay}
-            onPress={() => setShowProfileMenu(false)}
+            onPress={() => {
+              setShowProfileMenu(false);
+              setShowAppearanceSubmenu(false);
+              setShowAccessibilitySubmenu(false);
+            }}
           />
+
           <View
             style={[
               styles.dropdownMenu,
@@ -638,136 +695,340 @@ export default function HomeScreen() {
                 backgroundColor: theme.surface,
                 top: profileMenuPosition.top,
                 right: profileMenuPosition.right,
+                shadowColor: theme.shadow ?? "#000",
               },
             ]}
           >
-            {/* Controles de fonte – sempre disponíveis */}
+            {/* ── Perfil ── */}
+            {isLoggedIn && (
+              <TouchableOpacity
+                style={[
+                  styles.dropdownOption,
+                  { borderBottomColor: theme.border, borderBottomWidth: 1 },
+                ]}
+                onPress={() => {
+                  setShowProfileMenu(false);
+                  if (isAdmin) router.push("/admin/AdminDashboard");
+                  else router.push("/profile");
+                }}
+              >
+                <Ionicons
+                  name="person-outline"
+                  size={16}
+                  color={isAdmin ? theme.primary : theme.text}
+                  style={styles.dropdownIcon}
+                />
+                <Text
+                  style={[
+                    styles.dropdownOptionText,
+                    {
+                      color: isAdmin ? theme.primary : theme.text,
+                      fontWeight: isAdmin ? "800" : "600",
+                      fontSize: fontSize,
+                    },
+                  ]}
+                >
+                  {isAdmin ? "Admin" : "Perfil"}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* ── Aparência ── */}
             <TouchableOpacity
               style={[
                 styles.dropdownOption,
                 { borderBottomColor: theme.border, borderBottomWidth: 1 },
               ]}
               onPress={() => {
-                decreaseFontSize();
-                setShowProfileMenu(false);
+                setShowAccessibilitySubmenu(false);
+                setShowAppearanceSubmenu(!showAppearanceSubmenu);
               }}
             >
+              <Ionicons
+                name="color-palette-outline"
+                size={16}
+                color={theme.text}
+                style={styles.dropdownIcon}
+              />
               <Text
                 style={[
                   styles.dropdownOptionText,
-                  { color: theme.text, fontSize: fontSize },
+                  { color: theme.text, fontSize: fontSize, flex: 1 },
                 ]}
               >
-                Diminuir fonte (A-)
+                Aparência
               </Text>
+              <Ionicons
+                name={showAppearanceSubmenu ? "chevron-up" : "chevron-down"}
+                size={14}
+                color={theme.textSecondary}
+              />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.dropdownOption,
-                { borderBottomColor: theme.border, borderBottomWidth: 1 },
-              ]}
-              onPress={() => {
-                increaseFontSize();
-                setShowProfileMenu(false);
-              }}
-            >
-              <Text
+
+            {/* Submenu de aparência */}
+            {showAppearanceSubmenu && (
+              <View
                 style={[
-                  styles.dropdownOptionText,
-                  { color: theme.text, fontSize: fontSize },
+                  styles.submenu,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
                 ]}
               >
-                Aumentar fonte (A+)
-              </Text>
-            </TouchableOpacity>
-
-            <View
-              style={{
-                height: 1,
-                backgroundColor: theme.border,
-                marginVertical: 4,
-              }}
-            />
-
-            {/* Opções de login / perfil conforme estado */}
-            {isLoggedIn ? (
-              <>
                 <TouchableOpacity
                   style={[
-                    styles.dropdownOption,
-                    { borderBottomColor: theme.border, borderBottomWidth: 1 },
+                    styles.submenuOption,
+                    colorScheme === "light" && styles.submenuOptionActive,
+                    colorScheme === "light" && { borderColor: theme.primary },
                   ]}
                   onPress={() => {
-                    setShowProfileMenu(false);
-                    if (isAdmin) router.push("/admin/AdminDashboard");
-                    else router.push("/profile");
+                    setColorScheme("light");
+                    setShowAppearanceSubmenu(false);
                   }}
                 >
+                  <Ionicons
+                    name="sunny-outline"
+                    size={15}
+                    color={
+                      colorScheme === "light"
+                        ? theme.primary
+                        : theme.textSecondary
+                    }
+                  />
                   <Text
                     style={[
-                      styles.dropdownOptionText,
+                      styles.submenuText,
                       {
-                        color: isAdmin ? theme.primary : theme.text,
-                        fontWeight: isAdmin ? "800" : "600",
-                        fontSize: fontSize,
+                        color:
+                          colorScheme === "light"
+                            ? theme.primary
+                            : theme.textSecondary,
+                        fontSize: fontSize - 1,
+                        fontWeight: colorScheme === "light" ? "700" : "400",
                       },
                     ]}
                   >
-                    {isAdmin ? "Admin" : "Perfil"}
+                    Claro
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dropdownOption}
-                  onPress={handleLogout}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownOptionText,
-                      { color: "#EF4444", fontSize: fontSize },
-                    ]}
-                  >
-                    Sair
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
+
                 <TouchableOpacity
                   style={[
-                    styles.dropdownOption,
-                    { borderBottomColor: theme.border, borderBottomWidth: 1 },
+                    styles.submenuOption,
+                    colorScheme === "dark" && styles.submenuOptionActive,
+                    colorScheme === "dark" && { borderColor: theme.primary },
                   ]}
                   onPress={() => {
-                    setShowProfileMenu(false);
-                    router.push("/login");
+                    setColorScheme("dark");
+                    setShowAppearanceSubmenu(false);
                   }}
                 >
+                  <Ionicons
+                    name="moon-outline"
+                    size={15}
+                    color={
+                      colorScheme === "dark"
+                        ? theme.primary
+                        : theme.textSecondary
+                    }
+                  />
                   <Text
                     style={[
-                      styles.dropdownOptionText,
-                      { color: theme.text, fontSize: fontSize },
+                      styles.submenuText,
+                      {
+                        color:
+                          colorScheme === "dark"
+                            ? theme.primary
+                            : theme.textSecondary,
+                        fontSize: fontSize - 1,
+                        fontWeight: colorScheme === "dark" ? "700" : "400",
+                      },
                     ]}
                   >
-                    Login
+                    Escuro
                   </Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Acessibilidade ── */}
+            <TouchableOpacity
+              style={[
+                styles.dropdownOption,
+                { borderBottomColor: theme.border, borderBottomWidth: 1 },
+              ]}
+              onPress={() => {
+                setShowAppearanceSubmenu(false);
+                setShowAccessibilitySubmenu(!showAccessibilitySubmenu);
+              }}
+            >
+              <Ionicons
+                name="text-outline"
+                size={16}
+                color={theme.text}
+                style={styles.dropdownIcon}
+              />
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  { color: theme.text, fontSize: fontSize, flex: 1 },
+                ]}
+              >
+                Acessibilidade
+              </Text>
+              <Ionicons
+                name={showAccessibilitySubmenu ? "chevron-up" : "chevron-down"}
+                size={14}
+                color={theme.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Submenu de acessibilidade (A- / A+) */}
+            {showAccessibilitySubmenu && (
+              <View
+                style={[
+                  styles.submenu,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <TouchableOpacity
-                  style={styles.dropdownOption}
-                  onPress={() => {
-                    setShowProfileMenu(false);
-                    router.push("/register");
-                  }}
+                  style={[styles.submenuOption, { borderColor: theme.border }]}
+                  onPress={decreaseFontSize}
                 >
                   <Text
                     style={[
-                      styles.dropdownOptionText,
-                      { color: theme.text, fontSize: fontSize },
+                      styles.submenuText,
+                      {
+                        color: theme.primary,
+                        fontSize: fontSize,
+                        fontWeight: "700",
+                      },
                     ]}
                   >
-                    Registrar
+                    A−
+                  </Text>
+                  <Text
+                    style={[
+                      styles.submenuText,
+                      { color: theme.textSecondary, fontSize: fontSize - 3 },
+                    ]}
+                  >
+                    Diminuir
                   </Text>
                 </TouchableOpacity>
-              </>
+
+                <TouchableOpacity
+                  style={[styles.submenuOption, { borderColor: theme.border }]}
+                  onPress={increaseFontSize}
+                >
+                  <Text
+                    style={[
+                      styles.submenuText,
+                      {
+                        color: theme.primary,
+                        fontSize: fontSize + 2,
+                        fontWeight: "700",
+                      },
+                    ]}
+                  >
+                    A+
+                  </Text>
+                  <Text
+                    style={[
+                      styles.submenuText,
+                      { color: theme.textSecondary, fontSize: fontSize - 3 },
+                    ]}
+                  >
+                    Aumentar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Informações do App ── */}
+            <TouchableOpacity
+              style={[
+                styles.dropdownOption,
+                {
+                  borderBottomColor: theme.border,
+                  borderBottomWidth: isLoggedIn ? 1 : 0,
+                },
+              ]}
+              onPress={() => {
+                setShowProfileMenu(false);
+                router.push("/sobre");
+              }}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color={theme.text}
+                style={styles.dropdownIcon}
+              />
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  { color: theme.text, fontSize: fontSize },
+                ]}
+              >
+                Informações do App
+              </Text>
+            </TouchableOpacity>
+
+            {/* ── Sair (somente logado) ── */}
+            {isLoggedIn && (
+              <TouchableOpacity
+                style={styles.dropdownOption}
+                onPress={handleLogout}
+              >
+                <Ionicons
+                  name="log-out-outline"
+                  size={16}
+                  color="#EF4444"
+                  style={styles.dropdownIcon}
+                />
+                <Text
+                  style={[
+                    styles.dropdownOptionText,
+                    { color: "#EF4444", fontSize: fontSize },
+                  ]}
+                >
+                  Sair
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* ── Entrar (não logado) ── */}
+            {!isLoggedIn && (
+              <TouchableOpacity
+                style={[
+                  styles.dropdownOption,
+                  { borderTopColor: theme.border, borderTopWidth: 1 },
+                ]}
+                onPress={() => {
+                  setShowProfileMenu(false);
+                  router.push("/login");
+                }}
+              >
+                <Ionicons
+                  name="log-in-outline"
+                  size={16}
+                  color={theme.primary}
+                  style={styles.dropdownIcon}
+                />
+                <Text
+                  style={[
+                    styles.dropdownOptionText,
+                    { color: theme.primary, fontSize: fontSize },
+                  ]}
+                >
+                  Entrar
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         </>
@@ -779,6 +1040,8 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingBottom: 40 },
+
+  // ── Cabeçalho ──
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -790,14 +1053,86 @@ const styles = StyleSheet.create({
   headerLogo: { width: 45, height: 45, marginRight: 12, borderRadius: 10 },
   welcomeText: { fontWeight: "500" },
   brandText: { fontWeight: "800" },
-  headerActions: { flexDirection: "row", gap: 10, alignItems: "center" },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+
+  // ── Botão avatar ──
+  avatarButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 6,
+  },
+  avatarCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
   },
+  avatarText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+  loginText: {
+    fontWeight: "700",
+  },
+
+  // ── Dropdown ──
+  dropdownOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 98,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    width: 200,
+    borderRadius: 14,
+    overflow: "hidden",
+    zIndex: 99,
+    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+  },
+  dropdownOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  dropdownIcon: { marginRight: 10 },
+  dropdownOptionText: { fontWeight: "600" },
+
+  // ── Submenu ──
+  submenu: {
+    flexDirection: "row",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 8,
+    borderBottomWidth: 1,
+  },
+  submenuOption: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  submenuOptionActive: {},
+  submenuText: {},
+
+  // ── Hero Banner ──
   heroBanner: {
     marginHorizontal: 20,
     borderRadius: 24,
@@ -827,6 +1162,8 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   heroButtonText: { color: "#D4AF37", fontWeight: "bold" },
+
+  // ── Seções ──
   sectionTitle: { fontWeight: "700", paddingHorizontal: 20, marginBottom: 15 },
   categoriesScroll: { paddingHorizontal: 15, marginBottom: 25 },
   categoryItem: { alignItems: "center", marginHorizontal: 8 },
@@ -884,30 +1221,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  dropdownOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 98,
-  },
-  dropdownMenu: {
-    position: "absolute",
-    width: 180,
-    borderRadius: 12,
-    overflow: "hidden",
-    zIndex: 99,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-  },
-  dropdownOption: { padding: 14, alignItems: "center" },
-  dropdownOptionText: { fontWeight: "600" },
 
-  // Modal de detalhes
+  // ── Modal de detalhes ──
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -929,29 +1244,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  modalImage: {
-    width: "100%",
-    height: 180,
-    marginBottom: 16,
-  },
-  modalProductName: {
-    fontWeight: "800",
-    marginBottom: 4,
-  },
+  modalImage: { width: "100%", height: 180, marginBottom: 16 },
+  modalProductName: { fontWeight: "800", marginBottom: 4 },
   modalCategory: {
     fontWeight: "500",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  modalPrice: {
-    fontWeight: "800",
-    marginBottom: 12,
-  },
-  modalDescription: {
-    lineHeight: 22,
-    marginBottom: 20,
-  },
+  modalPrice: { fontWeight: "800", marginBottom: 12 },
+  modalDescription: { lineHeight: 22, marginBottom: 20 },
   modalAddButton: {
     flexDirection: "row",
     height: 52,
@@ -961,24 +1263,21 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  modalAddButtonText: {
-    color: "#FFF",
-    fontWeight: "700",
+  modalAddButtonText: { color: "#FFF", fontWeight: "700" },
+
+  // ── Card de adoção / dica ──
+  adoptionCard: {
+    marginHorizontal: 20,
+    marginBottom: 25,
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-adoptionCard: {
-  marginHorizontal: 20,
-  marginBottom: 25,
-  borderRadius: 20,
-  padding: 20,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  elevation: 2,
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.1,
-  shadowRadius: 2,
-},
-
-
 });

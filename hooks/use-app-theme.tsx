@@ -1,6 +1,7 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = "light" | "dark";
 
 export type AppThemeColors = {
   background: string;
@@ -17,30 +18,32 @@ export type AppThemeColors = {
 
 const ThemePalette: Record<ThemeMode, AppThemeColors> = {
   light: {
-    background: '#F8F6F2',
-    surface: '#FFFFFF',
-    primary: '#D4AF37',
-    text: '#1A1A1A',
-    textSecondary: '#6B7280',
-    border: '#E5E7EB',
-    buttonBackground: 'rgba(212, 175, 55, 0.1)',
-    error: '#dc3545',
-    secondary: '#927957',
-    shadow: 'rgba(0,0,0,0.08)',
+    background: "#F8F6F2",
+    surface: "#FFFFFF",
+    primary: "#D4AF37",
+    text: "#1A1A1A",
+    textSecondary: "#6B7280",
+    border: "#E5E7EB",
+    buttonBackground: "rgba(212, 175, 55, 0.1)",
+    error: "#dc3545",
+    secondary: "#927957",
+    shadow: "rgba(0,0,0,0.08)",
   },
   dark: {
-    background: '#121212',
-    surface: '#1E1E1E',
-    primary: '#D4AF37',
-    text: '#F5F5F5',
-    textSecondary: '#A1A1AA',
-    border: '#2A2A2A',
-    buttonBackground: 'rgba(212, 175, 55, 0.15)',
-    error: '#dc3545',
-    secondary: '#2A2A2A',
-    shadow: 'rgba(0,0,0,0.6)',
+    background: "#121212",
+    surface: "#1E1E1E",
+    primary: "#D4AF37",
+    text: "#F5F5F5",
+    textSecondary: "#A1A1AA",
+    border: "#2A2A2A",
+    buttonBackground: "rgba(212, 175, 55, 0.15)",
+    error: "#dc3545",
+    secondary: "#2A2A2A",
+    shadow: "rgba(0,0,0,0.6)",
   },
 };
+
+const THEME_STORAGE_KEY = "app_color_scheme";
 
 type AppThemeContextValue = {
   colorScheme: ThemeMode;
@@ -49,22 +52,33 @@ type AppThemeContextValue = {
   setColorScheme: (mode: ThemeMode) => void;
 };
 
-const AppThemeContext = createContext<AppThemeContextValue | undefined>(undefined);
+const AppThemeContext = createContext<AppThemeContextValue | undefined>(
+  undefined,
+);
 
 export function AppThemeProvider({ children }: { children: React.ReactNode }) {
-  const [colorScheme, setColorSchemeState] = useState<ThemeMode>('light');
-  const [userPreference, setUserPreference] = useState<ThemeMode | null>(null);
+  const [colorScheme, setColorSchemeState] = useState<ThemeMode>("light");
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Por padrão, manter o app em 'light' até que o usuário escolha
-  // uma preferência manual. Não aplicar automaticamente o tema do sistema.
+  // Carregar preferência salva ao iniciar
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_STORAGE_KEY)
+      .then((saved) => {
+        if (saved === "light" || saved === "dark") {
+          setColorSchemeState(saved);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setIsLoaded(true));
+  }, []);
 
   const setColorScheme = (mode: ThemeMode) => {
-    setUserPreference(mode);
     setColorSchemeState(mode);
+    AsyncStorage.setItem(THEME_STORAGE_KEY, mode).catch(() => {});
   };
 
   const toggleColorScheme = () => {
-    setColorScheme(colorScheme === 'dark' ? 'light' : 'dark');
+    setColorScheme(colorScheme === "dark" ? "light" : "dark");
   };
 
   const value = useMemo(
@@ -74,16 +88,23 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
       toggleColorScheme,
       setColorScheme,
     }),
-    [colorScheme]
+    [colorScheme],
   );
 
-  return <AppThemeContext.Provider value={value}>{children}</AppThemeContext.Provider>;
+  // Aguardar carregamento para evitar flash de tema errado
+  if (!isLoaded) return null;
+
+  return (
+    <AppThemeContext.Provider value={value}>
+      {children}
+    </AppThemeContext.Provider>
+  );
 }
 
 export function useAppTheme() {
   const context = useContext(AppThemeContext);
   if (!context) {
-    throw new Error('useAppTheme must be used within AppThemeProvider');
+    throw new Error("useAppTheme must be used within AppThemeProvider");
   }
   return context;
 }
