@@ -248,12 +248,73 @@ export default function HomeScreen() {
           </View>
         </View>
 
+  {/* Card de Adoção */}
+   <TouchableOpacity
+      style={[
+       styles.adoptionCard,
+       { backgroundColor: theme.surface },
+      ]}
+     activeOpacity={0.8}
+     onPress={() => router.push("/adocao")}
+     >
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            color: theme.text,
+            fontWeight: "800",
+            fontSize: fontSize + 2,
+            marginBottom: 6,
+          }}
+        >
+        Adote um amigo
+        </Text>
+
+        <Text
+          style={{
+            color: theme.textSecondary,
+            fontSize: fontSize - 1,
+            marginBottom: 12,
+          }}
+        >
+          Mais de 50 pets aguardam uma família cheia de amor.
+        </Text>
+
+            <View
+              style={{
+                alignSelf: "flex-start",
+                backgroundColor: theme.primary,
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 10,
+              }}
+            >
+              <Text
+                style={{
+                  color: "#FFF",
+                  fontWeight: "700",
+                }}
+              >
+                Ver Pets para Adoção
+              </Text>
+            </View>
+      </View>
+
+      <Ionicons
+        name="heart"
+        size={60}
+        color={theme.primary}
+        style={{ opacity: 0.7 }}
+      />
+    </TouchableOpacity>
+
         <Text
           style={[
             styles.sectionTitle,
+            
             { color: theme.text, fontSize: fontSize + 2 },
           ]}
         >
+           
           Categorias
         </Text>
         <ScrollView
@@ -383,8 +444,57 @@ export default function HomeScreen() {
             );
           })}
         </ScrollView>
-      </ScrollView>
 
+        {/* 💡 Dica do Dia */}
+        <Text
+          style={[
+            styles.sectionTitle,
+            {
+              color: theme.text,
+              fontSize: fontSize + 2,
+              marginTop: 15,
+            },
+          ]}
+        >
+          💡 Dica do Dia
+        </Text>
+
+        <View
+          style={[
+            styles.adoptionCard,
+            { backgroundColor: theme.surface },
+          ]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: theme.text,
+                fontWeight: "700",
+                fontSize: fontSize,
+                marginBottom: 8,
+              }}
+            >
+              Água fresca sempre disponível
+            </Text>
+
+            <Text
+              style={{
+                color: theme.textSecondary,
+                fontSize: fontSize - 1,
+              }}
+            >
+              Troque a água diariamente para manter seu pet saudável e hidratado.
+            </Text>
+          </View>
+
+          <Ionicons
+            name="water"
+            size={40}
+            color={theme.primary}
+          />
+        </View>
+      </ScrollView>
+    
       {/* ── Modal de Detalhes do Produto ── */}
       <Modal
         visible={!!selectedProduto}
@@ -855,4 +965,20 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "700",
   },
+adoptionCard: {
+  marginHorizontal: 20,
+  marginBottom: 25,
+  borderRadius: 20,
+  padding: 20,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  elevation: 2,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.1,
+  shadowRadius: 2,
+},
+
+
 });
